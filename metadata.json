@@ -1,0 +1,6 @@
+{
+  "name": "ICU & CCU Clinical Notebook",
+  "description": "Secure ICU & CCU personal clinical notebook with cloud account synchronization, real-time Firestore backup, patient census, timeline notes, and customizable critical care fields.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

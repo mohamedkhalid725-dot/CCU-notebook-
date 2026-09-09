@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "collections": [
+    {
+      "path": "users/{userId}/patients",
+      "description": "Clinical patient records belonging exclusively to the authenticated physician",
+      "documentSchema": {
+        "id": "string",
+        "bedNumber": "number or string",
+        "name": "string",
+        "age": "number",
+        "gender": "string",
+        "mrn": "string",
+        "admissionDate": "string",
+        "status": "string",
+        "primaryDiagnosis": "string",
+        "isDischarged": "boolean",
+        "dischargeDetails": "object",
+        "vitals": "array",
+        "labs": "array",
+        "abgRecords": "array",
+        "progressNotes": "array",
+        "lastUpdated": "string"
+      }
+    },
+    {
+      "path": "users/{userId}/settings",
+      "description": "User clinical settings, field toggles, and total beds preferences",
+      "documentSchema": {
+        "totalBeds": "number",
+        "specialtyMode": "string",
+        "fieldConfig": "object",
+        "updatedAt": "string"
+      }
+    }
+  ]
+}
