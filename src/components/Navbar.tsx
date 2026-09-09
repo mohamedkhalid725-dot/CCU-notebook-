@@ -11,7 +11,8 @@ import {
   Printer,
   ShieldCheck,
   Plus,
-  Cloud
+  Cloud,
+  LogOut
 } from 'lucide-react';
 import { SpecialtyMode, PatientRecord } from '../types';
 import { PWAInstallButton } from '../services/pwa';
@@ -32,6 +33,7 @@ interface NavbarProps {
   onOpenApkGuide: () => void;
   onOpenPrintHandover: () => void;
   onLockSession: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,7 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCustomizer,
   onOpenApkGuide,
   onOpenPrintHandover,
-  onLockSession
+  onLockSession,
+  onLogout
 }) => {
   const occupiedCount = patients.length;
   const criticalCount = patients.filter(p => p.status === 'critical' || p.status === 'deteriorating').length;
@@ -212,10 +215,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onLockSession}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-400 border border-slate-700/80 transition"
-              title="Lock Session Now"
+              title="قفل الجلسة (Lock Session)"
             >
               <Lock className="w-4 h-4" />
             </button>
+
+            {/* Logout / Switch Account */}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 hover:text-white transition flex items-center gap-1 text-xs"
+                title="تسجيل الخروج والعودة للشاشة الرئيسية"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden xl:inline">خروج</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -28,13 +28,16 @@ import { AdmitPatientModal } from './components/AdmitPatientModal';
 import { DischargePatientModal } from './components/DischargePatientModal';
 import { ReadmitPatientModal } from './components/ReadmitPatientModal';
 import { CloudAccountModal } from './components/CloudAccountModal';
+import { LoginScreen } from './components/LoginScreen';
 import { User } from 'firebase/auth';
+import { HeartPulse } from 'lucide-react';
 import { 
   subscribeToAuth, 
   fetchCloudPatients, 
   savePatientToCloud, 
   deletePatientFromCloud, 
-  syncAllPatientsToCloud 
+  syncAllPatientsToCloud,
+  logoutUser 
 } from './services/firebase';
 
 export default function App() {
@@ -46,6 +49,8 @@ export default function App() {
 
   // Cloud & Firebase State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [isOfflineBypassed, setIsOfflineBypassed] = useState<boolean>(false);
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('offline');
   const [showCloudAccountModal, setShowCloudAccountModal] = useState<boolean>(false);
 
@@ -87,7 +92,10 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToAuth(async (user) => {
       setCurrentUser(user);
+      setAuthLoading(false);
+
       if (user) {
+        setIsUnlocked(true);
         setCloudSyncStatus('syncing');
         try {
           const cloudData = await fetchCloudPatients(user.uid);
@@ -126,6 +134,23 @@ export default function App() {
     setShowCloudAccountModal(false);
     // Refresh security settings in case changed
     setSecuritySettings(getSecuritySettings());
+  }, []);
+
+  // Logout and return to Login screen
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    setCurrentUser(null);
+    setIsOfflineBypassed(false);
+    setIsUnlocked(false);
+    setActivePin('');
+    setPatients([]);
+    setSelectedPatientId(null);
+    setAdmitBedNumber(null);
+    setShowCloudAccountModal(false);
   }, []);
 
   // Save changes to patient list and re-encrypt
@@ -434,7 +459,46 @@ export default function App() {
   );
   const availableBeds = Array.from({ length: totalBeds }, (_, i) => i + 1).filter(b => !occupiedBedNumbers.has(b));
 
-  // Render LockScreen if locked
+  // 1. Initial Auth Check Spinner
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl mb-4 animate-pulse">
+          <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
+            <HeartPulse className="w-7 h-7 text-cyan-400" />
+          </div>
+        </div>
+        <p className="text-sm font-semibold text-slate-200">جاري التحقق من جلسة العمل السريرية...</p>
+        <p className="text-xs text-slate-500 mt-1">ICU & CCU Clinical Notebook</p>
+      </div>
+    );
+  }
+
+  // 2. Main Interface is Login Screen when user is not authenticated and not in offline bypass mode
+  if (!currentUser && !isOfflineBypassed) {
+    return (
+      <LoginScreen
+        onLoginSuccess={() => {
+          setIsUnlocked(true);
+        }}
+        onContinueOffline={async (pin) => {
+          setIsOfflineBypassed(true);
+          const pinToUse = pin || '0000';
+          setActivePin(pinToUse);
+          setIsUnlocked(true);
+          try {
+            const loaded = await loadPatients(pinToUse);
+            setPatients(loaded);
+          } catch (err) {
+            console.error('Failed to load offline patients:', err);
+          }
+        }}
+        securitySettings={securitySettings}
+      />
+    );
+  }
+
+  // 3. Render LockScreen if locked
   if (!isUnlocked) {
     return (
       <LockScreen
@@ -462,6 +526,7 @@ export default function App() {
         onOpenApkGuide={() => setShowApkModal(true)}
         onOpenPrintHandover={() => setShowPrintView(true)}
         onLockSession={handleLockApp}
+        onLogout={handleLogout}
       />
 
       {/* Main Census Workspace */}
