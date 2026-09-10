@@ -1,4 +1,3 @@
-```tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   PatientRecord,
@@ -99,24 +98,36 @@ export default function App() {
   // =========================================================
 
   const [language, setLanguageState] =
-    useState<AppLanguage>(() => initializeLanguage());
+    useState<AppLanguage>(() => {
+      try {
+        return initializeLanguage();
+      } catch {
+        return 'en';
+      }
+    });
 
   // =========================================================
   // Theme
   // =========================================================
 
-  const [theme] = useState<AppTheme>(() => {
-    try {
-      return getAppTheme();
-    } catch {
-      return 'dark';
-    }
-  });
+  const [theme, setTheme] =
+    useState<AppTheme>(() => {
+      try {
+        return getAppTheme();
+      } catch {
+        return 'dark';
+      }
+    });
 
   const [isDarkTheme, setIsDarkTheme] =
     useState<boolean>(() => {
       try {
-        if (typeof window === 'undefined') return true;
+        if (
+          typeof window === 'undefined' ||
+          typeof window.matchMedia !== 'function'
+        ) {
+          return true;
+        }
 
         const savedTheme = getAppTheme();
 
@@ -124,7 +135,9 @@ export default function App() {
           savedTheme === 'dark' ||
           (
             savedTheme === 'system' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches
+            window.matchMedia(
+              '(prefers-color-scheme: dark)'
+            ).matches
           )
         );
       } catch {
@@ -176,13 +189,11 @@ export default function App() {
   const [totalBeds, setTotalBeds] =
     useState<number>(() => {
       try {
-        const saved = localStorage.getItem(
-          'icu_total_beds'
-        );
+        const saved =
+          localStorage.getItem('icu_total_beds');
 
-        const parsed = saved
-          ? Number(saved)
-          : 6;
+        const parsed =
+          saved ? Number(saved) : 6;
 
         if (!Number.isFinite(parsed)) {
           return 6;
@@ -250,65 +261,141 @@ export default function App() {
     useState<PatientRecord | null>(null);
 
   // =========================================================
-  // Language / Theme Initialization
+  // Language Initialization
   // =========================================================
 
   useEffect(() => {
-    setAppLanguage(language);
-    applyLanguageToDom(language);
+    try {
+      setAppLanguage(language);
+      applyLanguageToDom(language);
+    } catch (err) {
+      console.error(
+        'Language initialization failed:',
+        err
+      );
+    }
   }, [language]);
 
+  // =========================================================
+  // Theme Synchronization
+  //
+  // Supports:
+  // - Dark
+  // - Light
+  // - System
+  // - Navbar theme changes
+  // - OS theme changes
+  // =========================================================
+
   useEffect(() => {
-    try {
-      applyThemeToDom(theme);
+    if (typeof document === 'undefined') {
+      return;
+    }
 
-      if (typeof window === 'undefined') return;
+    const updateTheme = () => {
+      try {
+        const currentTheme =
+          getAppTheme();
 
-      const mediaQuery = window.matchMedia(
-        '(prefers-color-scheme: dark)'
-      );
+        setTheme(currentTheme);
 
-      const updateTheme = () => {
-        try {
-          const currentTheme = getAppTheme();
+        const systemDark =
+          typeof window !== 'undefined' &&
+          typeof window.matchMedia === 'function'
+            ? window.matchMedia(
+                '(prefers-color-scheme: dark)'
+              ).matches
+            : false;
 
-          const dark =
-            currentTheme === 'dark' ||
-            (
-              currentTheme === 'system' &&
-              mediaQuery.matches
-            );
-
-          setIsDarkTheme(dark);
-          applyThemeToDom(currentTheme);
-        } catch (err) {
-          console.error(
-            'Theme update failed:',
-            err
+        const dark =
+          currentTheme === 'dark' ||
+          (
+            currentTheme === 'system' &&
+            systemDark
           );
-        }
-      };
 
-      updateTheme();
+        setIsDarkTheme(dark);
+
+        applyThemeToDom(
+          currentTheme
+        );
+      } catch (err) {
+        console.error(
+          'Theme synchronization failed:',
+          err
+        );
+      }
+    };
+
+    updateTheme();
+
+    let mediaQuery: MediaQueryList | null = null;
+
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function'
+    ) {
+      mediaQuery =
+        window.matchMedia(
+          '(prefers-color-scheme: dark)'
+        );
 
       mediaQuery.addEventListener?.(
         'change',
         updateTheme
       );
-
-      return () => {
-        mediaQuery.removeEventListener?.(
-          'change',
-          updateTheme
-        );
-      };
-    } catch (err) {
-      console.error(
-        'Theme initialization failed:',
-        err
-      );
     }
-  }, [theme]);
+
+    /*
+     * Navbar changes the theme directly in localStorage
+     * and on document.documentElement.
+     *
+     * MutationObserver makes App react immediately,
+     * even though localStorage "storage" events do not
+     * fire in the same browser tab.
+     */
+    const observer =
+      new MutationObserver(() => {
+        updateTheme();
+      });
+
+    observer.observe(
+      document.documentElement,
+      {
+        attributes: true,
+        attributeFilter: ['class']
+      }
+    );
+
+    const handleStorage =
+      (event: StorageEvent) => {
+        if (
+          event.key === 'cardiovault_theme' ||
+          event.key === 'icu_total_beds'
+        ) {
+          updateTheme();
+        }
+      };
+
+    window.addEventListener(
+      'storage',
+      handleStorage
+    );
+
+    return () => {
+      mediaQuery?.removeEventListener?.(
+        'change',
+        updateTheme
+      );
+
+      observer.disconnect();
+
+      window.removeEventListener(
+        'storage',
+        handleStorage
+      );
+    };
+  }, []);
 
   // =========================================================
   // Unlock
@@ -317,9 +404,16 @@ export default function App() {
   const handleUnlockSuccess = async (
     pin: string
   ) => {
-    setActivePin(pin);
+    setActivePin(
+      typeof pin === 'string'
+        ? pin
+        : ''
+    );
+
     setIsUnlocked(true);
-    setLastActivity(Date.now());
+    setLastActivity(
+      Date.now()
+    );
 
     try {
       const loaded =
@@ -327,12 +421,12 @@ export default function App() {
 
       setPatients(
         Array.isArray(loaded)
-          ? loaded
+          ? loaded.filter(Boolean)
           : []
       );
     } catch (err) {
       console.error(
-        'Failed to load patient records',
+        'Failed to load patient records:',
         err
       );
 
@@ -347,93 +441,141 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    const unsubscribe = subscribeToAuth(
-      async (user) => {
-        if (!mounted) return;
+    let unsubscribe:
+      | (() => void)
+      | undefined;
 
-        setCurrentUser(user);
-        setAuthLoading(false);
+    try {
+      unsubscribe =
+        subscribeToAuth(
+          async (user) => {
+            if (!mounted) return;
 
-        if (!user) {
-          setCloudSyncStatus('offline');
-          return;
-        }
+            setCurrentUser(user);
+            setAuthLoading(false);
 
-        setIsUnlocked(true);
-        setCloudSyncStatus('syncing');
+            if (!user) {
+              setCloudSyncStatus(
+                'offline'
+              );
 
-        try {
-          const cloudData =
-            await fetchCloudPatients(user.uid);
+              return;
+            }
 
-          if (!mounted) return;
+            setIsUnlocked(true);
+            setCloudSyncStatus(
+              'syncing'
+            );
 
-          const safeCloudData =
-            Array.isArray(cloudData)
-              ? cloudData
-              : [];
-
-          if (safeCloudData.length > 0) {
-            setPatients(safeCloudData);
-
-            if (activePin) {
-              try {
-                await savePatients(
-                  safeCloudData,
-                  activePin
+            try {
+              const cloudData =
+                await fetchCloudPatients(
+                  user.uid
                 );
-              } catch (storageError) {
-                console.error(
-                  'Failed to save cloud data locally:',
-                  storageError
+
+              if (!mounted) return;
+
+              const safeCloudData =
+                Array.isArray(cloudData)
+                  ? cloudData.filter(Boolean)
+                  : [];
+
+              if (
+                safeCloudData.length > 0
+              ) {
+                setPatients(
+                  safeCloudData
+                );
+
+                if (activePin) {
+                  try {
+                    await savePatients(
+                      safeCloudData,
+                      activePin
+                    );
+                  } catch (
+                    storageError
+                  ) {
+                    console.error(
+                      'Failed to save cloud data locally:',
+                      storageError
+                    );
+                  }
+                }
+              } else {
+                setPatients(
+                  (localPatients) => {
+                    const safeLocalPatients =
+                      Array.isArray(
+                        localPatients
+                      )
+                        ? localPatients.filter(
+                            Boolean
+                          )
+                        : [];
+
+                    if (
+                      safeLocalPatients.length >
+                      0
+                    ) {
+                      syncAllPatientsToCloud(
+                        user.uid,
+                        safeLocalPatients
+                      ).catch(
+                        (syncError) => {
+                          console.error(
+                            'Initial cloud sync failed:',
+                            syncError
+                          );
+
+                          if (mounted) {
+                            setCloudSyncStatus(
+                              'error'
+                            );
+                          }
+                        }
+                      );
+                    }
+
+                    return safeLocalPatients;
+                  }
+                );
+              }
+
+              if (mounted) {
+                setCloudSyncStatus(
+                  'synced'
+                );
+              }
+            } catch (err) {
+              console.error(
+                'Failed to sync cloud patients:',
+                err
+              );
+
+              if (mounted) {
+                setCloudSyncStatus(
+                  'error'
                 );
               }
             }
-          } else {
-            setPatients((localPatients) => {
-              if (
-                localPatients.length > 0
-              ) {
-                syncAllPatientsToCloud(
-                  user.uid,
-                  localPatients
-                ).catch((syncError) => {
-                  console.error(
-                    'Initial cloud sync failed:',
-                    syncError
-                  );
-
-                  if (mounted) {
-                    setCloudSyncStatus('error');
-                  }
-                });
-              }
-
-              return localPatients;
-            });
           }
+        );
+    } catch (err) {
+      console.error(
+        'Auth subscription failed:',
+        err
+      );
 
-          if (mounted) {
-            setCloudSyncStatus('synced');
-          }
-        } catch (err) {
-          console.error(
-            'Failed to sync cloud patients:',
-            err
-          );
-
-          if (mounted) {
-            setCloudSyncStatus('error');
-          }
-        }
-      }
-    );
+      setAuthLoading(false);
+      setCurrentUser(null);
+    }
 
     return () => {
       mounted = false;
 
       try {
-        unsubscribe();
+        unsubscribe?.();
       } catch (err) {
         console.error(
           'Auth unsubscribe failed:',
@@ -521,10 +663,12 @@ export default function App() {
     ) => {
       const safePatients =
         Array.isArray(newPatients)
-          ? newPatients
+          ? newPatients.filter(Boolean)
           : [];
 
-      setPatients(safePatients);
+      setPatients(
+        safePatients
+      );
 
       if (activePin) {
         try {
@@ -541,7 +685,9 @@ export default function App() {
       }
 
       if (currentUser) {
-        setCloudSyncStatus('syncing');
+        setCloudSyncStatus(
+          'syncing'
+        );
 
         try {
           await syncAllPatientsToCloud(
@@ -549,14 +695,18 @@ export default function App() {
             safePatients
           );
 
-          setCloudSyncStatus('synced');
-        } catch (e) {
+          setCloudSyncStatus(
+            'synced'
+          );
+        } catch (err) {
           console.error(
             'Cloud batch sync error:',
-            e
+            err
           );
 
-          setCloudSyncStatus('error');
+          setCloudSyncStatus(
+            'error'
+          );
         }
       }
     },
@@ -567,135 +717,168 @@ export default function App() {
   // Update Patient
   // =========================================================
 
-  const handleUpdatePatient = useCallback(
-    async (
-      updatedPatient: PatientRecord
-    ) => {
-      if (!updatedPatient?.id) {
-        console.warn(
-          'Invalid patient update ignored.'
-        );
-        return;
-      }
-
-      const nextPatients =
-        patients.map((p) =>
-          p?.id === updatedPatient.id
-            ? updatedPatient
-            : p
-        );
-
-      setPatients(nextPatients);
-
-      if (activePin) {
-        try {
-          await savePatients(
-            nextPatients,
-            activePin
+  const handleUpdatePatient =
+    useCallback(
+      async (
+        updatedPatient: PatientRecord
+      ) => {
+        if (!updatedPatient?.id) {
+          console.warn(
+            'Invalid patient update ignored.'
           );
-        } catch (err) {
-          console.error(
-            'Local patient update failed:',
-            err
-          );
+
+          return;
         }
-      }
 
-      if (currentUser) {
-        setCloudSyncStatus('syncing');
-
-        try {
-          await savePatientToCloud(
-            currentUser.uid,
-            updatedPatient
+        const nextPatients =
+          patients.map((p) =>
+            p?.id === updatedPatient.id
+              ? updatedPatient
+              : p
           );
 
-          setCloudSyncStatus('synced');
-        } catch (e) {
-          console.error(
-            'Cloud save failed:',
-            e
-          );
+        setPatients(
+          nextPatients
+        );
 
-          setCloudSyncStatus('error');
+        if (activePin) {
+          try {
+            await savePatients(
+              nextPatients,
+              activePin
+            );
+          } catch (err) {
+            console.error(
+              'Local patient update failed:',
+              err
+            );
+          }
         }
-      }
-    },
-    [patients, activePin, currentUser]
-  );
+
+        if (currentUser) {
+          setCloudSyncStatus(
+            'syncing'
+          );
+
+          try {
+            await savePatientToCloud(
+              currentUser.uid,
+              updatedPatient
+            );
+
+            setCloudSyncStatus(
+              'synced'
+            );
+          } catch (err) {
+            console.error(
+              'Cloud save failed:',
+              err
+            );
+
+            setCloudSyncStatus(
+              'error'
+            );
+          }
+        }
+      },
+      [
+        patients,
+        activePin,
+        currentUser
+      ]
+    );
 
   // =========================================================
   // Delete Patient
   // =========================================================
 
-  const handleDeletePatient = useCallback(
-    async (
-      patientId: string
-    ) => {
-      if (!patientId) return;
+  const handleDeletePatient =
+    useCallback(
+      async (
+        patientId: string
+      ) => {
+        if (!patientId) return;
 
-      const nextPatients =
-        patients.filter(
-          (p) => p?.id !== patientId
+        const nextPatients =
+          patients.filter(
+            (p) =>
+              p?.id !== patientId
+          );
+
+        setPatients(
+          nextPatients
         );
 
-      setPatients(nextPatients);
+        if (activePin) {
+          try {
+            await savePatients(
+              nextPatients,
+              activePin
+            );
+          } catch (err) {
+            console.error(
+              'Local patient delete failed:',
+              err
+            );
+          }
+        }
 
-      if (activePin) {
-        try {
-          await savePatients(
-            nextPatients,
-            activePin
-          );
-        } catch (err) {
-          console.error(
-            'Local patient delete failed:',
-            err
+        if (
+          selectedPatientId ===
+          patientId
+        ) {
+          setSelectedPatientId(
+            null
           );
         }
-      }
 
-      if (
-        selectedPatientId === patientId
-      ) {
-        setSelectedPatientId(null);
-      }
-
-      if (
-        patientToPrint?.id === patientId
-      ) {
-        setPatientToPrint(null);
-        setShowPrintView(false);
-      }
-
-      if (currentUser) {
-        setCloudSyncStatus('syncing');
-
-        try {
-          await deletePatientFromCloud(
-            currentUser.uid,
-            patientId
+        if (
+          patientToPrint?.id ===
+          patientId
+        ) {
+          setPatientToPrint(
+            null
           );
 
-          setCloudSyncStatus('synced');
-        } catch (e) {
-          console.error(
-            'Cloud delete failed:',
-            e
+          setShowPrintView(
+            false
           );
-
-          setCloudSyncStatus('error');
         }
-      }
-    },
-    [
-      patients,
-      activePin,
-      selectedPatientId,
-      currentUser,
-      patientToPrint
-    ]
-  );
+
+        if (currentUser) {
+          setCloudSyncStatus(
+            'syncing'
+          );
+
+          try {
+            await deletePatientFromCloud(
+              currentUser.uid,
+              patientId
+            );
+
+            setCloudSyncStatus(
+              'synced'
+            );
+          } catch (err) {
+            console.error(
+              'Cloud delete failed:',
+              err
+            );
+
+            setCloudSyncStatus(
+              'error'
+            );
+          }
+        }
+      },
+      [
+        patients,
+        activePin,
+        selectedPatientId,
+        currentUser,
+        patientToPrint
+      ]
+    );
 
   // =========================================================
   // Admit
@@ -710,15 +893,24 @@ export default function App() {
           console.warn(
             'Invalid patient admission ignored.'
           );
+
           return;
         }
+
+        const newBedNumber =
+          Number(
+            newPatient.bedNumber
+          );
 
         const filtered =
           patients.filter(
             (p) =>
               p?.isDischarged ||
+              !Number.isFinite(
+                newBedNumber
+              ) ||
               Number(p?.bedNumber) !==
-                Number(newPatient.bedNumber)
+                newBedNumber
           );
 
         const next = [
@@ -742,10 +934,14 @@ export default function App() {
           }
         }
 
-        setAdmitBedNumber(null);
+        setAdmitBedNumber(
+          null
+        );
 
         if (currentUser) {
-          setCloudSyncStatus('syncing');
+          setCloudSyncStatus(
+            'syncing'
+          );
 
           try {
             await savePatientToCloud(
@@ -753,18 +949,26 @@ export default function App() {
               newPatient
             );
 
-            setCloudSyncStatus('synced');
-          } catch (e) {
+            setCloudSyncStatus(
+              'synced'
+            );
+          } catch (err) {
             console.error(
               'Cloud admit save failed:',
-              e
+              err
             );
 
-            setCloudSyncStatus('error');
+            setCloudSyncStatus(
+              'error'
+            );
           }
         }
       },
-      [patients, activePin, currentUser]
+      [
+        patients,
+        activePin,
+        currentUser
+      ]
     );
 
   // =========================================================
@@ -777,22 +981,29 @@ export default function App() {
         patientId: string,
         details: DischargeDetails
       ) => {
-        if (!patientId || !details) {
+        if (
+          !patientId ||
+          !details
+        ) {
           return;
         }
 
         let dischargedRecord:
-          PatientRecord | null = null;
+          | PatientRecord
+          | null = null;
 
-        const now = new Date();
+        const now =
+          new Date();
 
-        const mm = String(
-          now.getMonth() + 1
-        ).padStart(2, '0');
+        const mm =
+          String(
+            now.getMonth() + 1
+          ).padStart(2, '0');
 
-        const dd = String(
-          now.getDate()
-        ).padStart(2, '0');
+        const dd =
+          String(
+            now.getDate()
+          ).padStart(2, '0');
 
         const timeStr =
           now.toLocaleTimeString(
@@ -820,7 +1031,8 @@ export default function App() {
 
             const dischargeNote:
               ProgressNote = {
-                id: `note-${Date.now()}`,
+                id:
+                  `note-${Date.now()}`,
 
                 timestamp:
                   `${mm}/${dd} — ${timeStr}`,
@@ -830,7 +1042,8 @@ export default function App() {
                   p.attendingPhysician ||
                   'Attending Physician',
 
-                tag: 'Handover',
+                tag:
+                  'Handover',
 
                 subjective:
                   `Discharge protocol executed. Destination: ${details.disposition}.`,
@@ -851,12 +1064,14 @@ export default function App() {
               PatientRecord = {
                 ...p,
 
-                isDischarged: true,
+                isDischarged:
+                  true,
 
                 previousBedNumber:
                   p.bedNumber,
 
-                bedNumber: '',
+                bedNumber:
+                  '',
 
                 status:
                   'discharged' as BedStatus,
@@ -895,13 +1110,17 @@ export default function App() {
           }
         }
 
-        setPatientToDischarge(null);
+        setPatientToDischarge(
+          null
+        );
 
         if (
           currentUser &&
           dischargedRecord
         ) {
-          setCloudSyncStatus('syncing');
+          setCloudSyncStatus(
+            'syncing'
+          );
 
           try {
             await savePatientToCloud(
@@ -909,18 +1128,26 @@ export default function App() {
               dischargedRecord
             );
 
-            setCloudSyncStatus('synced');
-          } catch (e) {
+            setCloudSyncStatus(
+              'synced'
+            );
+          } catch (err) {
             console.error(
               'Cloud discharge save failed:',
-              e
+              err
             );
 
-            setCloudSyncStatus('error');
+            setCloudSyncStatus(
+              'error'
+            );
           }
         }
       },
-      [patients, activePin, currentUser]
+      [
+        patients,
+        activePin,
+        currentUser
+      ]
     );
 
   // =========================================================
@@ -937,7 +1164,9 @@ export default function App() {
         if (!patientId) return;
 
         const safeBedNumber =
-          Number(targetBedNumber);
+          Number(
+            targetBedNumber
+          );
 
         if (
           !Number.isFinite(
@@ -951,7 +1180,9 @@ export default function App() {
           patients.some(
             (p) =>
               !p?.isDischarged &&
-              Number(p?.bedNumber) ===
+              Number(
+                p?.bedNumber
+              ) ===
                 safeBedNumber
           );
 
@@ -964,17 +1195,21 @@ export default function App() {
         }
 
         let readmittedRecord:
-          PatientRecord | null = null;
+          | PatientRecord
+          | null = null;
 
-        const now = new Date();
+        const now =
+          new Date();
 
-        const mm = String(
-          now.getMonth() + 1
-        ).padStart(2, '0');
+        const mm =
+          String(
+            now.getMonth() + 1
+          ).padStart(2, '0');
 
-        const dd = String(
-          now.getDate()
-        ).padStart(2, '0');
+        const dd =
+          String(
+            now.getDate()
+          ).padStart(2, '0');
 
         const timeStr =
           now.toLocaleTimeString(
@@ -1002,7 +1237,8 @@ export default function App() {
 
             const readmitNote:
               ProgressNote = {
-                id: `note-${Date.now()}`,
+                id:
+                  `note-${Date.now()}`,
 
                 timestamp:
                   `${mm}/${dd} — ${timeStr}`,
@@ -1011,7 +1247,8 @@ export default function App() {
                   p.attendingPhysician ||
                   'Attending Physician',
 
-                tag: 'Round',
+                tag:
+                  'Round',
 
                 subjective:
                   `Patient re-admitted to intensive care (Assigned Bed ${safeBedNumber}).`,
@@ -1032,7 +1269,8 @@ export default function App() {
               PatientRecord = {
                 ...p,
 
-                isDischarged: false,
+                isDischarged:
+                  false,
 
                 bedNumber:
                   safeBedNumber,
@@ -1070,13 +1308,17 @@ export default function App() {
           }
         }
 
-        setPatientToReadmit(null);
+        setPatientToReadmit(
+          null
+        );
 
         if (
           currentUser &&
           readmittedRecord
         ) {
-          setCloudSyncStatus('syncing');
+          setCloudSyncStatus(
+            'syncing'
+          );
 
           try {
             await savePatientToCloud(
@@ -1084,18 +1326,26 @@ export default function App() {
               readmittedRecord
             );
 
-            setCloudSyncStatus('synced');
-          } catch (e) {
+            setCloudSyncStatus(
+              'synced'
+            );
+          } catch (err) {
             console.error(
               'Cloud readmit save failed:',
-              e
+              err
             );
 
-            setCloudSyncStatus('error');
+            setCloudSyncStatus(
+              'error'
+            );
           }
         }
       },
-      [patients, activePin, currentUser]
+      [
+        patients,
+        activePin,
+        currentUser
+      ]
     );
 
   // =========================================================
@@ -1106,22 +1356,28 @@ export default function App() {
     async () => {
       if (!currentUser) return;
 
-      setCloudSyncStatus('syncing');
+      setCloudSyncStatus(
+        'syncing'
+      );
 
       try {
         await syncAllPatientsToCloud(
           currentUser.uid,
-          patients
+          safePatients
         );
 
-        setCloudSyncStatus('synced');
+        setCloudSyncStatus(
+          'synced'
+        );
       } catch (err) {
         console.error(
           'Manual sync failed:',
           err
         );
 
-        setCloudSyncStatus('error');
+        setCloudSyncStatus(
+          'error'
+        );
       }
     };
 
@@ -1129,7 +1385,9 @@ export default function App() {
     async () => {
       if (!currentUser) return;
 
-      setCloudSyncStatus('syncing');
+      setCloudSyncStatus(
+        'syncing'
+      );
 
       try {
         const cloudData =
@@ -1139,7 +1397,7 @@ export default function App() {
 
         const safeCloudData =
           Array.isArray(cloudData)
-            ? cloudData
+            ? cloudData.filter(Boolean)
             : [];
 
         setPatients(
@@ -1152,7 +1410,9 @@ export default function App() {
               safeCloudData,
               activePin
             );
-          } catch (storageError) {
+          } catch (
+            storageError
+          ) {
             console.error(
               'Failed to cache cloud data:',
               storageError
@@ -1160,14 +1420,18 @@ export default function App() {
           }
         }
 
-        setCloudSyncStatus('synced');
+        setCloudSyncStatus(
+          'synced'
+        );
       } catch (err) {
         console.error(
           'Pull cloud data failed:',
           err
         );
 
-        setCloudSyncStatus('error');
+        setCloudSyncStatus(
+          'error'
+        );
       }
     };
 
@@ -1177,17 +1441,26 @@ export default function App() {
 
   const handleChangeTotalBeds =
     (newCount: number) => {
-      if (!Number.isFinite(newCount)) {
+      const numeric =
+        Number(newCount);
+
+      if (
+        !Number.isFinite(
+          numeric
+        )
+      ) {
         return;
       }
 
       const safeCount =
         Math.max(
           3,
-          Math.floor(newCount)
+          Math.floor(numeric)
         );
 
-      setTotalBeds(safeCount);
+      setTotalBeds(
+        safeCount
+      );
 
       try {
         localStorage.setItem(
@@ -1206,7 +1479,9 @@ export default function App() {
     useCallback(
       async (
         patientId: string,
-        newBedNumber: string | number
+        newBedNumber:
+          | string
+          | number
       ) => {
         const targetPatient =
           patients.find(
@@ -1222,7 +1497,9 @@ export default function App() {
           PatientRecord = {
             ...targetPatient,
             bedNumber:
-              String(newBedNumber)
+              String(
+                newBedNumber
+              )
           };
 
         await handleUpdatePatient(
@@ -1241,8 +1518,13 @@ export default function App() {
 
   const handleSaveFieldConfig =
     (
-      newConfig: FieldVisibilityConfig
+      newConfig:
+        FieldVisibilityConfig
     ) => {
+      if (!newConfig) {
+        return;
+      }
+
       setFieldConfig(
         newConfig
       );
@@ -1267,9 +1549,10 @@ export default function App() {
     if (!isUnlocked) return;
 
     const updateActivity =
-      () => setLastActivity(
-        Date.now()
-      );
+      () =>
+        setLastActivity(
+          Date.now()
+        );
 
     window.addEventListener(
       'mousemove',
@@ -1299,7 +1582,8 @@ export default function App() {
       () => {
         if (
           document.hidden &&
-          securitySettings.autoLockMinutes === 0
+          securitySettings.autoLockMinutes ===
+            0
         ) {
           handleLockApp();
         }
@@ -1313,7 +1597,8 @@ export default function App() {
     const interval =
       window.setInterval(() => {
         if (
-          securitySettings.autoLockMinutes > 0
+          securitySettings.autoLockMinutes >
+          0
         ) {
           const inactiveMs =
             Date.now() -
@@ -1381,12 +1666,14 @@ export default function App() {
 
   const activePatients =
     safePatients.filter(
-      (p) => !p.isDischarged
+      (p) =>
+        !p.isDischarged
     );
 
   const archivedPatients =
     safePatients.filter(
-      (p) => p.isDischarged
+      (p) =>
+        p.isDischarged
     );
 
   const occupiedPatients =
@@ -1448,9 +1735,13 @@ export default function App() {
   const availableBeds =
     Array.from(
       {
-        length: totalBeds
+        length: Math.max(
+          0,
+          totalBeds
+        )
       },
-      (_, i) => i + 1
+      (_, i) =>
+        i + 1
     ).filter(
       (b) =>
         !occupiedBedNumbers.has(
@@ -1467,44 +1758,56 @@ export default function App() {
         ) || null
       : null;
 
+  const normalizedSearch =
+    String(
+      patientSearch || ''
+    )
+      .trim()
+      .toLowerCase();
+
   const filteredPatients =
     safePatients.filter(
       (p) => {
-        const q =
-          String(
-            patientSearch || ''
-          )
-            .trim()
-            .toLowerCase();
-
-        if (!q) return true;
+        if (
+          !normalizedSearch
+        ) {
+          return true;
+        }
 
         return (
           String(
-            p.name || ''
+            p?.name || ''
           )
             .toLowerCase()
-            .includes(q) ||
+            .includes(
+              normalizedSearch
+            ) ||
 
           String(
-            p.mrn || ''
+            p?.mrn || ''
           )
             .toLowerCase()
-            .includes(q) ||
+            .includes(
+              normalizedSearch
+            ) ||
 
           String(
-            p.primaryDiagnosis ||
+            p?.primaryDiagnosis ||
               ''
           )
             .toLowerCase()
-            .includes(q) ||
+            .includes(
+              normalizedSearch
+            ) ||
 
           String(
-            p.bedNumber ??
+            p?.bedNumber ??
               ''
           )
             .toLowerCase()
-            .includes(q)
+            .includes(
+              normalizedSearch
+            )
         );
       }
     );
@@ -1517,12 +1820,20 @@ export default function App() {
     path: string,
     fallback: string
   ) => {
-    const translated =
-      t(path, language);
+    try {
+      const translated =
+        t(
+          path,
+          language
+        );
 
-    return translated === path
-      ? fallback
-      : translated;
+      return translated ===
+        path
+        ? fallback
+        : translated;
+    } catch {
+      return fallback;
+    }
   };
 
   const surface =
@@ -1551,9 +1862,21 @@ export default function App() {
       : 'text-slate-600';
 
   const mutedText =
-    isDarkTheme
-      ? 'text-slate-500'
-      : 'text-slate-500';
+    'text-slate-500';
+
+  const textAlign =
+    language === 'ar'
+      ? 'text-right'
+      : 'text-left';
+
+  const direction =
+    language === 'ar'
+      ? 'rtl'
+      : 'ltr';
+
+  // Prevent unused state warnings while still
+  // keeping theme synchronized for future settings.
+  void theme;
 
   // =========================================================
   // Small UI Components
@@ -1567,15 +1890,18 @@ export default function App() {
     onClick
   }: {
     title: string;
-    value: number | string;
+    value:
+      | number
+      | string;
     icon: React.ElementType;
     subtitle: string;
     onClick?: () => void;
   }) => (
     <button
+      type="button"
       onClick={onClick}
       className={`
-        w-full text-left
+        w-full ${textAlign}
         rounded-2xl
         border
         ${surfaceSolid}
@@ -1588,8 +1914,9 @@ export default function App() {
         }
       `}
     >
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+
           <p
             className={`text-xs ${secondaryText}`}
           >
@@ -1607,17 +1934,20 @@ export default function App() {
           >
             {subtitle}
           </p>
+
         </div>
 
         <div
           className={`
             w-10 h-10 rounded-xl
             flex items-center justify-center
+            shrink-0
             ${secondarySurface}
           `}
         >
           <Icon className="w-5 h-5 text-cyan-400" />
         </div>
+
       </div>
     </button>
   );
@@ -1629,132 +1959,170 @@ export default function App() {
     patient: PatientRecord;
     archived?: boolean;
     key?: React.Key;
-  }) => (
-    <button
-      onClick={() =>
-        setSelectedPatientId(
-          patient.id
-        )
-      }
-      className={`
-        w-full text-left
-        p-4 rounded-2xl
-        border
-        ${surfaceSolid}
-        transition
-        ${
-          isDarkTheme
-            ? 'hover:bg-slate-800'
-            : 'hover:bg-slate-50'
+  }) => {
+    const patientName =
+      String(
+        patient?.name || ''
+      ).trim();
+
+    const diagnosis =
+      String(
+        patient?.primaryDiagnosis ||
+          ''
+      ).trim();
+
+    const status =
+      String(
+        patient?.status ||
+          'unknown'
+      );
+
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          patient?.id &&
+          setSelectedPatientId(
+            patient.id
+          )
         }
-      `}
-    >
-      <div className="flex items-center gap-3">
+        className={`
+          w-full ${textAlign}
+          p-4 rounded-2xl
+          border
+          ${surfaceSolid}
+          transition
+          ${
+            isDarkTheme
+              ? 'hover:bg-slate-800'
+              : 'hover:bg-slate-50'
+          }
+        `}
+      >
+        <div className="flex items-center gap-3">
 
-        <div
-          className={`
-            w-11 h-11
-            rounded-xl
-            flex items-center justify-center
-            shrink-0
-            ${secondarySurface}
-          `}
-        >
-          <HeartPulse className="w-5 h-5 text-cyan-400" />
-        </div>
+          <div
+            className={`
+              w-11 h-11
+              rounded-xl
+              flex items-center justify-center
+              shrink-0
+              ${secondarySurface}
+            `}
+          >
+            <HeartPulse className="w-5 h-5 text-cyan-400" />
+          </div>
 
-        <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
 
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+
+              <p
+                className={`font-semibold truncate ${primaryText}`}
+              >
+                {patientName ||
+                  tr(
+                    'patients.unnamed',
+                    'Unnamed Patient'
+                  )}
+              </p>
+
+              {!archived && (
+                <span
+                  className={`
+                    text-[9px]
+                    px-2 py-0.5
+                    rounded-full
+                    shrink-0
+                    ${
+                      status ===
+                        'critical' ||
+                      status ===
+                        'deteriorating'
+                        ? isDarkTheme
+                          ? 'bg-rose-950 text-rose-300'
+                          : 'bg-rose-100 text-rose-700'
+                        : status ===
+                            'stable'
+                          ? isDarkTheme
+                            ? 'bg-emerald-950 text-emerald-300'
+                            : 'bg-emerald-100 text-emerald-700'
+                          : isDarkTheme
+                            ? 'bg-amber-950 text-amber-300'
+                            : 'bg-amber-100 text-amber-700'
+                    }
+                  `}
+                >
+                  {status}
+                </span>
+              )}
+
+            </div>
 
             <p
-              className={`font-semibold truncate ${primaryText}`}
+              className={`text-xs mt-1 truncate ${secondaryText}`}
             >
-              {patient.name ||
+              {diagnosis ||
                 tr(
-                  'patients.unnamed',
-                  'Unnamed Patient'
+                  'patients.noDiagnosis',
+                  'No diagnosis recorded'
                 )}
             </p>
 
-            {!archived && (
-              <span
-                className={`
-                  text-[9px]
-                  px-2 py-0.5
-                  rounded-full
-                  ${
-                    patient.status ===
-                      'critical' ||
-                    patient.status ===
-                      'deteriorating'
-                      ? 'bg-rose-950 text-rose-300'
-                      : patient.status ===
-                          'stable'
-                        ? 'bg-emerald-950 text-emerald-300'
-                        : 'bg-amber-950 text-amber-300'
-                  }
-                `}
-              >
-                {patient.status ||
-                  'unknown'}
-              </span>
-            )}
-
-          </div>
-
-          <p
-            className={`text-xs mt-1 truncate ${secondaryText}`}
-          >
-            {patient.primaryDiagnosis ||
-              tr(
-                'patients.noDiagnosis',
-                'No diagnosis recorded'
-              )}
-          </p>
-
-          <div
-            className={`flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] ${mutedText}`}
-          >
-            <span>
-              ID:{' '}
-              {patient.mrn ||
-                '—'}
-            </span>
-
-            <span>
-              {patient.age ||
-                '—'}{' '}
-              {tr(
-                'common.years',
-                'yrs'
-              )}
-            </span>
-
-            {patient.bedNumber !==
-              '' && (
+            <div
+              className={`
+                flex flex-wrap
+                gap-x-3 gap-y-1
+                mt-2 text-[10px]
+                ${mutedText}
+              `}
+            >
               <span>
-                {tr(
-                  'common.bed',
-                  'Bed'
-                )}{' '}
-                {patient.bedNumber}
+                ID:{' '}
+                {patient?.mrn ||
+                  '—'}
               </span>
-            )}
+
+              <span>
+                {patient?.age ||
+                  '—'}{' '}
+                {tr(
+                  'common.years',
+                  'yrs'
+                )}
+              </span>
+
+              {patient?.bedNumber !==
+                '' && (
+                <span>
+                  {tr(
+                    'common.bed',
+                    'Bed'
+                  )}{' '}
+                  {patient?.bedNumber ??
+                    '—'}
+                </span>
+              )}
+            </div>
+
           </div>
+
+          <ChevronRight
+            className={`
+              w-4 h-4 shrink-0
+              ${mutedText}
+              ${
+                language === 'ar'
+                  ? 'rotate-180'
+                  : ''
+              }
+            `}
+          />
 
         </div>
-
-        <ChevronRight
-          className={`
-            w-4 h-4 shrink-0
-            ${mutedText}
-          `}
-        />
-
-      </div>
-    </button>
-  );
+      </button>
+    );
+  };
 
   // =========================================================
   // Home Page
@@ -1765,7 +2133,8 @@ export default function App() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
-        <div>
+        <div className={textAlign}>
+
           <p className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">
             {tr(
               'dashboard.title',
@@ -1787,9 +2156,11 @@ export default function App() {
               'ICU & CCU patient management'
             )}
           </p>
+
         </div>
 
         <button
+          type="button"
           onClick={() =>
             setAdmitBedNumber(
               availableBeds[0] ||
@@ -1824,14 +2195,18 @@ export default function App() {
             'dashboard.totalBeds',
             'Total Beds'
           )}
-          value={totalBeds}
+          value={
+            totalBeds
+          }
           subtitle={`${occupiedCount} ${tr(
             'dashboard.occupied',
             'occupied'
           )}`}
           icon={BedDouble}
           onClick={() =>
-            setActiveTab('beds')
+            setActiveTab(
+              'beds'
+            )
           }
         />
 
@@ -1840,14 +2215,18 @@ export default function App() {
             'dashboard.available',
             'Available'
           )}
-          value={availableCount}
+          value={
+            availableCount
+          }
           subtitle={tr(
             'dashboard.bedsAvailable',
             'Beds available'
           )}
           icon={CheckCircle2}
           onClick={() =>
-            setActiveTab('beds')
+            setActiveTab(
+              'beds'
+            )
           }
         />
 
@@ -1856,14 +2235,18 @@ export default function App() {
             'dashboard.critical',
             'Critical'
           )}
-          value={criticalCount}
+          value={
+            criticalCount
+          }
           subtitle={tr(
             'dashboard.criticalSubtitle',
             'Critical / deteriorating'
           )}
           icon={AlertTriangle}
           onClick={() =>
-            setActiveTab('patients')
+            setActiveTab(
+              'patients'
+            )
           }
         />
 
@@ -1881,7 +2264,9 @@ export default function App() {
           )}
           icon={Archive}
           onClick={() =>
-            setActiveTab('archive')
+            setActiveTab(
+              'archive'
+            )
           }
         />
 
@@ -1898,9 +2283,10 @@ export default function App() {
           `}
         >
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between gap-3 mb-4">
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
@@ -1918,15 +2304,17 @@ export default function App() {
                   'Active ICU / CCU cases'
                 )}
               </p>
+
             </div>
 
             <button
+              type="button"
               onClick={() =>
                 setActiveTab(
                   'patients'
                 )
               }
-              className="text-xs text-cyan-400 hover:text-cyan-300"
+              className="text-xs text-cyan-400 hover:text-cyan-300 whitespace-nowrap"
             >
               {tr(
                 'common.viewAll',
@@ -1941,11 +2329,14 @@ export default function App() {
             <div className="py-12 text-center">
 
               <Users
-                className={`w-10 h-10 mx-auto ${
-                  isDarkTheme
-                    ? 'text-slate-700'
-                    : 'text-slate-300'
-                }`}
+                className={`
+                  w-10 h-10 mx-auto
+                  ${
+                    isDarkTheme
+                      ? 'text-slate-700'
+                      : 'text-slate-300'
+                  }
+                `}
               />
 
               <p
@@ -1958,6 +2349,7 @@ export default function App() {
               </p>
 
               <button
+                type="button"
                 onClick={() =>
                   setAdmitBedNumber(
                     availableBeds[0] ||
@@ -1978,7 +2370,9 @@ export default function App() {
               {activePatients
                 .slice(0, 5)
                 .map(
-                  (patient) => (
+                  (
+                    patient
+                  ) => (
                     <PatientRow
                       key={
                         patient.id
@@ -2062,7 +2456,10 @@ export default function App() {
             <div className="grid grid-cols-2 gap-2 pt-2">
 
               <div
-                className={`rounded-xl p-3 ${secondarySurface}`}
+                className={`
+                  rounded-xl p-3
+                  ${secondarySurface}
+                `}
               >
                 <p
                   className={`text-[10px] ${mutedText}`}
@@ -2079,7 +2476,10 @@ export default function App() {
               </div>
 
               <div
-                className={`rounded-xl p-3 ${secondarySurface}`}
+                className={`
+                  rounded-xl p-3
+                  ${secondarySurface}
+                `}
               >
                 <p
                   className={`text-[10px] ${mutedText}`}
@@ -2099,6 +2499,7 @@ export default function App() {
           </div>
 
           <button
+            type="button"
             onClick={() =>
               setActiveTab(
                 'beds'
@@ -2150,6 +2551,7 @@ export default function App() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
 
           <button
+            type="button"
             onClick={() =>
               setShowCalculators(
                 true
@@ -2157,7 +2559,7 @@ export default function App() {
             }
             className={`
               p-3 rounded-xl
-              text-left
+              ${textAlign}
               ${
                 isDarkTheme
                   ? 'bg-slate-800 hover:bg-slate-700'
@@ -2178,6 +2580,7 @@ export default function App() {
           </button>
 
           <button
+            type="button"
             onClick={() =>
               setShowCustomizer(
                 true
@@ -2185,7 +2588,7 @@ export default function App() {
             }
             className={`
               p-3 rounded-xl
-              text-left
+              ${textAlign}
               ${
                 isDarkTheme
                   ? 'bg-slate-800 hover:bg-slate-700'
@@ -2206,6 +2609,7 @@ export default function App() {
           </button>
 
           <button
+            type="button"
             onClick={() =>
               setShowCloudAccountModal(
                 true
@@ -2213,7 +2617,7 @@ export default function App() {
             }
             className={`
               p-3 rounded-xl
-              text-left
+              ${textAlign}
               ${
                 isDarkTheme
                   ? 'bg-slate-800 hover:bg-slate-700'
@@ -2234,6 +2638,7 @@ export default function App() {
           </button>
 
           <button
+            type="button"
             onClick={() =>
               setShowSecurityModal(
                 true
@@ -2241,7 +2646,7 @@ export default function App() {
             }
             className={`
               p-3 rounded-xl
-              text-left
+              ${textAlign}
               ${
                 isDarkTheme
                   ? 'bg-slate-800 hover:bg-slate-700'
@@ -2271,148 +2676,186 @@ export default function App() {
   // Patients Page
   // =========================================================
 
-  const PatientsPage = () => (
-    <div className="space-y-5">
-
-      <div>
-        <h2
-          className={`text-2xl font-bold ${primaryText}`}
-        >
-          {tr(
-            'patients.title',
-            'Patients'
-          )}
-        </h2>
-
-        <p
-          className={`text-sm mt-1 ${secondaryText}`}
-        >
-          {tr(
-            'patients.subtitle',
-            'Active ICU / CCU patient records'
-          )}
-        </p>
-      </div>
-
-      <div className="relative">
-
-        <Search
-          className={`
-            absolute
-            ${language === 'ar'
-              ? 'right-3'
-              : 'left-3'}
-            top-1/2
-            -translate-y-1/2
-            w-4 h-4
-            ${mutedText}
-          `}
-        />
-
-        <input
-          value={
-            patientSearch
-          }
-          onChange={(e) =>
-            setPatientSearch(
-              e.target.value
-            )
-          }
-          placeholder={tr(
-            'patients.search',
-            'Search by name, ID, diagnosis or bed...'
-          )}
-          className={`
-            w-full
-            border
-            rounded-xl
-            ${
-              isDarkTheme
-                ? 'bg-slate-900 border-slate-800 text-white'
-                : 'bg-white border-slate-200 text-slate-900'
-            }
-            ${
-              language === 'ar'
-                ? 'pr-10 pl-4'
-                : 'pl-10 pr-4'
-            }
-            py-3
-            text-sm
-            outline-none
-            focus:border-cyan-600
-          `}
-        />
-
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-
-        <span className="px-3 py-1.5 rounded-full bg-cyan-950 text-cyan-300 text-xs whitespace-nowrap">
-          {tr(
-            'patients.active',
-            'Active'
-          )}: {activePatients.length}
-        </span>
-
-        <span className="px-3 py-1.5 rounded-full bg-rose-950 text-rose-300 text-xs whitespace-nowrap">
-          {tr(
-            'patients.critical',
-            'Critical'
-          )}: {criticalCount}
-        </span>
-
-        <span className="px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 text-xs whitespace-nowrap">
-          {tr(
-            'patients.stable',
-            'Stable'
-          )}: {stableCount}
-        </span>
-
-      </div>
-
-      {filteredPatients.filter(
+  const PatientsPage = () => {
+    const visiblePatients =
+      filteredPatients.filter(
         (p) =>
           !p.isDischarged
-      ).length === 0 ? (
+      );
 
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            py-16 text-center
-          `}
-        >
-          <Users
+    return (
+      <div className="space-y-5">
+
+        <div className={textAlign}>
+
+          <h2
+            className={`text-2xl font-bold ${primaryText}`}
+          >
+            {tr(
+              'patients.title',
+              'Patients'
+            )}
+          </h2>
+
+          <p
+            className={`text-sm mt-1 ${secondaryText}`}
+          >
+            {tr(
+              'patients.subtitle',
+              'Active ICU / CCU patient records'
+            )}
+          </p>
+
+        </div>
+
+        <div className="relative">
+
+          <Search
             className={`
-              w-12 h-12 mx-auto
+              absolute
               ${
-                isDarkTheme
-                  ? 'text-slate-700'
-                  : 'text-slate-300'
+                language === 'ar'
+                  ? 'right-3'
+                  : 'left-3'
               }
+              top-1/2
+              -translate-y-1/2
+              w-4 h-4
+              ${mutedText}
             `}
           />
 
-          <p
-            className={`text-sm mt-3 ${secondaryText}`}
-          >
-            {tr(
-              'patients.noMatching',
-              'No matching active patients'
+          <input
+            value={
+              patientSearch
+            }
+            onChange={(e) =>
+              setPatientSearch(
+                e.target.value
+              )
+            }
+            placeholder={tr(
+              'patients.search',
+              'Search by name, ID, diagnosis or bed...'
             )}
-          </p>
+            dir={direction}
+            className={`
+              w-full
+              border
+              rounded-xl
+              ${
+                isDarkTheme
+                  ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-500'
+                  : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
+              }
+              ${
+                language === 'ar'
+                  ? 'pr-10 pl-4'
+                  : 'pl-10 pr-4'
+              }
+              py-3
+              text-sm
+              outline-none
+              focus:border-cyan-600
+            `}
+          />
+
         </div>
 
-      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1">
 
-        <div className="grid md:grid-cols-2 gap-3">
+          <span
+            className={`
+              px-3 py-1.5 rounded-full
+              ${
+                isDarkTheme
+                  ? 'bg-cyan-950 text-cyan-300'
+                  : 'bg-cyan-100 text-cyan-700'
+              }
+              text-xs whitespace-nowrap
+            `}
+          >
+            {tr(
+              'patients.active',
+              'Active'
+            )}
+            : {activePatients.length}
+          </span>
 
-          {filteredPatients
-            .filter(
-              (p) =>
-                !p.isDischarged
-            )
-            .map(
+          <span
+            className={`
+              px-3 py-1.5 rounded-full
+              ${
+                isDarkTheme
+                  ? 'bg-rose-950 text-rose-300'
+                  : 'bg-rose-100 text-rose-700'
+              }
+              text-xs whitespace-nowrap
+            `}
+          >
+            {tr(
+              'patients.critical',
+              'Critical'
+            )}
+            : {criticalCount}
+          </span>
+
+          <span
+            className={`
+              px-3 py-1.5 rounded-full
+              ${
+                isDarkTheme
+                  ? 'bg-emerald-950 text-emerald-300'
+                  : 'bg-emerald-100 text-emerald-700'
+              }
+              text-xs whitespace-nowrap
+            `}
+          >
+            {tr(
+              'patients.stable',
+              'Stable'
+            )}
+            : {stableCount}
+          </span>
+
+        </div>
+
+        {visiblePatients.length ===
+        0 ? (
+
+          <div
+            className={`
+              rounded-2xl border
+              ${surface}
+              py-16 text-center
+            `}
+          >
+            <Users
+              className={`
+                w-12 h-12 mx-auto
+                ${
+                  isDarkTheme
+                    ? 'text-slate-700'
+                    : 'text-slate-300'
+                }
+              `}
+            />
+
+            <p
+              className={`text-sm mt-3 ${secondaryText}`}
+            >
+              {tr(
+                'patients.noMatching',
+                'No matching active patients'
+              )}
+            </p>
+          </div>
+
+        ) : (
+
+          <div className="grid md:grid-cols-2 gap-3">
+
+            {visiblePatients.map(
               (patient) => (
                 <PatientRow
                   key={
@@ -2425,11 +2868,12 @@ export default function App() {
               )
             )}
 
-        </div>
-      )}
+          </div>
+        )}
 
-    </div>
-  );
+      </div>
+    );
+  };
 
   // =========================================================
   // Beds Page
@@ -2437,8 +2881,12 @@ export default function App() {
 
   const BedsPage = () => (
     <CensusView
-      patients={safePatients}
-      totalBeds={totalBeds}
+      patients={
+        safePatients
+      }
+      totalBeds={
+        totalBeds
+      }
       specialtyMode={
         specialtyMode
       }
@@ -2454,11 +2902,13 @@ export default function App() {
         )
       }
       onDischargePatient={(pt) =>
+        pt &&
         setPatientToDischarge(
           pt
         )
       }
       onReadmitPatient={(pt) =>
+        pt &&
         setPatientToReadmit(
           pt
         )
@@ -2476,125 +2926,130 @@ export default function App() {
   // Archive Page
   // =========================================================
 
-  const ArchivePage = () => (
-    <div className="space-y-5">
-
-      <div>
-        <h2
-          className={`text-2xl font-bold ${primaryText}`}
-        >
-          {tr(
-            'archive.title',
-            'Archive'
-          )}
-        </h2>
-
-        <p
-          className={`text-sm mt-1 ${secondaryText}`}
-        >
-          {tr(
-            'archive.subtitle',
-            'Discharged patients and completed cases'
-          )}
-        </p>
-      </div>
-
-      <div className="relative">
-
-        <Search
-          className={`
-            absolute
-            ${language === 'ar'
-              ? 'right-3'
-              : 'left-3'}
-            top-1/2
-            -translate-y-1/2
-            w-4 h-4
-            ${mutedText}
-          `}
-        />
-
-        <input
-          value={
-            patientSearch
-          }
-          onChange={(e) =>
-            setPatientSearch(
-              e.target.value
-            )
-          }
-          placeholder={tr(
-            'archive.search',
-            'Search archived patients...'
-          )}
-          className={`
-            w-full
-            border
-            rounded-xl
-            ${
-              isDarkTheme
-                ? 'bg-slate-900 border-slate-800 text-white'
-                : 'bg-white border-slate-200 text-slate-900'
-            }
-            ${
-              language === 'ar'
-                ? 'pr-10 pl-4'
-                : 'pl-10 pr-4'
-            }
-            py-3
-            text-sm
-            outline-none
-            focus:border-cyan-600
-          `}
-        />
-
-      </div>
-
-      {filteredPatients.filter(
+  const ArchivePage = () => {
+    const visiblePatients =
+      filteredPatients.filter(
         (p) =>
           p.isDischarged
-      ).length === 0 ? (
+      );
 
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            py-16 text-center
-          `}
-        >
+    return (
+      <div className="space-y-5">
 
-          <Archive
-            className={`
-              w-12 h-12 mx-auto
-              ${
-                isDarkTheme
-                  ? 'text-slate-700'
-                  : 'text-slate-300'
-              }
-            `}
-          />
+        <div className={textAlign}>
 
-          <p
-            className={`text-sm mt-3 ${secondaryText}`}
+          <h2
+            className={`text-2xl font-bold ${primaryText}`}
           >
             {tr(
-              'archive.empty',
-              'Archive is empty'
+              'archive.title',
+              'Archive'
+            )}
+          </h2>
+
+          <p
+            className={`text-sm mt-1 ${secondaryText}`}
+          >
+            {tr(
+              'archive.subtitle',
+              'Discharged patients and completed cases'
             )}
           </p>
 
         </div>
 
-      ) : (
+        <div className="relative">
 
-        <div className="grid md:grid-cols-2 gap-3">
+          <Search
+            className={`
+              absolute
+              ${
+                language === 'ar'
+                  ? 'right-3'
+                  : 'left-3'
+              }
+              top-1/2
+              -translate-y-1/2
+              w-4 h-4
+              ${mutedText}
+            `}
+          />
 
-          {filteredPatients
-            .filter(
-              (p) =>
-                p.isDischarged
-            )
-            .map(
+          <input
+            value={
+              patientSearch
+            }
+            onChange={(e) =>
+              setPatientSearch(
+                e.target.value
+              )
+            }
+            placeholder={tr(
+              'archive.search',
+              'Search archived patients...'
+            )}
+            dir={direction}
+            className={`
+              w-full
+              border
+              rounded-xl
+              ${
+                isDarkTheme
+                  ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-500'
+                  : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
+              }
+              ${
+                language === 'ar'
+                  ? 'pr-10 pl-4'
+                  : 'pl-10 pr-4'
+              }
+              py-3
+              text-sm
+              outline-none
+              focus:border-cyan-600
+            `}
+          />
+
+        </div>
+
+        {visiblePatients.length ===
+        0 ? (
+
+          <div
+            className={`
+              rounded-2xl border
+              ${surface}
+              py-16 text-center
+            `}
+          >
+
+            <Archive
+              className={`
+                w-12 h-12 mx-auto
+                ${
+                  isDarkTheme
+                    ? 'text-slate-700'
+                    : 'text-slate-300'
+                }
+              `}
+            />
+
+            <p
+              className={`text-sm mt-3 ${secondaryText}`}
+            >
+              {tr(
+                'archive.empty',
+                'Archive is empty'
+              )}
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div className="grid md:grid-cols-2 gap-3">
+
+            {visiblePatients.map(
               (patient) => (
                 <PatientRow
                   key={
@@ -2608,11 +3063,12 @@ export default function App() {
               )
             )}
 
-        </div>
-      )}
+          </div>
+        )}
 
-    </div>
-  );
+      </div>
+    );
+  };
 
   // =========================================================
   // Settings Page
@@ -2621,7 +3077,8 @@ export default function App() {
   const SettingsPage = () => (
     <div className="space-y-5">
 
-      <div>
+      <div className={textAlign}>
+
         <h2
           className={`text-2xl font-bold ${primaryText}`}
         >
@@ -2639,6 +3096,7 @@ export default function App() {
             'CardioVault configuration'
           )}
         </p>
+
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -2657,7 +3115,8 @@ export default function App() {
 
             <BedDouble className="w-5 h-5 text-cyan-400" />
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
@@ -2675,6 +3134,7 @@ export default function App() {
                   'Set the total number of ICU/CCU beds'
                 )}
               </p>
+
             </div>
 
           </div>
@@ -2760,7 +3220,8 @@ export default function App() {
 
             <ShieldCheck className="w-5 h-5 text-violet-400" />
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
@@ -2778,11 +3239,13 @@ export default function App() {
                   'PIN and automatic lock'
                 )}
               </p>
+
             </div>
 
           </div>
 
           <button
+            type="button"
             onClick={() =>
               setShowSecurityModal(
                 true
@@ -2809,7 +3272,14 @@ export default function App() {
             </span>
 
             <ChevronRight
-              className={`w-4 h-4 ${mutedText}`}
+              className={`
+                w-4 h-4 ${mutedText}
+                ${
+                  language === 'ar'
+                    ? 'rotate-180'
+                    : ''
+                }
+              `}
             />
           </button>
 
@@ -2829,7 +3299,8 @@ export default function App() {
 
             <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
@@ -2847,11 +3318,13 @@ export default function App() {
                   'Customize visible clinical sections'
                 )}
               </p>
+
             </div>
 
           </div>
 
           <button
+            type="button"
             onClick={() =>
               setShowCustomizer(
                 true
@@ -2878,7 +3351,14 @@ export default function App() {
             </span>
 
             <ChevronRight
-              className={`w-4 h-4 ${mutedText}`}
+              className={`
+                w-4 h-4 ${mutedText}
+                ${
+                  language === 'ar'
+                    ? 'rotate-180'
+                    : ''
+                }
+              `}
             />
           </button>
 
@@ -2898,22 +3378,30 @@ export default function App() {
 
             <Languages className="w-5 h-5 text-cyan-400" />
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
-                {language === 'ar'
-                  ? 'اللغة'
-                  : 'Language'}
+                {tr(
+                  'settings.language',
+                  language === 'ar'
+                    ? 'اللغة'
+                    : 'Language'
+                )}
               </h3>
 
               <p
                 className={`text-[11px] ${mutedText}`}
               >
-                {language === 'ar'
-                  ? 'اختر لغة واجهة التطبيق'
-                  : 'Choose the application language'}
+                {tr(
+                  'settings.languageDescription',
+                  language === 'ar'
+                    ? 'اختر لغة واجهة التطبيق'
+                    : 'Choose the application language'
+                )}
               </p>
+
             </div>
 
           </div>
@@ -2921,6 +3409,7 @@ export default function App() {
           <div className="grid grid-cols-2 gap-2">
 
             <button
+              type="button"
               onClick={() =>
                 setLanguageState(
                   'en'
@@ -2935,7 +3424,9 @@ export default function App() {
                 ${
                   language ===
                   'en'
-                    ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
+                    ? isDarkTheme
+                      ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
+                      : 'border-cyan-600 bg-cyan-50 text-cyan-700'
                     : isDarkTheme
                       ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
                       : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -2946,6 +3437,7 @@ export default function App() {
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 setLanguageState(
                   'ar'
@@ -2960,7 +3452,9 @@ export default function App() {
                 ${
                   language ===
                   'ar'
-                    ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
+                    ? isDarkTheme
+                      ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
+                      : 'border-cyan-600 bg-cyan-50 text-cyan-700'
                     : isDarkTheme
                       ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
                       : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -2988,7 +3482,8 @@ export default function App() {
 
             <Cloud className="w-5 h-5 text-emerald-400" />
 
-            <div>
+            <div className={textAlign}>
+
               <h3
                 className={`font-semibold ${primaryText}`}
               >
@@ -3006,6 +3501,7 @@ export default function App() {
                   'Backup and multi-device sync'
                 )}
               </p>
+
             </div>
 
           </div>
@@ -3018,6 +3514,9 @@ export default function App() {
             ) : cloudSyncStatus ===
               'synced' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : cloudSyncStatus ===
+              'error' ? (
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
             ) : (
               <Clock3 className="w-4 h-4 text-slate-500" />
             )}
@@ -3052,6 +3551,7 @@ export default function App() {
           </div>
 
           <button
+            type="button"
             onClick={() =>
               setShowCloudAccountModal(
                 true
@@ -3091,7 +3591,7 @@ export default function App() {
 
           <LogOut className="w-5 h-5 text-rose-400" />
 
-          <div className="flex-1">
+          <div className={`flex-1 ${textAlign}`}>
 
             <h3
               className={`font-semibold ${primaryText}`}
@@ -3115,6 +3615,7 @@ export default function App() {
           </div>
 
           <button
+            type="button"
             onClick={
               handleLockApp
             }
@@ -3137,17 +3638,20 @@ export default function App() {
 
           {currentUser && (
             <button
+              type="button"
               onClick={
                 handleLogout
               }
-              className="
+              className={`
                 px-3 py-2
                 rounded-xl
-                bg-rose-950
-                hover:bg-rose-900
                 text-xs
-                text-rose-300
-              "
+                ${
+                  isDarkTheme
+                    ? 'bg-rose-950 hover:bg-rose-900 text-rose-300'
+                    : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                }
+              `}
             >
               {tr(
                 'settings.logout',
@@ -3172,6 +3676,7 @@ export default function App() {
           p-4
         `}
       >
+
         <div className="flex items-center gap-2">
 
           <Wrench
@@ -3185,6 +3690,7 @@ export default function App() {
           </p>
 
         </div>
+
       </div>
 
     </div>
@@ -3232,6 +3738,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div
+        dir={direction}
         className={`
           min-h-screen
           flex flex-col
@@ -3308,7 +3815,10 @@ export default function App() {
             );
 
             const pinToUse =
-              pin || '0000';
+              typeof pin === 'string' &&
+              pin.length > 0
+                ? pin
+                : '0000';
 
             setActivePin(
               pinToUse
@@ -3328,7 +3838,9 @@ export default function App() {
                 Array.isArray(
                   loaded
                 )
-                  ? loaded
+                  ? loaded.filter(
+                      Boolean
+                    )
                   : []
               );
             } catch (err) {
@@ -3371,11 +3883,8 @@ export default function App() {
 
   return (
     <div
-      dir={
-        language === 'ar'
-          ? 'rtl'
-          : 'ltr'
-      }
+      dir={direction}
+      lang={language}
       className={`
         min-h-screen
         flex flex-col
@@ -3513,6 +4022,7 @@ export default function App() {
 
           onDischargePatient={
             (pt) =>
+              pt &&
               setPatientToDischarge(
                 pt
               )
@@ -3520,6 +4030,7 @@ export default function App() {
 
           onReadmitPatient={
             (pt) =>
+              pt &&
               setPatientToReadmit(
                 pt
               )
@@ -3625,7 +4136,11 @@ export default function App() {
           onRestorePatients={
             (restored) =>
               updatePatients(
-                restored
+                Array.isArray(
+                  restored
+                )
+                  ? restored
+                  : []
               )
           }
 
@@ -3751,4 +4266,3 @@ export default function App() {
     </div>
   );
 }
-```
