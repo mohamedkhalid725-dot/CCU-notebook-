@@ -223,6 +223,11 @@ const [showCloudAccountModal, setShowCloudAccountModal] =
     return () => unsubscribe();
   }, [activePin]);
 
+  useEffect(() => {
+    setAppLanguage(language);
+    applyLanguageToDom(language);
+  }, [language]);
+
   // =========================================================
   // Lock
   // =========================================================
