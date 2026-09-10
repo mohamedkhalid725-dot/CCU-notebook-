@@ -1,4 +1,3 @@
-```ts
 import { useCallback, useSyncExternalStore } from 'react';
 
 export type AppLanguage = 'en' | 'ar';
@@ -782,4 +781,3 @@ export function useI18n() {
     setLanguage,
   };
 }
-```
