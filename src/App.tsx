@@ -81,23 +81,25 @@ export default function App() {
   const [securitySettings, setSecuritySettings] =
     useState<AppSecuritySettings>(() => getSecuritySettings());
 
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
-  const [activePin, setActivePin] = useState<string>('');
-  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+const [language, setLanguageState] = useState<AppLanguage>(() => initializeLanguage());
 
-  // =========================================================
-  // Firebase / Cloud
-  // =========================================================
+const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+const [activePin, setActivePin] = useState<string>('');
+const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [isOfflineBypassed, setIsOfflineBypassed] =
+// =========================================================
+// Firebase / Cloud
+// =========================================================
+
+const [currentUser, setCurrentUser] = useState<User | null>(null);
+const [authLoading, setAuthLoading] = useState<boolean>(true);
+const [isOfflineBypassed, setIsOfflineBypassed] =
     useState<boolean>(false);
 
-  const [cloudSyncStatus, setCloudSyncStatus] =
+const [cloudSyncStatus, setCloudSyncStatus] =
     useState<'synced' | 'syncing' | 'offline' | 'error'>('offline');
 
-  const [showCloudAccountModal, setShowCloudAccountModal] =
+const [showCloudAccountModal, setShowCloudAccountModal] =
     useState<boolean>(false);
 
   // =========================================================
