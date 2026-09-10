@@ -62,6 +62,12 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Get Debug SHA-1
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew signingReport
+
       - name: Add Firebase configuration
         env:
           FIREBASE_ANDROID_JSON: ${{ secrets.FIREBASE_ANDROID_JSON }}
@@ -73,7 +79,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          # Enable Google Services Gradle plugin
           gradle = Path("android/build.gradle")
           text = gradle.read_text()
 
@@ -95,7 +100,6 @@ jobs:
 
           gradle.write_text(text)
 
-          # Apply Google Services plugin to the Android app
           app_gradle = Path("android/app/build.gradle")
           text = app_gradle.read_text()
 
