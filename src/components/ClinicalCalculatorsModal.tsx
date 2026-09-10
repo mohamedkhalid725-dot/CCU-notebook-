@@ -54,10 +54,10 @@ export const ClinicalCalculatorsModal: React.FC<
 
   const isArabic = language === 'ar';
 
-  // Interpret ABG
   const interpretAbg = () => {
     const anionGap = abgNa - (abgCl + abgHco3);
     const hasHighAG = anionGap > 12;
+    const agValue = anionGap.toFixed(1);
 
     let primary = isArabic
       ? 'غازات الدم الشرياني طبيعية'
@@ -65,13 +65,23 @@ export const ClinicalCalculatorsModal: React.FC<
 
     if (abgPh < 7.35) {
       if (abgHco3 < 22 && abgPco2 <= 42) {
-        primary = hasHighAG
-          ? isArabic
-            ? `حماض أيضي بفجوة أنيونية مرتفعة (AG = ${anionGap.toFixed(1)} mmol/L)`
-            : `High Anion Gap Metabolic Acidosis (AG = ${anionGap.toFixed(1)} mmol/L)`
-          : isArabic
-            ? `حماض أيضي بفجوة أنيونية طبيعية (AG = ${anionGap.toFixed(1)})`
-            : `Normal Anion Gap Metabolic Acidosis (AG = ${anionGap.toFixed(1)})`;
+        if (hasHighAG) {
+          primary = isArabic
+            ? 'حماض أيضي بفجوة أنيونية مرتفعة (AG = ' +
+              agValue +
+              ' mmol/L)'
+            : 'High Anion Gap Metabolic Acidosis (AG = ' +
+              agValue +
+              ' mmol/L)';
+        } else {
+          primary = isArabic
+            ? 'حماض أيضي بفجوة أنيونية طبيعية (AG = ' +
+              agValue +
+              ')'
+            : 'Normal Anion Gap Metabolic Acidosis (AG = ' +
+              agValue +
+              ')';
+        }
       } else if (abgPco2 > 45) {
         primary = isArabic
           ? 'حماض تنفسي (احتباس CO2 / نقص التهوية)'
@@ -93,17 +103,25 @@ export const ClinicalCalculatorsModal: React.FC<
       }
     } else if (abgHco3 < 22 || abgPco2 > 45 || hasHighAG) {
       primary = isArabic
-        ? `اضطراب حمضي-قاعدي معوَّض (AG = ${anionGap.toFixed(1)})`
-        : `Compensated Acid-Base Disturbance (AG = ${anionGap.toFixed(1)})`;
+        ? 'اضطراب حمضي-قاعدي معوَّض (AG = ' + agValue + ')'
+        : 'Compensated Acid-Base Disturbance (AG = ' + agValue + ')';
     }
 
-    return { primary, anionGap };
+    return {
+      primary,
+      anionGap,
+    };
   };
 
   const safeIvFluids = Number.isFinite(ivFluids) ? ivFluids : 0;
   const safeEnteralFeed = Number.isFinite(enteralFeed) ? enteralFeed : 0;
-  const safeUrineOutput = Number.isFinite(urineOutput) ? urineOutput : 0;
-  const safeDrainOutput = Number.isFinite(drainOutput) ? drainOutput : 0;
+  const safeUrineOutput = Number.isFinite(urineOutput)
+    ? urineOutput
+    : 0;
+  const safeDrainOutput = Number.isFinite(drainOutput)
+    ? drainOutput
+    : 0;
+
   const safePatientWeight =
     Number.isFinite(patientWeight) && patientWeight > 0
       ? patientWeight
@@ -144,12 +162,16 @@ export const ClinicalCalculatorsModal: React.FC<
     },
     {
       id: 'electrolytes' as const,
-      label: isArabic ? 'الشوارد والعلامات' : 'Electrolytes & General',
+      label: isArabic
+        ? 'الشوارد والعلامات'
+        : 'Electrolytes & General',
       icon: Zap,
     },
     {
       id: 'fluid' as const,
-      label: isArabic ? 'السوائل وغازات الدم' : 'Fluids & ABG',
+      label: isArabic
+        ? 'السوائل وغازات الدم'
+        : 'Fluids & ABG',
       icon: Droplets,
     },
   ];
@@ -168,7 +190,9 @@ export const ClinicalCalculatorsModal: React.FC<
             <div>
               <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <span>
-                  {isArabic ? 'الحاسبات السريرية' : 'Clinical Calculators'}
+                  {isArabic
+                    ? 'الحاسبات السريرية'
+                    : 'Clinical Calculators'}
                 </span>
 
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
@@ -258,7 +282,9 @@ export const ClinicalCalculatorsModal: React.FC<
 
                   <div className="text-right">
                     <span className="text-xs text-slate-400">
-                      {isArabic ? 'إخراج البول: ' : 'Urine Output: '}
+                      {isArabic
+                        ? 'إخراج البول: '
+                        : 'Urine Output: '}
                     </span>
 
                     <span className="text-sm font-bold text-emerald-400 font-mono">
@@ -282,7 +308,10 @@ export const ClinicalCalculatorsModal: React.FC<
                           : 'text-amber-400'
                       }`}
                     >
-                      {netBalance > 0 ? `+${netBalance}` : netBalance} mL
+                      {netBalance > 0
+                        ? '+' + netBalance
+                        : netBalance}{' '}
+                      mL
                     </div>
                   </div>
 
@@ -298,7 +327,9 @@ export const ClinicalCalculatorsModal: React.FC<
                   {/* Intake */}
                   <div className="space-y-2 p-3 rounded-lg bg-slate-900 border border-slate-800">
                     <span className="font-semibold text-cyan-300">
-                      {isArabic ? 'السوائل الداخلة (mL)' : 'Intake (mL)'}
+                      {isArabic
+                        ? 'السوائل الداخلة (mL)'
+                        : 'Intake (mL)'}
                     </span>
 
                     <div>
@@ -339,12 +370,16 @@ export const ClinicalCalculatorsModal: React.FC<
                   {/* Output */}
                   <div className="space-y-2 p-3 rounded-lg bg-slate-900 border border-slate-800">
                     <span className="font-semibold text-rose-300">
-                      {isArabic ? 'السوائل الخارجة (mL)' : 'Output (mL)'}
+                      {isArabic
+                        ? 'السوائل الخارجة (mL)'
+                        : 'Output (mL)'}
                     </span>
 
                     <div>
                       <label className="text-slate-400 block mb-0.5">
-                        {isArabic ? 'إخراج البول' : 'Urine Output'}
+                        {isArabic
+                          ? 'إخراج البول'
+                          : 'Urine Output'}
                       </label>
 
                       <input
@@ -419,7 +454,7 @@ export const ClinicalCalculatorsModal: React.FC<
                   </div>
 
                   <div className="text-xs text-slate-400 mt-1">
-                    {isArabic ? 'Anion Gap: ' : 'Anion Gap: '}
+                    Anion Gap:{' '}
 
                     <span className="text-white font-mono font-bold">
                       {abgAnalysis.anionGap.toFixed(1)} mmol/L
