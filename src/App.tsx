@@ -34,7 +34,27 @@ import { CloudAccountModal } from './components/CloudAccountModal';
 import { LoginScreen } from './components/LoginScreen';
 
 import { User } from 'firebase/auth';
-import { HeartPulse } from 'lucide-react';
+
+import {
+  HeartPulse,
+  Users,
+  BedDouble,
+  Archive,
+  Settings,
+  Search,
+  Plus,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Wrench,
+  ChevronRight,
+  ShieldCheck,
+  Cloud,
+  RefreshCw,
+  LogOut,
+  SlidersHorizontal
+} from 'lucide-react';
 
 import {
   subscribeToAuth,
@@ -47,7 +67,7 @@ import {
 
 export default function App() {
   // =========================================================
-  // Security State
+  // Security
   // =========================================================
 
   const [securitySettings, setSecuritySettings] =
@@ -58,7 +78,7 @@ export default function App() {
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
   // =========================================================
-  // Cloud & Firebase State
+  // Firebase / Cloud
   // =========================================================
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -73,25 +93,28 @@ export default function App() {
     useState<boolean>(false);
 
   // =========================================================
-  // Clinical & Census State
+  // Clinical State
   // =========================================================
 
   const [patients, setPatients] = useState<PatientRecord[]>([]);
 
   const [totalBeds, setTotalBeds] = useState<number>(() => {
     const saved = localStorage.getItem('icu_total_beds');
-    return saved ? Math.max(3, Number(saved)) : 6;
+    const parsed = saved ? Number(saved) : 6;
+    return Number.isFinite(parsed) ? Math.max(3, parsed) : 6;
   });
 
   const [specialtyMode, setSpecialtyMode] =
     useState<SpecialtyMode>('all');
 
-  // Bottom navigation
   const [activeTab, setActiveTab] =
     useState<AppTab>('home');
 
   const [fieldConfig, setFieldConfig] =
     useState<FieldVisibilityConfig>(() => getFieldConfig());
+
+  const [patientSearch, setPatientSearch] =
+    useState<string>('');
 
   // =========================================================
   // Modals
@@ -128,7 +151,7 @@ export default function App() {
     useState<PatientRecord | null>(null);
 
   // =========================================================
-  // Handle successful unlock
+  // Unlock
   // =========================================================
 
   const handleUnlockSuccess = async (pin: string) => {
@@ -145,7 +168,7 @@ export default function App() {
   };
 
   // =========================================================
-  // Auth & Cloud Sync listener
+  // Auth
   // =========================================================
 
   useEffect(() => {
@@ -176,7 +199,7 @@ export default function App() {
           setCloudSyncStatus('synced');
         } catch (err) {
           console.error(
-            'Failed to sync cloud patients on auth change:',
+            'Failed to sync cloud patients:',
             err
           );
 
@@ -191,7 +214,7 @@ export default function App() {
   }, [activePin]);
 
   // =========================================================
-  // Immediate lock
+  // Lock
   // =========================================================
 
   const handleLockApp = useCallback(() => {
@@ -235,7 +258,7 @@ export default function App() {
   }, []);
 
   // =========================================================
-  // Save patient list
+  // Save patients
   // =========================================================
 
   const updatePatients = useCallback(
@@ -266,24 +289,22 @@ export default function App() {
   );
 
   // =========================================================
-  // Update single patient
+  // Update patient
   // =========================================================
 
   const handleUpdatePatient = useCallback(
     async (updatedPatient: PatientRecord) => {
-      setPatients((prev) => {
-        const next = prev.map((p) =>
-          p.id === updatedPatient.id
-            ? updatedPatient
-            : p
-        );
+      const nextPatients = patients.map((p) =>
+        p.id === updatedPatient.id
+          ? updatedPatient
+          : p
+      );
 
-        if (activePin) {
-          savePatients(next, activePin);
-        }
+      setPatients(nextPatients);
 
-        return next;
-      });
+      if (activePin) {
+        await savePatients(nextPatients, activePin);
+      }
 
       if (currentUser) {
         setCloudSyncStatus('syncing');
@@ -301,7 +322,7 @@ export default function App() {
         }
       }
     },
-    [activePin, currentUser]
+    [patients, activePin, currentUser]
   );
 
   // =========================================================
@@ -310,17 +331,15 @@ export default function App() {
 
   const handleDeletePatient = useCallback(
     async (patientId: string) => {
-      setPatients((prev) => {
-        const next = prev.filter(
-          (p) => p.id !== patientId
-        );
+      const nextPatients = patients.filter(
+        (p) => p.id !== patientId
+      );
 
-        if (activePin) {
-          savePatients(next, activePin);
-        }
+      setPatients(nextPatients);
 
-        return next;
-      });
+      if (activePin) {
+        await savePatients(nextPatients, activePin);
+      }
 
       if (selectedPatientId === patientId) {
         setSelectedPatientId(null);
@@ -342,31 +361,34 @@ export default function App() {
         }
       }
     },
-    [activePin, selectedPatientId, currentUser]
+    [
+      patients,
+      activePin,
+      selectedPatientId,
+      currentUser
+    ]
   );
 
   // =========================================================
-  // Admit patient
+  // Admit
   // =========================================================
 
   const handleAdmitPatient = useCallback(
     async (newPatient: PatientRecord) => {
-      setPatients((prev) => {
-        const filtered = prev.filter(
-          (p) =>
-            p.isDischarged ||
-            Number(p.bedNumber) !==
-              Number(newPatient.bedNumber)
-        );
+      const filtered = patients.filter(
+        (p) =>
+          p.isDischarged ||
+          Number(p.bedNumber) !==
+            Number(newPatient.bedNumber)
+      );
 
-        const next = [...filtered, newPatient];
+      const next = [...filtered, newPatient];
 
-        if (activePin) {
-          savePatients(next, activePin);
-        }
+      setPatients(next);
 
-        return next;
-      });
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
 
       setAdmitBedNumber(null);
 
@@ -390,11 +412,11 @@ export default function App() {
         }
       }
     },
-    [activePin, currentUser]
+    [patients, activePin, currentUser]
   );
 
   // =========================================================
-  // Discharge patient
+  // Discharge
   // =========================================================
 
   const handleDischargePatient = useCallback(
@@ -404,84 +426,78 @@ export default function App() {
     ) => {
       let dischargedRecord: PatientRecord | null = null;
 
-      setPatients((prev) => {
-        const now = new Date();
+      const now = new Date();
 
-        const mm = String(
-          now.getMonth() + 1
-        ).padStart(2, '0');
+      const mm = String(
+        now.getMonth() + 1
+      ).padStart(2, '0');
 
-        const dd = String(
-          now.getDate()
-        ).padStart(2, '0');
+      const dd = String(
+        now.getDate()
+      ).padStart(2, '0');
 
-        const timeStr =
-          now.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-
-        const next = prev.map((p) => {
-          if (p.id !== patientId) return p;
-
-          const dischargeNote: ProgressNote = {
-            id: `note-${Date.now()}`,
-            timestamp: `${mm}/${dd} — ${timeStr}`,
-            author:
-              details.dischargedBy ||
-              p.attendingPhysician ||
-              'Attending Physician',
-
-            tag: 'Handover',
-
-            subjective:
-              `Discharge protocol executed. Destination: ${details.disposition}.`,
-
-            objective:
-              `Condition at discharge: ${details.conditionAtDischarge}. Discharged from Bed ${p.bedNumber}.`,
-
-            assessment:
-              `Discharged from ICU/CCU. Diagnosis: ${p.primaryDiagnosis}.`,
-
-            plan:
-              `Summary: ${details.dischargeSummary}\n` +
-              `Floor/Discharge Meds: ${details.dischargeMedications || 'See list'}\n` +
-              `Follow-up: ${details.followUpInstructions || 'Routine follow-up'}`
-          };
-
-          const updated: PatientRecord = {
-            ...p,
-
-            isDischarged: true,
-
-            previousBedNumber: p.bedNumber,
-
-            bedNumber: '',
-
-            status: 'discharged' as BedStatus,
-
-            dischargeDetails: details,
-
-            progressNotes: [
-              ...p.progressNotes,
-              dischargeNote
-            ],
-
-            lastUpdated:
-              `${now.toISOString().slice(0, 10)} ${timeStr}`
-          };
-
-          dischargedRecord = updated;
-
-          return updated;
+      const timeStr =
+        now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
         });
 
-        if (activePin) {
-          savePatients(next, activePin);
-        }
+      const next = patients.map((p) => {
+        if (p.id !== patientId) return p;
 
-        return next;
+        const dischargeNote: ProgressNote = {
+          id: `note-${Date.now()}`,
+
+          timestamp:
+            `${mm}/${dd} — ${timeStr}`,
+
+          author:
+            details.dischargedBy ||
+            p.attendingPhysician ||
+            'Attending Physician',
+
+          tag: 'Handover',
+
+          subjective:
+            `Discharge protocol executed. Destination: ${details.disposition}.`,
+
+          objective:
+            `Condition at discharge: ${details.conditionAtDischarge}. Discharged from Bed ${p.bedNumber}.`,
+
+          assessment:
+            `Discharged from ICU/CCU. Diagnosis: ${p.primaryDiagnosis}.`,
+
+          plan:
+            `Summary: ${details.dischargeSummary}\n` +
+            `Floor/Discharge Meds: ${details.dischargeMedications || 'See list'}\n` +
+            `Follow-up: ${details.followUpInstructions || 'Routine follow-up'}`
+        };
+
+        const updated: PatientRecord = {
+          ...p,
+          isDischarged: true,
+          previousBedNumber: p.bedNumber,
+          bedNumber: '',
+          status: 'discharged' as BedStatus,
+          dischargeDetails: details,
+          progressNotes: [
+            ...p.progressNotes,
+            dischargeNote
+          ],
+          lastUpdated:
+            `${now.toISOString().slice(0, 10)} ${timeStr}`
+        };
+
+        dischargedRecord = updated;
+
+        return updated;
       });
+
+      setPatients(next);
+
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
 
       setPatientToDischarge(null);
 
@@ -505,11 +521,11 @@ export default function App() {
         }
       }
     },
-    [activePin, currentUser]
+    [patients, activePin, currentUser]
   );
 
   // =========================================================
-  // Readmit patient
+  // Readmit
   // =========================================================
 
   const handleReadmitPatient = useCallback(
@@ -518,99 +534,96 @@ export default function App() {
       targetBedNumber: number,
       status: BedStatus
     ) => {
+      const isOccupied = patients.some(
+        (p) =>
+          !p.isDischarged &&
+          Number(p.bedNumber) ===
+            Number(targetBedNumber)
+      );
+
+      if (isOccupied) {
+        alert(
+          `Bed ${targetBedNumber} is currently occupied! Please select an empty bed.`
+        );
+        return;
+      }
+
       let readmittedRecord: PatientRecord | null = null;
 
-      setPatients((prev) => {
-        const now = new Date();
+      const now = new Date();
 
-        const mm = String(
-          now.getMonth() + 1
-        ).padStart(2, '0');
+      const mm = String(
+        now.getMonth() + 1
+      ).padStart(2, '0');
 
-        const dd = String(
-          now.getDate()
-        ).padStart(2, '0');
+      const dd = String(
+        now.getDate()
+      ).padStart(2, '0');
 
-        const timeStr =
-          now.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-
-        const isOccupied = prev.some(
-          (p) =>
-            !p.isDischarged &&
-            Number(p.bedNumber) ===
-              Number(targetBedNumber)
-        );
-
-        if (isOccupied) {
-          alert(
-            `Bed ${targetBedNumber} is currently occupied! Please select an empty bed.`
-          );
-
-          return prev;
-        }
-
-        const next = prev.map((p) => {
-          if (p.id !== patientId) return p;
-
-          const readmitNote: ProgressNote = {
-            id: `note-${Date.now()}`,
-
-            timestamp:
-              `${mm}/${dd} — ${timeStr}`,
-
-            author:
-              p.attendingPhysician ||
-              'Attending Physician',
-
-            tag: 'Round',
-
-            subjective:
-              `Patient re-admitted to intensive care (Assigned Bed ${targetBedNumber}).`,
-
-            objective:
-              `Re-admission evaluation. Continuous hemodynamic monitoring initiated.`,
-
-            assessment:
-              `Active ICU/CCU clinical management resumed for ${p.primaryDiagnosis}.`,
-
-            plan:
-              '1. Connected to bedside telemetry & monitoring\n' +
-              '2. Vital signs and laboratory panel reassessment\n' +
-              '3. Continue targeted protocol'
-          };
-
-          const updated: PatientRecord = {
-            ...p,
-
-            isDischarged: false,
-
-            bedNumber: targetBedNumber,
-
-            status,
-
-            progressNotes: [
-              ...p.progressNotes,
-              readmitNote
-            ],
-
-            lastUpdated:
-              `${now.toISOString().slice(0, 10)} ${timeStr}`
-          };
-
-          readmittedRecord = updated;
-
-          return updated;
+      const timeStr =
+        now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
         });
 
-        if (activePin) {
-          savePatients(next, activePin);
-        }
+      const next = patients.map((p) => {
+        if (p.id !== patientId) return p;
 
-        return next;
+        const readmitNote: ProgressNote = {
+          id: `note-${Date.now()}`,
+
+          timestamp:
+            `${mm}/${dd} — ${timeStr}`,
+
+          author:
+            p.attendingPhysician ||
+            'Attending Physician',
+
+          tag: 'Round',
+
+          subjective:
+            `Patient re-admitted to intensive care (Assigned Bed ${targetBedNumber}).`,
+
+          objective:
+            `Re-admission evaluation. Continuous hemodynamic monitoring initiated.`,
+
+          assessment:
+            `Active ICU/CCU clinical management resumed for ${p.primaryDiagnosis}.`,
+
+          plan:
+            '1. Connected to bedside telemetry & monitoring\n' +
+            '2. Vital signs and laboratory panel reassessment\n' +
+            '3. Continue targeted protocol'
+        };
+
+        const updated: PatientRecord = {
+          ...p,
+
+          isDischarged: false,
+
+          bedNumber: targetBedNumber,
+
+          status,
+
+          progressNotes: [
+            ...p.progressNotes,
+            readmitNote
+          ],
+
+          lastUpdated:
+            `${now.toISOString().slice(0, 10)} ${timeStr}`
+        };
+
+        readmittedRecord = updated;
+
+        return updated;
       });
+
+      setPatients(next);
+
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
 
       setPatientToReadmit(null);
 
@@ -634,11 +647,11 @@ export default function App() {
         }
       }
     },
-    [activePin, currentUser]
+    [patients, activePin, currentUser]
   );
 
   // =========================================================
-  // Manual cloud sync
+  // Cloud Sync
   // =========================================================
 
   const handleManualSync = async () => {
@@ -658,10 +671,6 @@ export default function App() {
       setCloudSyncStatus('error');
     }
   };
-
-  // =========================================================
-  // Pull cloud data
-  // =========================================================
 
   const handlePullCloudData = async () => {
     if (!currentUser) return;
@@ -693,22 +702,27 @@ export default function App() {
   };
 
   // =========================================================
-  // Change total beds
+  // Beds
   // =========================================================
 
   const handleChangeTotalBeds = (
     newCount: number
   ) => {
-    setTotalBeds(newCount);
+    const safeCount = Math.max(
+      3,
+      Math.floor(newCount)
+    );
+
+    setTotalBeds(safeCount);
 
     localStorage.setItem(
       'icu_total_beds',
-      String(newCount)
+      String(safeCount)
     );
   };
 
   // =========================================================
-  // Save field config
+  // Field Config
   // =========================================================
 
   const handleSaveFieldConfig = (
@@ -719,7 +733,7 @@ export default function App() {
   };
 
   // =========================================================
-  // Auto-lock listeners
+  // Auto Lock
   // =========================================================
 
   useEffect(() => {
@@ -821,27 +835,53 @@ export default function App() {
   ]);
 
   // =========================================================
-  // Active patient
+  // Derived Data
   // =========================================================
 
-  const activePatientRecord = selectedPatientId
-    ? patients.find(
-        (p) => p.id === selectedPatientId
-      ) || null
-    : null;
+  const activePatients = patients.filter(
+    (p) => !p.isDischarged
+  );
 
-  // =========================================================
-  // Available beds
-  // =========================================================
+  const archivedPatients = patients.filter(
+    (p) => p.isDischarged
+  );
+
+  const occupiedPatients = activePatients.filter(
+    (p) =>
+      p.bedNumber !== '' &&
+      p.bedNumber !== null &&
+      p.bedNumber !== undefined
+  );
+
+  const occupiedCount = occupiedPatients.length;
+
+  const availableCount =
+    Math.max(
+      0,
+      totalBeds - occupiedCount
+    );
+
+  const criticalCount =
+    activePatients.filter(
+      (p) =>
+        p.status === 'critical' ||
+        p.status === 'deteriorating'
+    ).length;
+
+  const stableCount =
+    activePatients.filter(
+      (p) => p.status === 'stable'
+    ).length;
+
+  const guardedCount =
+    activePatients.filter(
+      (p) => p.status === 'guarded'
+    ).length;
 
   const occupiedBedNumbers = new Set(
-    patients
-      .filter(
-        (p) =>
-          !p.isDischarged &&
-          p.bedNumber
-      )
-      .map((p) => Number(p.bedNumber))
+    occupiedPatients.map(
+      (p) => Number(p.bedNumber)
+    )
   );
 
   const availableBeds = Array.from(
@@ -851,8 +891,1101 @@ export default function App() {
     (b) => !occupiedBedNumbers.has(b)
   );
 
+  const activePatientRecord = selectedPatientId
+    ? patients.find(
+        (p) => p.id === selectedPatientId
+      ) || null
+    : null;
+
+  const filteredPatients = patients.filter((p) => {
+    const q =
+      patientSearch
+        .trim()
+        .toLowerCase();
+
+    if (!q) return true;
+
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.mrn.toLowerCase().includes(q) ||
+      p.primaryDiagnosis
+        .toLowerCase()
+        .includes(q) ||
+      String(p.bedNumber)
+        .toLowerCase()
+        .includes(q)
+    );
+  });
+
   // =========================================================
-  // Initial Auth Loading
+  // Small UI Components
+  // =========================================================
+
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    subtitle,
+    onClick
+  }: {
+    title: string;
+    value: number | string;
+    icon: React.ElementType;
+    subtitle: string;
+    onClick?: () => void;
+  }) => (
+    <button
+      onClick={onClick}
+      className="
+        w-full text-left
+        rounded-2xl
+        border border-slate-800
+        bg-slate-900/80
+        p-4
+        hover:bg-slate-800/80
+        transition
+      "
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-slate-400">
+            {title}
+          </p>
+
+          <p className="text-2xl font-bold text-white mt-1">
+            {value}
+          </p>
+
+          <p className="text-[11px] text-slate-500 mt-1">
+            {subtitle}
+          </p>
+        </div>
+
+        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-cyan-400" />
+        </div>
+      </div>
+    </button>
+  );
+
+  const PatientRow = ({
+    patient,
+    archived = false
+  }: {
+    patient: PatientRecord;
+    archived?: boolean;
+  }) => (
+    <button
+      onClick={() =>
+        setSelectedPatientId(patient.id)
+      }
+      className="
+        w-full
+        text-left
+        p-4
+        rounded-2xl
+        border border-slate-800
+        bg-slate-900/80
+        hover:bg-slate-800
+        transition
+      "
+    >
+      <div className="flex items-center gap-3">
+        <div className="
+          w-11 h-11
+          rounded-xl
+          bg-slate-800
+          flex items-center justify-center
+          shrink-0
+        ">
+          <HeartPulse className="w-5 h-5 text-cyan-400" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-white truncate">
+              {patient.name || 'Unnamed Patient'}
+            </p>
+
+            {!archived && (
+              <span className={`
+                text-[9px]
+                px-2 py-0.5
+                rounded-full
+                ${
+                  patient.status === 'critical' ||
+                  patient.status === 'deteriorating'
+                    ? 'bg-rose-950 text-rose-300'
+                    : patient.status === 'stable'
+                      ? 'bg-emerald-950 text-emerald-300'
+                      : 'bg-amber-950 text-amber-300'
+                }
+              `}>
+                {patient.status}
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-slate-400 mt-1 truncate">
+            {patient.primaryDiagnosis || 'No diagnosis recorded'}
+          </p>
+
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500">
+            <span>
+              ID: {patient.mrn || '—'}
+            </span>
+
+            <span>
+              {patient.age || '—'} yrs
+            </span>
+
+            {patient.bedNumber !== '' && (
+              <span>
+                Bed {patient.bedNumber}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+      </div>
+    </button>
+  );
+
+  // =========================================================
+  // Home Page
+  // =========================================================
+
+  const HomePage = () => (
+    <div className="space-y-6">
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">
+            Clinical Dashboard
+          </p>
+
+          <h2 className="text-2xl font-bold text-white mt-1">
+            CardioVault
+          </h2>
+
+          <p className="text-sm text-slate-400 mt-1">
+            ICU & CCU patient management
+          </p>
+        </div>
+
+        <button
+          onClick={() =>
+            setAdmitBedNumber(
+              availableBeds[0] || 1
+            )
+          }
+          className="
+            flex items-center justify-center gap-2
+            bg-cyan-600
+            hover:bg-cyan-500
+            text-white
+            px-4 py-3
+            rounded-xl
+            font-semibold
+            text-sm
+          "
+        >
+          <Plus className="w-4 h-4" />
+          Admit Patient
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          title="Total Beds"
+          value={totalBeds}
+          subtitle={`${occupiedCount} occupied`}
+          icon={BedDouble}
+          onClick={() =>
+            setActiveTab('beds')
+          }
+        />
+
+        <StatCard
+          title="Available"
+          value={availableCount}
+          subtitle="Beds available"
+          icon={CheckCircle2}
+          onClick={() =>
+            setActiveTab('beds')
+          }
+        />
+
+        <StatCard
+          title="Critical"
+          value={criticalCount}
+          subtitle="Critical / deteriorating"
+          icon={AlertTriangle}
+          onClick={() =>
+            setActiveTab('patients')
+          }
+        />
+
+        <StatCard
+          title="Archive"
+          value={archivedPatients.length}
+          subtitle="Discharged cases"
+          icon={Archive}
+          onClick={() =>
+            setActiveTab('archive')
+          }
+        />
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+
+        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-white">
+                Current Patients
+              </h3>
+
+              <p className="text-xs text-slate-500 mt-1">
+                Active ICU / CCU cases
+              </p>
+            </div>
+
+            <button
+              onClick={() =>
+                setActiveTab('patients')
+              }
+              className="text-xs text-cyan-400 hover:text-cyan-300"
+            >
+              View all
+            </button>
+          </div>
+
+          {activePatients.length === 0 ? (
+            <div className="py-12 text-center">
+              <Users className="w-10 h-10 text-slate-700 mx-auto" />
+
+              <p className="text-sm text-slate-400 mt-3">
+                No active patients
+              </p>
+
+              <button
+                onClick={() =>
+                  setAdmitBedNumber(
+                    availableBeds[0] || 1
+                  )
+                }
+                className="text-xs text-cyan-400 mt-2"
+              >
+                Add first patient
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activePatients
+                .slice(0, 5)
+                .map((patient) => (
+                  <PatientRow
+                    key={patient.id}
+                    patient={patient}
+                  />
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+
+          <h3 className="font-semibold text-white">
+            Bed Overview
+          </h3>
+
+          <div className="mt-4 space-y-3">
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Occupied
+              </span>
+
+              <span className="text-sm font-semibold text-cyan-300">
+                {occupiedCount}
+              </span>
+            </div>
+
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-cyan-500 rounded-full"
+                style={{
+                  width: `${
+                    totalBeds
+                      ? Math.min(
+                          100,
+                          (occupiedCount /
+                            totalBeds) *
+                            100
+                        )
+                      : 0
+                  }%`
+                }}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+
+              <div className="rounded-xl bg-slate-800/70 p-3">
+                <p className="text-[10px] text-slate-500">
+                  Stable
+                </p>
+
+                <p className="text-lg font-bold text-emerald-400">
+                  {stableCount}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-800/70 p-3">
+                <p className="text-[10px] text-slate-500">
+                  Guarded
+                </p>
+
+                <p className="text-lg font-bold text-amber-400">
+                  {guardedCount}
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+          <button
+            onClick={() =>
+              setActiveTab('beds')
+            }
+            className="
+              w-full
+              mt-4
+              py-2.5
+              rounded-xl
+              border border-slate-700
+              text-xs
+              text-slate-300
+              hover:bg-slate-800
+            "
+          >
+            Open Bed Board
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-cyan-400" />
+
+          <h3 className="font-semibold text-white">
+            Quick Clinical Tools
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+
+          <button
+            onClick={() =>
+              setShowCalculators(true)
+            }
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+          >
+            <Activity className="w-4 h-4 text-amber-400" />
+            <p className="text-xs font-semibold text-white mt-2">
+              Calculators
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setShowCustomizer(true)
+            }
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
+            <p className="text-xs font-semibold text-white mt-2">
+              Customize
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setShowCloudAccountModal(true)
+            }
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+          >
+            <Cloud className="w-4 h-4 text-emerald-400" />
+            <p className="text-xs font-semibold text-white mt-2">
+              Cloud Sync
+            </p>
+          </button>
+
+          <button
+            onClick={() =>
+              setShowSecurityModal(true)
+            }
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+          >
+            <ShieldCheck className="w-4 h-4 text-violet-400" />
+            <p className="text-xs font-semibold text-white mt-2">
+              Security
+            </p>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  );
+
+  // =========================================================
+  // Patients Page
+  // =========================================================
+
+  const PatientsPage = () => (
+    <div className="space-y-5">
+
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Patients
+        </h2>
+
+        <p className="text-sm text-slate-400 mt-1">
+          Active ICU / CCU patient records
+        </p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+
+        <input
+          value={patientSearch}
+          onChange={(e) =>
+            setPatientSearch(e.target.value)
+          }
+          placeholder="Search by name, ID, diagnosis or bed..."
+          className="
+            w-full
+            bg-slate-900
+            border border-slate-800
+            rounded-xl
+            pl-10 pr-4 py-3
+            text-sm
+            text-white
+            outline-none
+            focus:border-cyan-600
+          "
+        />
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <span className="px-3 py-1.5 rounded-full bg-cyan-950 text-cyan-300 text-xs whitespace-nowrap">
+          Active: {activePatients.length}
+        </span>
+
+        <span className="px-3 py-1.5 rounded-full bg-rose-950 text-rose-300 text-xs whitespace-nowrap">
+          Critical: {criticalCount}
+        </span>
+
+        <span className="px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 text-xs whitespace-nowrap">
+          Stable: {stableCount}
+        </span>
+      </div>
+
+      {filteredPatients.filter(
+        (p) => !p.isDischarged
+      ).length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
+          <Users className="w-12 h-12 text-slate-700 mx-auto" />
+
+          <p className="text-sm text-slate-400 mt-3">
+            No matching active patients
+          </p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-3">
+          {filteredPatients
+            .filter((p) => !p.isDischarged)
+            .map((patient) => (
+              <PatientRow
+                key={patient.id}
+                patient={patient}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // =========================================================
+  // Beds Page
+  // =========================================================
+
+  const BedsPage = () => (
+    <div className="space-y-5">
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">
+            Bed Board
+          </h2>
+
+          <p className="text-sm text-slate-400 mt-1">
+            {occupiedCount} occupied · {availableCount} available · {totalBeds} total
+          </p>
+        </div>
+
+        <button
+          onClick={() =>
+            setAdmitBedNumber(
+              availableBeds[0] || 1
+            )
+          }
+          className="
+            flex items-center gap-2
+            bg-cyan-600
+            hover:bg-cyan-500
+            text-white
+            px-3 py-2
+            rounded-xl
+            text-xs
+            font-semibold
+          "
+        >
+          <Plus className="w-4 h-4" />
+          Admit
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+
+        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
+          <p className="text-[10px] text-slate-500">
+            Occupied
+          </p>
+          <p className="text-xl font-bold text-cyan-400">
+            {occupiedCount}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
+          <p className="text-[10px] text-slate-500">
+            Available
+          </p>
+          <p className="text-xl font-bold text-emerald-400">
+            {availableCount}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
+          <p className="text-[10px] text-slate-500">
+            Critical
+          </p>
+          <p className="text-xl font-bold text-rose-400">
+            {criticalCount}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
+          <p className="text-[10px] text-slate-500">
+            Stable
+          </p>
+          <p className="text-xl font-bold text-emerald-400">
+            {stableCount}
+          </p>
+        </div>
+
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+
+        {Array.from(
+          { length: totalBeds },
+          (_, i) => i + 1
+        ).map((bedNumber) => {
+
+          const patient =
+            activePatients.find(
+              (p) =>
+                Number(p.bedNumber) ===
+                bedNumber
+            );
+
+          if (!patient) {
+            return (
+              <button
+                key={bedNumber}
+                onClick={() =>
+                  setAdmitBedNumber(bedNumber)
+                }
+                className="
+                  min-h-[145px]
+                  rounded-2xl
+                  border border-dashed
+                  border-slate-700
+                  bg-slate-900/50
+                  hover:bg-slate-800
+                  transition
+                  p-4
+                  text-left
+                "
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">
+                    BED
+                  </span>
+
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+
+                <p className="text-2xl font-bold text-white mt-3">
+                  {bedNumber}
+                </p>
+
+                <p className="text-xs text-emerald-400 mt-2">
+                  Available
+                </p>
+
+                <p className="text-[10px] text-slate-600 mt-3">
+                  Tap to admit patient
+                </p>
+              </button>
+            );
+          }
+
+          const isCritical =
+            patient.status === 'critical' ||
+            patient.status === 'deteriorating';
+
+          return (
+            <button
+              key={bedNumber}
+              onClick={() =>
+                setSelectedPatientId(
+                  patient.id
+                )
+              }
+              className={`
+                min-h-[145px]
+                rounded-2xl
+                border
+                p-4
+                text-left
+                transition
+                ${
+                  isCritical
+                    ? 'border-rose-900/70 bg-rose-950/20 hover:bg-rose-950/40'
+                    : 'border-slate-800 bg-slate-900/80 hover:bg-slate-800'
+                }
+              `}
+            >
+              <div className="flex items-center justify-between">
+
+                <span className="text-xs text-slate-500">
+                  BED
+                </span>
+
+                {isCritical ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                ) : (
+                  <HeartPulse className="w-4 h-4 text-cyan-400" />
+                )}
+
+              </div>
+
+              <p className="text-2xl font-bold text-white mt-3">
+                {bedNumber}
+              </p>
+
+              <p className="font-semibold text-sm text-white truncate mt-1">
+                {patient.name}
+              </p>
+
+              <p className="text-[10px] text-slate-500 truncate mt-1">
+                {patient.primaryDiagnosis || 'No diagnosis'}
+              </p>
+
+              <span className={`
+                inline-block
+                text-[9px]
+                mt-2
+                px-2 py-1
+                rounded-full
+                ${
+                  isCritical
+                    ? 'bg-rose-950 text-rose-300'
+                    : 'bg-slate-800 text-slate-300'
+                }
+              `}>
+                {patient.status}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // =========================================================
+  // Archive Page
+  // =========================================================
+
+  const ArchivePage = () => (
+    <div className="space-y-5">
+
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Archive
+        </h2>
+
+        <p className="text-sm text-slate-400 mt-1">
+          Discharged patients and completed cases
+        </p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+
+        <input
+          value={patientSearch}
+          onChange={(e) =>
+            setPatientSearch(e.target.value)
+          }
+          placeholder="Search archived patients..."
+          className="
+            w-full
+            bg-slate-900
+            border border-slate-800
+            rounded-xl
+            pl-10 pr-4 py-3
+            text-sm
+            text-white
+            outline-none
+            focus:border-cyan-600
+          "
+        />
+      </div>
+
+      {filteredPatients.filter(
+        (p) => p.isDischarged
+      ).length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
+          <Archive className="w-12 h-12 text-slate-700 mx-auto" />
+
+          <p className="text-sm text-slate-400 mt-3">
+            Archive is empty
+          </p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-3">
+          {filteredPatients
+            .filter((p) => p.isDischarged)
+            .map((patient) => (
+              <PatientRow
+                key={patient.id}
+                patient={patient}
+                archived
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // =========================================================
+  // Settings Page
+  // =========================================================
+
+  const SettingsPage = () => (
+    <div className="space-y-5">
+
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Settings
+        </h2>
+
+        <p className="text-sm text-slate-400 mt-1">
+          CardioVault configuration
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+
+          <div className="flex items-center gap-3 mb-4">
+            <BedDouble className="w-5 h-5 text-cyan-400" />
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Bed Configuration
+              </h3>
+
+              <p className="text-[11px] text-slate-500">
+                Set the total number of ICU/CCU beds
+              </p>
+            </div>
+          </div>
+
+          <label className="text-xs text-slate-400">
+            Total Beds
+          </label>
+
+          <div className="flex gap-2 mt-2">
+
+            <input
+              type="number"
+              min={3}
+              value={totalBeds}
+              onChange={(e) =>
+                handleChangeTotalBeds(
+                  Number(e.target.value)
+                )
+              }
+              className="
+                flex-1
+                bg-slate-950
+                border border-slate-700
+                rounded-xl
+                px-3 py-3
+                text-white
+                outline-none
+                focus:border-cyan-600
+              "
+            />
+
+            <div className="px-4 rounded-xl bg-slate-800 flex items-center text-xs text-slate-400">
+              beds
+            </div>
+
+          </div>
+
+          <p className="text-[10px] text-slate-600 mt-2">
+            Minimum 3 beds.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+
+          <div className="flex items-center gap-3 mb-4">
+            <ShieldCheck className="w-5 h-5 text-violet-400" />
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Security
+              </h3>
+
+              <p className="text-[11px] text-slate-500">
+                PIN and automatic lock
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() =>
+              setShowSecurityModal(true)
+            }
+            className="
+              w-full
+              flex items-center justify-between
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+            "
+          >
+            <span className="text-sm text-slate-200">
+              Security Settings
+            </span>
+
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+
+          <div className="flex items-center gap-3 mb-4">
+            <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Patient Fields
+              </h3>
+
+              <p className="text-[11px] text-slate-500">
+                Customize visible clinical sections
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() =>
+              setShowCustomizer(true)
+            }
+            className="
+              w-full
+              flex items-center justify-between
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+            "
+          >
+            <span className="text-sm text-slate-200">
+              Customize Fields
+            </span>
+
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+
+          <div className="flex items-center gap-3 mb-4">
+            <Cloud className="w-5 h-5 text-emerald-400" />
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Cloud Sync
+              </h3>
+
+              <p className="text-[11px] text-slate-500">
+                Backup and multi-device sync
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+
+            {cloudSyncStatus === 'syncing' ? (
+              <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
+            ) : cloudSyncStatus === 'synced' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <Clock3 className="w-4 h-4 text-slate-500" />
+            )}
+
+            <span className="text-xs text-slate-400">
+              {cloudSyncStatus === 'syncing'
+                ? 'Syncing...'
+                : cloudSyncStatus === 'synced'
+                  ? 'Synced'
+                  : cloudSyncStatus === 'error'
+                    ? 'Sync error'
+                    : 'Offline'}
+            </span>
+          </div>
+
+          <button
+            onClick={() =>
+              setShowCloudAccountModal(true)
+            }
+            className="
+              w-full
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+              text-sm
+              text-slate-200
+            "
+          >
+            Cloud Account
+          </button>
+        </div>
+
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+
+        <div className="flex items-center gap-3">
+          <LogOut className="w-5 h-5 text-rose-400" />
+
+          <div className="flex-1">
+            <h3 className="font-semibold text-white">
+              Session
+            </h3>
+
+            <p className="text-[11px] text-slate-500">
+              {currentUser?.email || 'Offline / Local mode'}
+            </p>
+          </div>
+
+          <button
+            onClick={handleLockApp}
+            className="
+              px-3 py-2
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+              text-xs
+              text-slate-300
+            "
+          >
+            Lock
+          </button>
+
+          {currentUser && (
+            <button
+              onClick={handleLogout}
+              className="
+                px-3 py-2
+                rounded-xl
+                bg-rose-950
+                hover:bg-rose-900
+                text-xs
+                text-rose-300
+              "
+            >
+              Logout
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+        <div className="flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-slate-500" />
+
+          <p className="text-xs text-slate-500">
+            CardioVault • ICU & CCU Clinical Notebook
+          </p>
+        </div>
+      </div>
+
+    </div>
+  );
+
+  // =========================================================
+  // Render Active Page
+  // =========================================================
+
+  const renderActivePage = () => {
+    switch (activeTab) {
+      case 'patients':
+        return <PatientsPage />;
+
+      case 'beds':
+        return <BedsPage />;
+
+      case 'archive':
+        return <ArchivePage />;
+
+      case 'settings':
+        return <SettingsPage />;
+
+      case 'home':
+      default:
+        return <HomePage />;
+    }
+  };
+
+  // =========================================================
+  // Auth Loading
   // =========================================================
 
   if (authLoading) {
@@ -930,9 +2063,15 @@ export default function App() {
   // =========================================================
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="
+      min-h-screen
+      bg-slate-950
+      text-slate-100
+      flex flex-col
+      selection:bg-cyan-500/30
+      selection:text-cyan-200
+    ">
 
-      {/* Navigation */}
       <Navbar
         specialtyMode={specialtyMode}
         onSetSpecialtyMode={setSpecialtyMode}
@@ -981,7 +2120,6 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Main Workspace */}
       <main
         className="
           flex-1
@@ -996,33 +2134,9 @@ export default function App() {
           md:pb-6
         "
       >
-        <CensusView
-          patients={patients}
-          totalBeds={totalBeds}
-          specialtyMode={specialtyMode}
 
-          onSelectPatient={(patient) =>
-            setSelectedPatientId(
-              patient.id
-            )
-          }
+        {renderActivePage()}
 
-          onAdmitToBed={(bedNum) =>
-            setAdmitBedNumber(bedNum)
-          }
-
-          onDischargePatient={(patient) =>
-            setPatientToDischarge(patient)
-          }
-
-          onReadmitPatient={(patient) =>
-            setPatientToReadmit(patient)
-          }
-
-          onChangeTotalBeds={
-            handleChangeTotalBeds
-          }
-        />
       </main>
 
       {/* =====================================================
@@ -1062,7 +2176,8 @@ export default function App() {
         />
       )}
 
-      {/* Admit Patient */}
+      {/* Admit */}
+
       {admitBedNumber !== null && (
         <AdmitPatientModal
           bedNumber={admitBedNumber}
@@ -1075,6 +2190,7 @@ export default function App() {
       )}
 
       {/* Calculators */}
+
       {showCalculators && (
         <ClinicalCalculatorsModal
           onClose={() =>
@@ -1083,7 +2199,8 @@ export default function App() {
         />
       )}
 
-      {/* Field Customizer */}
+      {/* Customizer */}
+
       {showCustomizer && (
         <FieldCustomizerModal
           config={fieldConfig}
@@ -1097,12 +2214,15 @@ export default function App() {
       )}
 
       {/* Security */}
+
       {showSecurityModal && (
         <SecuritySettingsModal
           securitySettings={
             securitySettings
           }
+
           patients={patients}
+
           currentActivePin={activePin}
 
           onUpdateSecurity={(newSettings) =>
@@ -1122,6 +2242,7 @@ export default function App() {
       )}
 
       {/* APK Guide */}
+
       {showApkModal && (
         <AndroidApkModal
           onClose={() =>
@@ -1131,6 +2252,7 @@ export default function App() {
       )}
 
       {/* Print */}
+
       {showPrintView && (
         <PrintableView
           patients={patients}
@@ -1144,6 +2266,7 @@ export default function App() {
       )}
 
       {/* Discharge */}
+
       {patientToDischarge && (
         <DischargePatientModal
           patient={patientToDischarge}
@@ -1159,6 +2282,7 @@ export default function App() {
       )}
 
       {/* Readmit */}
+
       {patientToReadmit && (
         <ReadmitPatientModal
           patient={patientToReadmit}
@@ -1175,6 +2299,7 @@ export default function App() {
       )}
 
       {/* Cloud */}
+
       {showCloudAccountModal && (
         <CloudAccountModal
           currentUser={currentUser}
@@ -1196,6 +2321,7 @@ export default function App() {
           }
         />
       )}
+
     </div>
   );
 }
