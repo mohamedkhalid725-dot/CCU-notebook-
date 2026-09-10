@@ -11,37 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download the project
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      # 3. Install Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # 4. Install web dependencies
       - name: Install dependencies
         run: npm install
 
-      # 5. Build the Vite application
       - name: Build Vite
         run: npm run build
 
-      # 6. Install Capacitor
       - name: Install Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      # 7. Create Capacitor configuration
       - name: Create Capacitor config
         run: |
           cat > capacitor.config.ts <<'EOF'
@@ -59,22 +52,48 @@ jobs:
           export default config;
           EOF
 
-      # 8. Create Android project
       - name: Add Android platform
         run: npx cap add android
 
-      # 9. Sync web app with Android
+      - name: Add Firebase configuration
+        env:
+          FIREBASE_ANDROID_JSON: ${{ secrets.FIREBASE_ANDROID_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_ANDROID_JSON" > android/app/google-services.json
+
+      - name: Enable Google Services
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          gradle = Path("android/build.gradle")
+          text = gradle.read_text()
+
+          plugin = "com.google.gms:google-services:4.4.4"
+
+          if plugin not in text:
+              text += f'\n\nbuildscript {{\n    dependencies {{\n        classpath "{plugin}"\n    }}\n}}\n'
+
+          gradle.write_text(text)
+
+          app_gradle = Path("android/app/build.gradle")
+          text = app_gradle.read_text()
+
+          if "com.google.gms.google-services" not in text:
+              text += '\n\napply plugin: "com.google.gms.google-services"\n'
+
+          app_gradle.write_text(text)
+          PY
+
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 10. Build APK
       - name: Build Debug APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # 11. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
