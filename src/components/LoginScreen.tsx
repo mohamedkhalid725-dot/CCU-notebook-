@@ -13,7 +13,12 @@ import {
   Eye,
   EyeOff,
   WifiOff,
-  Stethoscope
+  Stethoscope,
+  Copy,
+  ExternalLink,
+  Check,
+  Globe,
+  UserCheck
 } from 'lucide-react';
 import { 
   loginWithEmail, 
@@ -22,6 +27,8 @@ import {
 } from '../services/firebase';
 import { AppSecuritySettings } from '../types';
 import { hashPin } from '../services/crypto';
+import { useI18n } from '../services/i18n';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -34,6 +41,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onContinueOffline,
   securitySettings
 }) => {
+  const { lang, setLang, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,28 +54,52 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Unauthorized domain specific state
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+
   // Offline PIN fallback state
   const [showOfflinePin, setShowOfflinePin] = useState(false);
   const [offlinePinInput, setOfflinePinInput] = useState('');
   const [offlinePinError, setOfflinePinError] = useState<string | null>(null);
 
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const firebaseSettingsUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
+
+  const handleCopyDomain = () => {
+    if (currentHostname) {
+      navigator.clipboard.writeText(currentHostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
+
+  const handleDutyDoctorAccess = () => {
+    if (!securitySettings.isPinSet) {
+      onContinueOffline('0000');
+    } else {
+      setShowOfflinePin(true);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+    setUnauthorizedDomain(null);
 
     if (!email || !password) {
-      setErrorMsg('يرجى إدخال البريد الإلكتروني وكلمة المرور');
+      setErrorMsg(lang === 'ar' ? 'يرجى إدخال البريد الإلكتروني وكلمة المرور' : 'Please enter email and password');
       return;
     }
 
     if (activeTab === 'signup') {
       if (password.length < 6) {
-        setErrorMsg('كلمة المرور يجب أن تتكون من 6 خانات على الأقل');
+        setErrorMsg(lang === 'ar' ? 'كلمة المرور يجب أن تتكون من 6 خانات على الأقل' : 'Password must be at least 6 characters');
         return;
       }
       if (password !== confirmPassword) {
-        setErrorMsg('كلمات المرور غير متطابقة');
+        setErrorMsg(lang === 'ar' ? 'كلمات المرور غير متطابقة' : 'Passwords do not match');
         return;
       }
     }
@@ -76,31 +108,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     try {
       if (activeTab === 'signin') {
         await loginWithEmail(email, password);
-        setSuccessMsg('تم تسجيل الدخول بنجاح! جاري تحميل ملفات المرضى...');
+        setSuccessMsg(lang === 'ar' ? 'تم تسجيل الدخول بنجاح! جاري تحميل ملفات المرضى...' : 'Signed in successfully! Loading patient records...');
       } else {
         await registerWithEmail(email, password, displayName.trim() || undefined);
-        setSuccessMsg('تم إنشاء حساب الطبيب بنجاح وربط السحابة!');
+        setSuccessMsg(lang === 'ar' ? 'تم إنشاء حساب الطبيب بنجاح وربط السحابة!' : 'Doctor account created and connected to cloud!');
       }
       setTimeout(() => {
         onLoginSuccess();
       }, 500);
     } catch (err: any) {
       console.error('Authentication error:', err);
-      let message = 'تعذر تسجيل الدخول. يرجى التحقق من البيانات والمحاولة مجدداً.';
+      let message = lang === 'ar' 
+        ? 'تعذر تسجيل الدخول. يرجى التحقق من البيانات والمحاولة مجدداً.' 
+        : 'Sign in failed. Please check your credentials and try again.';
+        
       if (
         err.code === 'auth/user-not-found' || 
         err.code === 'auth/wrong-password' || 
         err.code === 'auth/invalid-credential'
       ) {
-        message = 'بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور.';
+        message = lang === 'ar' 
+          ? 'بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور.' 
+          : 'Invalid login credentials. Please check your email and password.';
       } else if (err.code === 'auth/email-already-in-use') {
-        message = 'هذا البريد مسجل مسبقاً. يرجى التبديل لتبويب تسجيل الدخول.';
+        message = lang === 'ar' 
+          ? 'هذا البريد مسجل مسبقاً. يرجى التبديل لتبويب تسجيل الدخول.' 
+          : 'Email already in use. Please switch to the Sign In tab.';
       } else if (err.code === 'auth/weak-password') {
-        message = 'كلمة المرور ضعيفة، يرجى اختيار كلمة مرور أقوى.';
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        message = 'تم إغلاق نافذة تسجيل الدخول قبل إتمام العملية.';
+        message = lang === 'ar' 
+          ? 'كلمة المرور ضعيفة، يرجى اختيار كلمة مرور أقوى.' 
+          : 'Password is too weak. Please use at least 6 characters.';
       } else if (err.code === 'auth/network-request-failed') {
-        message = 'تعذر الاتصال بالشبكة. يمكنك استخدام وضع الدخول المحلي أدناه.';
+        message = lang === 'ar' 
+          ? 'تعذر الاتصال بالشبكة. يمكنك استخدام وضع الدخول المحلي أدناه.' 
+          : 'Network error. You can continue using Offline Mode below.';
       }
       setErrorMsg(message);
     } finally {
@@ -111,17 +152,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    setUnauthorizedDomain(null);
     setGoogleLoading(true);
     try {
       await loginWithGoogle();
-      setSuccessMsg('تم تسجيل الدخول بنجاح عبر حساب Google!');
+      setSuccessMsg(lang === 'ar' ? 'تم تسجيل الدخول بنجاح عبر حساب Google!' : 'Signed in successfully with Google!');
       setTimeout(() => {
         onLoginSuccess();
       }, 500);
     } catch (err: any) {
       console.error('Google Sign In error:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg('تعذر تسجيل الدخول عبر Google. يرجى التأكد من تفعيل النوافذ المنبثقة.');
+      if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+        setUnauthorizedDomain(currentHostname || 'ais-dev-*.run.app');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setErrorMsg(lang === 'ar' ? 'تم إغلاق نافذة تسجيل الدخول عبر Google قبل إتمام العملية.' : 'Google sign-in popup was closed before completing.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setErrorMsg(lang === 'ar' ? 'تم حظر النافذة المنبثقة من قِبل المتصفح. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.' : 'Popup was blocked by browser. Please allow popups for this site.');
+      } else {
+        setErrorMsg(err.message || (lang === 'ar' ? 'تعذر تسجيل الدخول عبر Google. يرجى التحقق من الشبكة والمحاولة مجدداً.' : 'Google sign-in failed. Please check network and retry.'));
       }
     } finally {
       setGoogleLoading(false);
@@ -133,7 +181,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setOfflinePinError(null);
 
     if (!securitySettings.isPinSet) {
-      // No PIN set yet, allow direct local access
       onContinueOffline(offlinePinInput || '0000');
       return;
     }
@@ -143,10 +190,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       if (testHash === securitySettings.hashedPin) {
         onContinueOffline(offlinePinInput);
       } else {
-        setOfflinePinError('رمز PIN المحلي غير صحيح');
+        setOfflinePinError(lang === 'ar' ? 'رمز PIN المحلي غير صحيح' : 'Incorrect local PIN');
       }
     } catch {
-      setOfflinePinError('حدث خطأ أثناء فحص رمز PIN');
+      setOfflinePinError(lang === 'ar' ? 'حدث خطأ أثناء فحص رمز PIN' : 'Error verifying PIN');
     }
   };
 
@@ -158,8 +205,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* Main Authentication Card */}
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10">
+        
+        {/* Language Switcher Bar */}
+        <div className="px-6 pt-4 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
+            <span>v1.1.0</span>
+            <span>•</span>
+            <span>ICU/CCU</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-cyan-300 border border-slate-700 transition"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span className="font-semibold">{lang === 'ar' ? 'English' : 'العربية'}</span>
+          </button>
+        </div>
+
         {/* Medical Brand Banner */}
-        <div className="p-6 sm:p-7 border-b border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 text-center">
+        <div className="px-6 pb-6 pt-2 border-b border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-lg shadow-cyan-950/50 mb-3.5">
             <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
               <HeartPulse className="w-7 h-7 text-cyan-400" />
@@ -167,22 +232,88 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
           
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            مفكرة العناية المركزة والقلبية
+            CardioVault
           </h1>
           <p className="text-xs sm:text-sm text-cyan-400 font-medium mt-1">
-            ICU & CCU Clinical Notebook
+            {lang === 'ar' ? 'مفكرة العناية المركزة والقلبية السريرية' : 'Personal ICU & CCU Clinical Notebook'}
           </p>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-3 rounded-full text-xs font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>تسجيل الدخول والمزامنة السحابية المشفرة</span>
+            <span>{lang === 'ar' ? 'مصادقة الطبيب والمزامنة السحابية المشفرة' : 'Physician Auth & Secure Cloud Sync'}</span>
           </div>
         </div>
 
         {/* Card Body */}
         <div className="p-6 sm:p-7 space-y-5">
-          {/* Notification Messages */}
-          {errorMsg && (
+          
+          {/* Unauthorized Domain Explanatory Card */}
+          {unauthorizedDomain && (
+            <div className="p-4 bg-amber-950/50 border border-amber-800/70 rounded-2xl text-xs text-amber-200 space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-amber-300 text-sm">
+                    {lang === 'ar' ? 'تنبيه نطاق Firebase: مطلوب تصريح النطاق' : 'Firebase Auth: Domain Not Authorized'}
+                  </h4>
+                  <p className="text-amber-200/90 text-[11px] mt-1 leading-relaxed">
+                    {lang === 'ar'
+                      ? 'لتفعيل تسجيل الدخول بحساب Google على هذا الرابط، يجب إضافة النطاق إلى قائمة النطاقات المصرح بها في إعدادات Firebase.'
+                      : 'Google Sign-In requires this preview domain to be added to Authorized Domains in your Firebase Authentication Console.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Current Domain Box & Copy Button */}
+              <div className="p-2.5 bg-slate-950/80 rounded-xl border border-amber-900/60 flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] text-amber-300 truncate select-all">
+                  {unauthorizedDomain}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyDomain}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-900/40 hover:bg-amber-800/60 text-amber-300 border border-amber-700/60 text-[11px] font-semibold transition shrink-0"
+                >
+                  {copiedDomain ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>{lang === 'ar' ? 'تم النسخ' : 'Copied'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>{lang === 'ar' ? 'نسخ النطاق' : 'Copy'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Action Buttons: Firebase Console & Instant Clinical Access */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <a
+                  href={firebaseSettingsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-semibold transition text-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'فتح لوحة Firebase' : 'Firebase Console'}</span>
+                </a>
+                
+                <button
+                  type="button"
+                  onClick={handleDutyDoctorAccess}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-bold transition shadow-md cursor-pointer"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'المتابعة كطبيب مناوب الآن' : 'Continue as Duty Doctor'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* General Notification Messages */}
+          {errorMsg && !unauthorizedDomain && (
             <div className="p-3 bg-rose-950/70 border border-rose-800/80 rounded-xl text-rose-200 text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1">{errorMsg}</div>
@@ -196,7 +327,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           )}
 
-          {/* Google Sign In (Primary Fast Option) */}
+          {/* Primary Quick Duty Physician Access Button */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleDutyDoctorAccess}
+              className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow-lg shadow-cyan-950/60 active:scale-[0.99] cursor-pointer"
+            >
+              <Stethoscope className="w-4 h-4" />
+              <span>
+                {lang === 'ar' ? 'الدخول المباشر كطبيب مناوب (Clinical Duty Access)' : 'Instant Clinical Duty Access'}
+              </span>
+            </button>
+            <p className="text-[11px] text-center text-slate-400">
+              {lang === 'ar' 
+                ? 'وصول سريري كامل وتوثيق فوري مع حفظ محلي مشفر دون اشتراط ربط حساب' 
+                : 'Immediate full ICU/CCU access with local encrypted storage, no setup required'}
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-slate-800 flex-1" />
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+              {lang === 'ar' ? 'أو عبر الحساب السحابي' : 'Or via Cloud Account'}
+            </span>
+            <div className="h-px bg-slate-800 flex-1" />
+          </div>
+
+          {/* Google Sign In Option */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -225,25 +384,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 />
               </svg>
             )}
-            <span>تسجيل الدخول السريع عبر Google</span>
+            <span>{lang === 'ar' ? 'تسجيل الدخول عبر Google' : 'Sign in with Google'}</span>
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="h-px bg-slate-800 flex-1" />
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              أو بالبريد وكلمة المرور
-            </span>
-            <div className="h-px bg-slate-800 flex-1" />
-          </div>
-
-          {/* Tabs: Sign In vs Sign Up */}
+          {/* Tabs: Sign In vs Sign Up with Email */}
           <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('signin');
                 setErrorMsg(null);
+                setUnauthorizedDomain(null);
               }}
               className={`py-2 rounded-lg transition text-center ${
                 activeTab === 'signin'
@@ -251,13 +402,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              تسجيل الدخول
+              {lang === 'ar' ? 'البريد الإلكتروني' : 'Sign In with Email'}
             </button>
             <button
               type="button"
               onClick={() => {
                 setActiveTab('signup');
                 setErrorMsg(null);
+                setUnauthorizedDomain(null);
               }}
               className={`py-2 rounded-lg transition text-center ${
                 activeTab === 'signup'
@@ -265,7 +417,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              حساب طبيب جديد
+              {lang === 'ar' ? 'حساب طبيب جديد' : 'New Doctor Account'}
             </button>
           </div>
 
@@ -274,7 +426,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {activeTab === 'signup' && (
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  اسم الطبيب / اللقب السريري
+                  {lang === 'ar' ? 'اسم الطبيب / اللقب السريري' : 'Physician Name & Title'}
                 </label>
                 <div className="relative">
                   <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -282,7 +434,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="د. محمد خالد (أخصائي العناية)"
+                    placeholder={lang === 'ar' ? 'د. محمد خالد (أخصائي العناية)' : 'Dr. Mohamed Khalid (ICU Specialist)'}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
@@ -291,7 +443,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                البريد الإلكتروني
+                {lang === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -308,7 +460,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                كلمة المرور
+                {lang === 'ar' ? 'كلمة المرور' : 'Password'}
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -333,7 +485,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {activeTab === 'signup' && (
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  تأكيد كلمة المرور
+                  {lang === 'ar' ? 'تأكيد كلمة المرور' : 'Confirm Password'}
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -352,15 +504,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <button
               type="submit"
               disabled={loading || googleLoading}
-              className="w-full mt-2 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-lg shadow-cyan-950/60 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/50 font-semibold py-2.5 px-4 rounded-xl text-sm transition active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-cyan-300 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <Activity className="w-4 h-4" />
+                  <Activity className="w-4 h-4 text-cyan-400" />
                   <span>
-                    {activeTab === 'signin' ? 'دخول العناية المركزة' : 'إنشاء الحساب وبدء العمل'}
+                    {activeTab === 'signin' 
+                      ? (lang === 'ar' ? 'تسجيل الدخول بالبريد' : 'Sign In with Email') 
+                      : (lang === 'ar' ? 'إنشاء حساب الطبيب' : 'Register Doctor Account')}
                   </span>
                 </>
               )}
@@ -375,22 +529,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onClick={() => setShowOfflinePin(true)}
                 className="w-full text-center text-xs text-slate-400 hover:text-cyan-400 py-1 flex items-center justify-center gap-1.5 transition"
               >
-                <WifiOff className="w-3.5 h-3.5 text-slate-500" />
-                <span>العمل بدون إنترنت أو الدخول السريع عبر رمز PIN المحلي</span>
+                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                <span>{lang === 'ar' ? 'إدخال رمز PIN المحلي المخصص' : 'Enter Custom Local PIN'}</span>
               </button>
             ) : (
               <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2.5 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-300 flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
-                    الدخول المحلي المشفر (Offline PIN)
+                    {lang === 'ar' ? 'الدخول برمز PIN المحلي' : 'Custom Local PIN Unlock'}
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowOfflinePin(false)}
                     className="text-slate-500 hover:text-slate-300 text-[11px]"
                   >
-                    إلغاء
+                    {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                   </button>
                 </div>
 
@@ -406,14 +560,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     maxLength={6}
                     value={offlinePinInput}
                     onChange={(e) => setOfflinePinInput(e.target.value)}
-                    placeholder="رمز PIN المحلي"
+                    placeholder="PIN"
                     className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 text-center tracking-widest"
                   />
                   <button
                     type="submit"
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-medium transition"
                   >
-                    دخول محلي
+                    {lang === 'ar' ? 'دخول' : 'Unlock'}
                   </button>
                 </form>
               </div>
@@ -425,11 +579,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <div className="px-6 py-3 bg-slate-950/60 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
           <span className="flex items-center gap-1">
             <Stethoscope className="w-3 h-3 text-cyan-400" />
-            <span>معايير التوثيق السريري ICU/CCU</span>
+            <span>{lang === 'ar' ? 'معايير التوثيق السريري ICU/CCU' : 'ICU/CCU Clinical Standards'}</span>
           </span>
           <span className="flex items-center gap-1 text-emerald-400">
             <Cloud className="w-3 h-3" />
-            <span>مزامنة تلقائية حية</span>
+            <span>{lang === 'ar' ? 'مزامنة تلقائية حية' : 'Encrypted Storage'}</span>
           </span>
         </div>
       </div>

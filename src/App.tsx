@@ -721,6 +721,19 @@ export default function App() {
     );
   };
 
+  const handleUpdatePatientBed = useCallback(
+    async (patientId: string, newBedNumber: string | number) => {
+      const targetPatient = patients.find((p) => p.id === patientId);
+      if (!targetPatient) return;
+      const updated: PatientRecord = {
+        ...targetPatient,
+        bedNumber: String(newBedNumber)
+      };
+      await handleUpdatePatient(updated);
+    },
+    [patients, handleUpdatePatient]
+  );
+
   // =========================================================
   // Field Config
   // =========================================================
@@ -974,6 +987,7 @@ export default function App() {
   }: {
     patient: PatientRecord;
     archived?: boolean;
+    key?: React.Key;
   }) => (
     <button
       onClick={() =>
@@ -1426,208 +1440,17 @@ export default function App() {
   // =========================================================
 
   const BedsPage = () => (
-    <div className="space-y-5">
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">
-            Bed Board
-          </h2>
-
-          <p className="text-sm text-slate-400 mt-1">
-            {occupiedCount} occupied · {availableCount} available · {totalBeds} total
-          </p>
-        </div>
-
-        <button
-          onClick={() =>
-            setAdmitBedNumber(
-              availableBeds[0] || 1
-            )
-          }
-          className="
-            flex items-center gap-2
-            bg-cyan-600
-            hover:bg-cyan-500
-            text-white
-            px-3 py-2
-            rounded-xl
-            text-xs
-            font-semibold
-          "
-        >
-          <Plus className="w-4 h-4" />
-          Admit
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-
-        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-          <p className="text-[10px] text-slate-500">
-            Occupied
-          </p>
-          <p className="text-xl font-bold text-cyan-400">
-            {occupiedCount}
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-          <p className="text-[10px] text-slate-500">
-            Available
-          </p>
-          <p className="text-xl font-bold text-emerald-400">
-            {availableCount}
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-          <p className="text-[10px] text-slate-500">
-            Critical
-          </p>
-          <p className="text-xl font-bold text-rose-400">
-            {criticalCount}
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-          <p className="text-[10px] text-slate-500">
-            Stable
-          </p>
-          <p className="text-xl font-bold text-emerald-400">
-            {stableCount}
-          </p>
-        </div>
-
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-
-        {Array.from(
-          { length: totalBeds },
-          (_, i) => i + 1
-        ).map((bedNumber) => {
-
-          const patient =
-            activePatients.find(
-              (p) =>
-                Number(p.bedNumber) ===
-                bedNumber
-            );
-
-          if (!patient) {
-            return (
-              <button
-                key={bedNumber}
-                onClick={() =>
-                  setAdmitBedNumber(bedNumber)
-                }
-                className="
-                  min-h-[145px]
-                  rounded-2xl
-                  border border-dashed
-                  border-slate-700
-                  bg-slate-900/50
-                  hover:bg-slate-800
-                  transition
-                  p-4
-                  text-left
-                "
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">
-                    BED
-                  </span>
-
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                </div>
-
-                <p className="text-2xl font-bold text-white mt-3">
-                  {bedNumber}
-                </p>
-
-                <p className="text-xs text-emerald-400 mt-2">
-                  Available
-                </p>
-
-                <p className="text-[10px] text-slate-600 mt-3">
-                  Tap to admit patient
-                </p>
-              </button>
-            );
-          }
-
-          const isCritical =
-            patient.status === 'critical' ||
-            patient.status === 'deteriorating';
-
-          return (
-            <button
-              key={bedNumber}
-              onClick={() =>
-                setSelectedPatientId(
-                  patient.id
-                )
-              }
-              className={`
-                min-h-[145px]
-                rounded-2xl
-                border
-                p-4
-                text-left
-                transition
-                ${
-                  isCritical
-                    ? 'border-rose-900/70 bg-rose-950/20 hover:bg-rose-950/40'
-                    : 'border-slate-800 bg-slate-900/80 hover:bg-slate-800'
-                }
-              `}
-            >
-              <div className="flex items-center justify-between">
-
-                <span className="text-xs text-slate-500">
-                  BED
-                </span>
-
-                {isCritical ? (
-                  <AlertTriangle className="w-4 h-4 text-rose-400" />
-                ) : (
-                  <HeartPulse className="w-4 h-4 text-cyan-400" />
-                )}
-
-              </div>
-
-              <p className="text-2xl font-bold text-white mt-3">
-                {bedNumber}
-              </p>
-
-              <p className="font-semibold text-sm text-white truncate mt-1">
-                {patient.name}
-              </p>
-
-              <p className="text-[10px] text-slate-500 truncate mt-1">
-                {patient.primaryDiagnosis || 'No diagnosis'}
-              </p>
-
-              <span className={`
-                inline-block
-                text-[9px]
-                mt-2
-                px-2 py-1
-                rounded-full
-                ${
-                  isCritical
-                    ? 'bg-rose-950 text-rose-300'
-                    : 'bg-slate-800 text-slate-300'
-                }
-              `}>
-                {patient.status}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <CensusView
+      patients={patients}
+      totalBeds={totalBeds}
+      specialtyMode={specialtyMode}
+      onSelectPatient={(pt) => setSelectedPatientId(pt.id)}
+      onAdmitToBed={(bedNum) => setAdmitBedNumber(Number(bedNum) || 1)}
+      onDischargePatient={(pt) => setPatientToDischarge(pt)}
+      onReadmitPatient={(pt) => setPatientToReadmit(pt)}
+      onChangeTotalBeds={handleChangeTotalBeds}
+      onUpdatePatientBed={handleUpdatePatientBed}
+    />
   );
 
   // =========================================================

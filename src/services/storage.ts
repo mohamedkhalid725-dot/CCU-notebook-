@@ -1,10 +1,20 @@
-import { PatientRecord, AppSecuritySettings, FieldVisibilityConfig } from '../types';
+import { 
+  PatientRecord, 
+  AppSecuritySettings, 
+  FieldVisibilityConfig,
+  BedDefinition,
+  AppTheme
+} from '../types';
+
+export type { AppTheme };
 import { encryptData, decryptData, hashPin, generateSalt } from './crypto';
 
 const STORAGE_KEY_DATA = 'icu_patients_enc_data';
 const STORAGE_KEY_SECURITY = 'icu_security_config';
 const STORAGE_KEY_FIELDS = 'icu_fields_config';
 const STORAGE_KEY_ACTIVE_BEDS = 'icu_total_beds';
+const STORAGE_KEY_BEDS_LIST = 'cardiovault_beds_list';
+const STORAGE_KEY_THEME = 'cardiovault_theme';
 
 export const DEFAULT_TOTAL_BEDS = 8;
 
@@ -543,11 +553,145 @@ export function getTotalBeds(): number {
   const stored = localStorage.getItem(STORAGE_KEY_ACTIVE_BEDS);
   if (!stored) return DEFAULT_TOTAL_BEDS;
   const num = parseInt(stored, 10);
-  return isNaN(num) || num < 4 ? DEFAULT_TOTAL_BEDS : num;
+  return isNaN(num) || num < 1 ? DEFAULT_TOTAL_BEDS : num;
 }
 
 export function setTotalBeds(beds: number): void {
   localStorage.setItem(STORAGE_KEY_ACTIVE_BEDS, beds.toString());
+}
+
+/**
+ * Dynamic bed management
+ */
+export function getBedsList(defaultTotal?: number): BedDefinition[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BEDS_LIST);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.error('Error loading beds list:', err);
+  }
+  const total = defaultTotal || getTotalBeds();
+  const initialBeds: BedDefinition[] = Array.from({ length: total }, (_, i) => ({
+    id: `bed-${i + 1}`,
+    name: `Bed ${i + 1}`,
+    department: i < Math.ceil(total / 2) ? 'CCU' : 'ICU',
+    status: 'active'
+  }));
+  localStorage.setItem(STORAGE_KEY_BEDS_LIST, JSON.stringify(initialBeds));
+  return initialBeds;
+}
+
+export function saveBedsList(beds: BedDefinition[]): void {
+  localStorage.setItem(STORAGE_KEY_BEDS_LIST, JSON.stringify(beds));
+  localStorage.setItem(STORAGE_KEY_ACTIVE_BEDS, beds.length.toString());
+}
+
+/**
+ * Application Theme (Light, Dark, System)
+ */
+export function getAppTheme(): AppTheme {
+  try {
+    const t = localStorage.getItem(STORAGE_KEY_THEME);
+    if (t === 'light' || t === 'dark' || t === 'system') return t;
+  } catch {}
+  return 'dark';
+}
+
+export function setAppTheme(theme: AppTheme): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_THEME, theme);
+  } catch {}
+  applyThemeToDom(theme);
+}
+
+export function applyThemeToDom(theme: AppTheme): void {
+  if (typeof document === 'undefined') return;
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', isDark ? '#0f172a' : '#059669');
+  }
+}
+
+/**
+ * Ensures backward compatibility and populates newly introduced clinical fields
+ */
+export function migratePatientRecord(p: PatientRecord): PatientRecord {
+  // Populate ecgRecords from ccuData if missing
+  const ecgRecords = p.ecgRecords && Array.isArray(p.ecgRecords) ? [...p.ecgRecords] : [];
+  if (ecgRecords.length === 0 && p.ccuData?.ecgSummary) {
+    ecgRecords.push({
+      id: `ecg-init-${p.id}`,
+      timestamp: p.admissionDate || new Date().toISOString().slice(0, 16),
+      interpretation: p.ccuData.ecgSummary,
+      rhythm: p.ccuData.arrhythmia || 'Sinus Rhythm',
+      stTChanges: p.ccuData.stElevationLeads ? `ST Elevation: ${p.ccuData.stElevationLeads}` : undefined,
+      notes: 'Imported from initial CCU admission record',
+    });
+  }
+
+  // Populate echoStudies from ccuData if missing
+  const echoStudies = p.echoStudies && Array.isArray(p.echoStudies) ? [...p.echoStudies] : [];
+  if (echoStudies.length === 0 && (p.ccuData?.echoEF || p.ccuData?.echoFindings)) {
+    echoStudies.push({
+      id: `echo-init-${p.id}`,
+      timestamp: p.admissionDate || new Date().toISOString().slice(0, 16),
+      ef: p.ccuData.echoEF || 'N/A',
+      findings: p.ccuData.echoFindings || 'Bedside evaluation',
+      impression: p.ccuData.echoFindings || `LVEF: ${p.ccuData.echoEF || 'N/A'}%`,
+    });
+  }
+
+  // Populate imagingStudies if missing
+  const imagingStudies = p.imagingStudies && Array.isArray(p.imagingStudies) ? [...p.imagingStudies] : [];
+  if (imagingStudies.length === 0 && p.imagingSummary) {
+    imagingStudies.push({
+      id: `img-init-${p.id}`,
+      timestamp: p.admissionDate || new Date().toISOString().slice(0, 16),
+      type: 'Chest X-ray',
+      findings: p.imagingSummary,
+      impression: p.imagingSummary,
+    });
+  }
+
+  return {
+    ...p,
+    secondaryDiagnoses: p.secondaryDiagnoses || [],
+    vitals: p.vitals || [],
+    ioRecords: p.ioRecords || [],
+    labs: p.labs || [],
+    labPanels: p.labPanels || [],
+    abgRecords: p.abgRecords || [],
+    ecgRecords,
+    echoStudies,
+    imagingStudies,
+    medications: p.medications || [],
+    infusions: p.infusions || [],
+    procedures: p.procedures || [],
+    progressNotes: p.progressNotes || [],
+    pastSurgicalHistory: p.pastSurgicalHistory || '',
+    drugHistory: p.drugHistory || '',
+    allergies: p.allergies || 'No known drug allergies (NKDA)',
+    familyHistory: p.familyHistory || '',
+    socialHistory: p.socialHistory || '',
+    generalExamination: p.generalExamination || '',
+    cardiovascularExamination: p.cardiovascularExamination || '',
+    respiratoryExamination: p.respiratoryExamination || '',
+    abdominalExamination: p.abdominalExamination || '',
+    cnsExamination: p.cnsExamination || '',
+    peripheralVascularExamination: p.peripheralVascularExamination || '',
+    otherExamination: p.otherExamination || '',
+  };
 }
 
 /**
@@ -561,15 +705,19 @@ export async function loadPatients(activePin?: string): Promise<PatientRecord[]>
 
     if (!rawData) {
       // First run: persist initial patients
-      await savePatients(INITIAL_PATIENTS, activePin);
-      return INITIAL_PATIENTS;
+      const migrated = INITIAL_PATIENTS.map(migratePatientRecord);
+      await savePatients(migrated, activePin);
+      return migrated;
     }
 
     if (security.isPinSet && activePin) {
       // Encrypted data format
       try {
         const decryptedJson = await decryptData(rawData, activePin, security.pinSalt);
-        return JSON.parse(decryptedJson);
+        const parsed = JSON.parse(decryptedJson);
+        if (Array.isArray(parsed)) {
+          return parsed.map(migratePatientRecord);
+        }
       } catch (err) {
         console.warn('Could not decrypt with provided PIN, attempting fallback or re-throw', err);
         throw err;
@@ -578,16 +726,19 @@ export async function loadPatients(activePin?: string): Promise<PatientRecord[]>
       // Unencrypted or initial
       try {
         const parsed = JSON.parse(rawData);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map(migratePatientRecord);
+        }
       } catch {
         // May be encrypted but no pin provided yet
       }
-      return INITIAL_PATIENTS;
+      return INITIAL_PATIENTS.map(migratePatientRecord);
     }
   } catch (err) {
     console.error('Error loading patients:', err);
-    return INITIAL_PATIENTS;
+    return INITIAL_PATIENTS.map(migratePatientRecord);
   }
+  return INITIAL_PATIENTS.map(migratePatientRecord);
 }
 
 /**

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PatientRecord, 
   BedStatus, 
   SpecialtyMode,
-  DischargeDisposition
+  DischargeDisposition,
+  BedDefinition
 } from '../types';
 import { 
   User, 
@@ -17,25 +18,33 @@ import {
   ArrowRight,
   Clock, 
   Stethoscope, 
-  Wind,
-  LogOut,
-  FolderArchive,
-  FileText,
-  Calendar,
-  CheckCircle2,
-  Share2,
-  Printer
+  Wind, 
+  LogOut, 
+  FolderArchive, 
+  FileText, 
+  Calendar, 
+  CheckCircle2, 
+  Share2, 
+  Printer,
+  Sliders,
+  ArrowRightLeft,
+  Filter,
+  Layers,
+  Settings
 } from 'lucide-react';
+import { getBedsList, saveBedsList } from '../services/storage';
+import { BedManagementModal } from './BedManagementModal';
 
 interface CensusViewProps {
   patients: PatientRecord[];
   totalBeds: number;
   specialtyMode: SpecialtyMode;
   onSelectPatient: (patient: PatientRecord) => void;
-  onAdmitToBed: (bedNum: number) => void;
+  onAdmitToBed: (bedNum: number | string) => void;
   onDischargePatient: (patient: PatientRecord) => void;
   onReadmitPatient: (patient: PatientRecord) => void;
   onChangeTotalBeds: (newTotal: number) => void;
+  onUpdatePatientBed?: (patientId: string, newBedNumber: string | number) => void;
 }
 
 export const CensusView: React.FC<CensusViewProps> = ({
@@ -46,28 +55,67 @@ export const CensusView: React.FC<CensusViewProps> = ({
   onAdmitToBed,
   onDischargePatient,
   onReadmitPatient,
-  onChangeTotalBeds
+  onChangeTotalBeds,
+  onUpdatePatientBed
 }) => {
   const [currentView, setCurrentView] = useState<'census' | 'archive'>('census');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [archiveFilter, setArchiveFilter] = useState<string>('all');
 
+  // Dynamic Bed definitions
+  const [beds, setBeds] = useState<BedDefinition[]>(() => getBedsList(totalBeds));
+  const [isBedModalOpen, setIsBedModalOpen] = useState(false);
+
+  // Sync beds if totalBeds changes or on mount
+  useEffect(() => {
+    const loaded = getBedsList(totalBeds);
+    setBeds(loaded);
+  }, [totalBeds]);
+
+  const handleSaveBeds = (updatedBeds: BedDefinition[]) => {
+    setBeds(updatedBeds);
+    saveBedsList(updatedBeds);
+    if (updatedBeds.length !== totalBeds) {
+      onChangeTotalBeds(updatedBeds.length);
+    }
+  };
+
+  const handleUpdatePatientBedInternal = (patientId: string, newBedNumber: string | number) => {
+    if (onUpdatePatientBed) {
+      onUpdatePatientBed(patientId, newBedNumber);
+    } else {
+      // Fallback: update in localStorage directly if handler not passed
+      const currentPatient = patients.find(p => p.id === patientId);
+      if (currentPatient) {
+        currentPatient.bedNumber = String(newBedNumber);
+      }
+    }
+  };
+
   const activePatients = patients.filter(p => !p.isDischarged);
   const dischargedPatients = patients.filter(p => p.isDischarged);
 
-  // Build full bed array from 1 to totalBeds
-  const bedList = Array.from({ length: totalBeds }, (_, i) => {
-    const bedNum = i + 1;
-    const patient = activePatients.find(p => Number(p.bedNumber) === bedNum);
+  // Calculate stats
+  const occupiedCount = activePatients.length;
+  const availableCount = Math.max(0, beds.length - occupiedCount);
+  const criticalCount = activePatients.filter(p => p.status === 'critical' || p.status === 'deteriorating').length;
+  const stableCount = activePatients.filter(p => p.status === 'stable').length;
+  const occupancyRate = beds.length > 0 ? Math.round((occupiedCount / beds.length) * 100) : 0;
+
+  // Map beds to patients
+  const bedItems = beds.map(b => {
+    const patient = activePatients.find(
+      p => String(p.bedNumber) === String(b.bedNumber) || (b.name && p.bedName === b.name)
+    );
     return {
-      bedNumber: bedNum,
+      definition: b,
       patient: patient || null
     };
   });
 
   // Filter based on search & status for active beds
-  const filteredBeds = bedList.filter(({ bedNumber, patient }) => {
+  const filteredBeds = bedItems.filter(({ definition, patient }) => {
     if (filterStatus === 'occupied' && !patient) return false;
     if (filterStatus === 'empty' && patient) return false;
     if (filterStatus === 'critical' && (!patient || (patient.status !== 'critical' && patient.status !== 'deteriorating'))) return false;
@@ -78,12 +126,13 @@ export const CensusView: React.FC<CensusViewProps> = ({
     if (patient) {
       return (
         patient.name.toLowerCase().includes(q) ||
-        patient.primaryDiagnosis.toLowerCase().includes(q) ||
-        patient.mrn.toLowerCase().includes(q) ||
-        bedNumber.toString().includes(q)
+        (patient.diagnosis || '').toLowerCase().includes(q) ||
+        (patient.mrn || '').toLowerCase().includes(q) ||
+        definition.name.toLowerCase().includes(q) ||
+        String(definition.bedNumber).includes(q)
       );
     }
-    return bedNumber.toString().includes(q) || 'empty'.includes(q);
+    return definition.name.toLowerCase().includes(q) || String(definition.bedNumber).includes(q) || 'empty'.includes(q);
   });
 
   // Filter for Medical Records / Discharged Archive
@@ -98,260 +147,301 @@ export const CensusView: React.FC<CensusViewProps> = ({
     const q = searchQuery.toLowerCase();
     return (
       patient.name.toLowerCase().includes(q) ||
-      patient.primaryDiagnosis.toLowerCase().includes(q) ||
-      patient.mrn.toLowerCase().includes(q) ||
+      (patient.diagnosis || '').toLowerCase().includes(q) ||
+      (patient.mrn || '').toLowerCase().includes(q) ||
       (patient.dischargeDetails?.disposition || '').toLowerCase().includes(q) ||
-      (patient.dischargeDetails?.dischargeSummary || '').toLowerCase().includes(q) ||
-      (patient.dischargeDetails?.dischargeDate || '').toLowerCase().includes(q)
+      (patient.dischargePlan?.dischargeDiagnosis || '').toLowerCase().includes(q)
     );
   });
 
-  const getStatusBadge = (status: BedStatus) => {
+  const getStatusBadge = (status?: BedStatus) => {
     switch (status) {
       case 'stable':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Stable
           </span>
         );
       case 'critical':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-950/90 text-rose-300 border border-rose-800/80 animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950/90 dark:text-rose-300 border border-rose-300 dark:border-rose-800/80 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
             Critical
           </span>
         );
       case 'deteriorating':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/70">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800/70">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Deteriorating
           </span>
         );
       case 'guarded':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-950/80 text-purple-300 border border-purple-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-300 dark:border-purple-800/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
             Guarded
           </span>
         );
       case 'post-op':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/60">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-300 dark:border-blue-800/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             Post-Op
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700/60">
-            Empty
-          </span>
-        );
-    }
-  };
-
-  const getDispositionBadge = (disposition?: DischargeDisposition) => {
-    switch (disposition) {
-      case 'Transferred to Ward':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-950/90 text-blue-300 border border-blue-800/70">
-            🏥 Transferred to Ward
-          </span>
-        );
-      case 'Discharged Home':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/90 text-emerald-300 border border-emerald-800/70">
-            🏠 Discharged Home
-          </span>
-        );
-      case 'Transferred to Step-Down Unit':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950/90 text-amber-300 border border-amber-800/70">
-            🛏️ Step-Down Unit
-          </span>
-        );
-      case 'Deceased':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-            🕊️ Deceased
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
-            📋 {disposition || 'Discharged'}
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">
+            Available
           </span>
         );
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5">
-      {/* Primary Navigation Tabs: Bed Census vs Medical Records Archive */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800/80">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 space-y-5">
+      {/* Top Header & Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-              {currentView === 'census' ? (
-                <>
-                  <Bed className="w-6 h-6 text-cyan-400" />
-                  <span>ICU / CCU Census</span>
-                </>
-              ) : (
-                <>
-                  <FolderArchive className="w-6 h-6 text-amber-400" />
-                  <span>Medical Records Archive (السجل الطبي)</span>
-                </>
-              )}
-            </h2>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            {currentView === 'census' ? (
+              <>
+                <Bed className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                <span>ICU / CCU Bed Census</span>
+              </>
+            ) : (
+              <>
+                <FolderArchive className="w-6 h-6 text-amber-500" />
+                <span>Medical Records Archive</span>
+              </>
+            )}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {currentView === 'census'
-              ? 'Real-time bed occupancy, hemodynamics, and patient clinical charts'
-              : 'Permanent archive of discharged & transferred patients with complete clinical history'}
+              ? 'Real-time bed occupancy, hemodynamics, patient acuity and bed allocation'
+              : 'Permanent archive of discharged and transferred patient clinical files'}
           </p>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="flex items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 self-start sm:self-auto shadow-inner">
-          <button
-            onClick={() => setCurrentView('census')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-              currentView === 'census'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/50'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Bed className="w-4 h-4" />
-            <span>Active Beds Census</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-              currentView === 'census' ? 'bg-cyan-800 text-cyan-100' : 'bg-slate-800 text-slate-300'
-            }`}>
-              {activePatients.length}/{totalBeds}
-            </span>
-          </button>
+        {/* View Switcher & Bed Management Action */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <button
+              onClick={() => setCurrentView('census')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                currentView === 'census'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Bed className="w-4 h-4" />
+              <span>Active Beds</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                currentView === 'census' ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}>
+                {occupiedCount}/{beds.length}
+              </span>
+            </button>
 
-          <button
-            onClick={() => setCurrentView('archive')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-              currentView === 'archive'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-900/50'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <FolderArchive className="w-4 h-4" />
-            <span>Medical Records (السجل الطبي)</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-              currentView === 'archive' ? 'bg-amber-800 text-amber-100' : 'bg-slate-800 text-slate-300'
-            }`}>
-              {dischargedPatients.length}
-            </span>
-          </button>
+            <button
+              onClick={() => setCurrentView('archive')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                currentView === 'archive'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <FolderArchive className="w-4 h-4" />
+              <span>Discharged Archive</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                currentView === 'archive' ? 'bg-amber-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}>
+                {dischargedPatients.length}
+              </span>
+            </button>
+          </div>
+
+          {currentView === 'census' && (
+            <button
+              onClick={() => setIsBedModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 text-xs font-semibold shadow-sm transition"
+              title="Add, rename or remove beds"
+            >
+              <Settings className="w-4 h-4 text-emerald-500" />
+              <span>Manage Beds</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* VIEW 1: ACTIVE BEDS CENSUS */}
+      {/* CENSUS VIEW */}
       {currentView === 'census' && (
         <div className="space-y-4">
-          {/* Filter Toolbar */}
+          {/* Occupancy Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Total Beds
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-slate-900 dark:text-white">
+                  {beds.length}
+                </span>
+                <span className="text-[10px] text-slate-400">allocated</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block">
+                Occupied Beds
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {occupiedCount}
+                </span>
+                <span className="text-[10px] text-slate-400">({occupancyRate}%)</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400 block">
+                Available Beds
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                  {availableCount}
+                </span>
+                <span className="text-[10px] text-slate-400">ready</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 block">
+                Critical / Deteriorating
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-rose-600 dark:text-rose-400">
+                  {criticalCount}
+                </span>
+                <span className="text-[10px] text-slate-400">high alert</span>
+              </div>
+            </div>
+
+            <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Stable Cases
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-slate-700 dark:text-slate-300">
+                  {stableCount}
+                </span>
+                <span className="text-[10px] text-slate-400">ward candidates</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters Toolbar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 sm:w-72">
+            <div className="relative flex-1 sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search patient, MRN, diagnosis, bed..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition shadow-sm"
               />
             </div>
 
-            <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs overflow-x-auto shadow-sm">
               <button
                 onClick={() => setFilterStatus('all')}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
-                  filterStatus === 'all' ? 'bg-slate-800 text-cyan-300' : 'text-slate-400 hover:text-white'
+                  filterStatus === 'all' ? 'bg-emerald-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                All Beds
+                All Beds ({beds.length})
               </button>
               <button
                 onClick={() => setFilterStatus('occupied')}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
-                  filterStatus === 'occupied' ? 'bg-slate-800 text-cyan-300' : 'text-slate-400 hover:text-white'
+                  filterStatus === 'occupied' ? 'bg-emerald-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Occupied ({activePatients.length})
+                Occupied ({occupiedCount})
               </button>
               <button
                 onClick={() => setFilterStatus('critical')}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
-                  filterStatus === 'critical' ? 'bg-rose-950 text-rose-300' : 'text-slate-400 hover:text-white'
+                  filterStatus === 'critical' ? 'bg-rose-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Critical
+                Critical ({criticalCount})
               </button>
               <button
                 onClick={() => setFilterStatus('empty')}
                 className={`px-3 py-1 rounded-lg font-medium transition ${
-                  filterStatus === 'empty' ? 'bg-slate-800 text-slate-300' : 'text-slate-400 hover:text-white'
+                  filterStatus === 'empty' ? 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Empty ({totalBeds - activePatients.length})
+                Empty ({availableCount})
               </button>
             </div>
           </div>
 
-          {/* Table Container */}
-          <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+          {/* Beds Grid / Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3 bg-slate-950/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <div className="col-span-2 sm:col-span-1">Bed</div>
+            <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <div className="col-span-3 sm:col-span-2">Bed & Unit</div>
               <div className="col-span-4 sm:col-span-3">Patient</div>
-              <div className="col-span-4 sm:col-span-5">Diagnosis & Clinical Focus</div>
-              <div className="col-span-2 sm:col-span-3 text-right sm:text-left">Status & Actions</div>
+              <div className="col-span-3 sm:col-span-4">Diagnosis & Telemetry</div>
+              <div className="col-span-2 sm:col-span-3 text-right">Status & Action</div>
             </div>
 
             {/* Rows */}
-            <div className="divide-y divide-slate-800/70">
-              {filteredBeds.map(({ bedNumber, patient }) => {
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/70">
+              {filteredBeds.map(({ definition, patient }) => {
                 if (!patient) {
                   // Empty Bed Row
                   return (
                     <div
-                      key={`bed-${bedNumber}`}
-                      onClick={() => onAdmitToBed(bedNumber)}
-                      className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-4 items-center hover:bg-slate-800/40 cursor-pointer transition group"
+                      key={`bed-${definition.id}`}
+                      onClick={() => onAdmitToBed(definition.bedNumber)}
+                      className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3.5 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition group"
                     >
-                      {/* Bed Number */}
-                      <div className="col-span-2 sm:col-span-1 font-mono font-bold text-slate-500 group-hover:text-cyan-400 flex items-center gap-1.5">
-                        <span className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xs text-slate-400">
-                          {bedNumber}
+                      <div className="col-span-3 sm:col-span-2 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+                          {definition.bedNumber}
                         </span>
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                            {definition.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {definition.department || 'CCU'}
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Patient Name Placeholder */}
-                      <div className="col-span-4 sm:col-span-3 text-slate-500 italic flex items-center gap-2 text-xs sm:text-sm">
+                      <div className="col-span-4 sm:col-span-3 text-slate-400 text-xs italic flex items-center gap-2">
                         <span>—</span>
-                        <span className="text-slate-600">(Available Bed)</span>
+                        <span className="text-slate-400 dark:text-slate-500">(Available Bed)</span>
                       </div>
 
-                      {/* Diagnosis Placeholder */}
-                      <div className="col-span-4 sm:col-span-5 text-slate-500 text-xs">
-                        Empty Bed — Ready for admission
+                      <div className="col-span-3 sm:col-span-4 text-slate-400 text-xs">
+                        Ready for admission
                       </div>
 
-                      {/* Actions */}
-                      <div className="col-span-2 sm:col-span-3 flex items-center justify-end sm:justify-between">
-                        <span className="hidden sm:inline text-xs text-slate-500">—</span>
+                      <div className="col-span-2 sm:col-span-3 flex items-center justify-end">
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            onAdmitToBed(bedNumber);
+                            onAdmitToBed(definition.bedNumber);
                           }}
-                          className="inline-flex items-center gap-1 text-xs text-cyan-400 font-medium px-3 py-1.5 rounded-lg bg-cyan-950/40 border border-cyan-800/40 group-hover:bg-cyan-600 group-hover:text-white transition"
+                          className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 hover:bg-emerald-600 hover:text-white transition"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Admit</span>
@@ -362,166 +452,100 @@ export const CensusView: React.FC<CensusViewProps> = ({
                 }
 
                 // Occupied Bed Row
-                const latestVital = patient.vitals[patient.vitals.length - 1];
-                const latestNote = patient.progressNotes[patient.progressNotes.length - 1];
+                const latestVital = patient.vitals && patient.vitals[0];
 
                 return (
                   <div
                     key={patient.id}
                     onClick={() => onSelectPatient(patient)}
-                    className={`grid grid-cols-12 gap-2 px-4 sm:px-6 py-4 items-center hover:bg-slate-800/60 cursor-pointer transition group ${
-                      patient.status === 'critical' ? 'bg-rose-950/10' : ''
+                    className={`grid grid-cols-12 gap-2 px-4 sm:px-6 py-3.5 items-center hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition group ${
+                      patient.status === 'critical' ? 'bg-rose-50/40 dark:bg-rose-950/10' : ''
                     }`}
                   >
-                    {/* Bed # */}
-                    <div className="col-span-2 sm:col-span-1">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs transition ${
+                    <div className="col-span-3 sm:col-span-2 flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs transition ${
                         patient.status === 'critical'
-                          ? 'bg-rose-900/60 border border-rose-700/80 text-rose-200'
-                          : 'bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 group-hover:bg-cyan-600 group-hover:text-white'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 group-hover:bg-emerald-600 group-hover:text-white'
                       }`}>
-                        {bedNumber}
+                        {definition.bedNumber}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                          {definition.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {definition.department || 'CCU'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Patient Information */}
                     <div className="col-span-4 sm:col-span-3 pr-2">
-                      <div className="font-semibold text-white text-sm sm:text-base flex items-center gap-1.5 group-hover:text-cyan-300 transition">
+                      <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center gap-1.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                         <span>{patient.name}</span>
                         <span className="text-xs font-normal text-slate-400">
-                          ({patient.age}{patient.gender === 'Male' ? 'M' : 'F'})
+                          ({patient.age || '—'}{patient.gender === 'Male' ? 'M' : 'F'})
                         </span>
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                        <span className="font-mono">{patient.mrn}</span>
-                        <span className="text-slate-600">•</span>
-                        <span className="truncate">{patient.codeStatus}</span>
-                      </div>
-                    </div>
-
-                    {/* Diagnosis & Key Clinical Tags */}
-                    <div className="col-span-4 sm:col-span-5 pr-2">
-                      <div className="text-xs sm:text-sm font-medium text-slate-100 flex items-center gap-1.5 flex-wrap">
-                        <span>{patient.primaryDiagnosis}</span>
-                        {patient.ccuData?.echoEF && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800/40">
-                            EF {patient.ccuData.echoEF}
-                          </span>
-                        )}
-                        {patient.icuScores?.sofaScore > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-800/40">
-                            SOFA {patient.icuScores.sofaScore}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Secondary info or latest note snippet */}
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
-                        {latestVital && (
-                          <span className="font-mono text-slate-300 bg-slate-950/60 px-1.5 py-0.5 rounded border border-slate-800/60">
-                            BP {latestVital.bpSystolic}/{latestVital.bpDiastolic} • HR {latestVital.hr} • SpO2 {latestVital.spo2}%
-                          </span>
-                        )}
-                        {latestNote && (
-                          <span className="hidden md:inline-flex items-center gap-1 text-slate-400 truncate max-w-xs">
-                            <Clock className="w-3 h-3 text-slate-500 shrink-0" />
-                            <span className="truncate">{latestNote.timestamp}: {latestNote.assessment || latestNote.plan}</span>
+                        {patient.mrn && <span className="font-mono">MRN: {patient.mrn}</span>}
+                        {patient.codeStatus && (
+                          <span className="text-slate-500 dark:text-slate-400 truncate">
+                            • {patient.codeStatus}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Status, Discharge & Open */}
+                    <div className="col-span-3 sm:col-span-4 pr-2">
+                      <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5 flex-wrap">
+                        <span className="truncate max-w-[200px]">{patient.diagnosis || 'Cardiology Admission'}</span>
+                        {patient.echoStudies && patient.echoStudies.length > 0 && patient.echoStudies[0].ejectionFraction && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40">
+                            EF {patient.echoStudies[0].ejectionFraction}%
+                          </span>
+                        )}
+                      </div>
+
+                      {latestVital && (
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                          <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">
+                            BP {latestVital.bpSystolic}/{latestVital.bpDiastolic || '—'} • HR {latestVital.hr || '—'} • SpO2 {latestVital.spo2 ? `${latestVital.spo2}%` : '—'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="col-span-2 sm:col-span-3 flex items-center justify-end gap-2">
                       <div>{getStatusBadge(patient.status)}</div>
 
-                      {/* Quick Discharge Button */}
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           onDischargePatient(patient);
                         }}
-                        className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-amber-950 hover:text-amber-300 text-slate-300 border border-slate-700/80 transition"
-                        title="Discharge / Free Bed"
+                        className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-amber-50 hover:text-amber-700 dark:bg-slate-800 dark:hover:bg-amber-950 dark:hover:text-amber-300 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+                        title="Discharge Patient"
                       >
-                        <LogOut className="w-3.5 h-3.5 text-amber-400" />
+                        <LogOut className="w-3.5 h-3.5 text-amber-500" />
                         <span className="hidden xl:inline">Discharge</span>
                       </button>
 
-                      <div className="hidden sm:flex items-center text-xs text-slate-400 group-hover:text-cyan-300 transition ml-1">
-                        <span>File</span>
-                        <ChevronRight className="w-4 h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
+                      <div className="hidden sm:flex items-center text-xs text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+                        <ChevronRight className="w-4 h-4 ml-0.5" />
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* Footer / Bed Capacity settings */}
-            <div className="px-4 sm:px-6 py-3 bg-slate-950/90 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-              <div className="flex items-center gap-2">
-                <span>Total Bed Capacity: <strong className="text-white">{totalBeds} Beds</strong></span>
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => onChangeTotalBeds(Math.max(4, totalBeds - 2))}
-                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-mono"
-                    title="Decrease bed count"
-                  >
-                    -2
-                  </button>
-                  <button
-                    onClick={() => onChangeTotalBeds(totalBeds + 2)}
-                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-mono"
-                    title="Add 2 beds"
-                  >
-                    +2
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-emerald-400">● Stable</span>
-                <span className="text-rose-400">● Critical</span>
-                <span className="text-amber-400">● Deteriorating</span>
-                <span className="text-slate-500">○ Empty</span>
-              </div>
-            </div>
           </div>
         </div>
       )}
 
-      {/* VIEW 2: MEDICAL RECORDS ARCHIVE (السجل الطبي وأرشيف الخروج) */}
+      {/* MEDICAL RECORDS ARCHIVE */}
       {currentView === 'archive' && (
         <div className="space-y-4">
-          {/* Header & Reassurance card */}
-          <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
-                <FolderArchive className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                  <span>الأرشيف الطبي والسجل التاريخي للحالات</span>
-                  <span className="text-xs px-2 py-0.2 rounded-full bg-amber-900/60 text-amber-200 border border-amber-700/60 font-normal">
-                    {dischargedPatients.length} حالات مسجلة
-                  </span>
-                </h3>
-                <p className="text-slate-300 text-[11px] mt-0.5">
-                  الحالات التي تم إخلاء أسرتها تظل محفوظة بالكامل في هذا السجل الطبي مع إمكانية فتح الملف وطباعته أو إعادة التسكين في سرير شاغر.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-[11px]">الأسرة الشاغرة حالياً:</span>
-              <span className="font-bold text-cyan-300 text-sm font-mono px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                {totalBeds - activePatients.length} أسرة
-              </span>
-            </div>
-          </div>
-
-          {/* Search & Filter bar for archive */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -529,145 +553,71 @@ export const CensusView: React.FC<CensusViewProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search discharged patient, MRN, diagnosis, date..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"
+                placeholder="Search discharged patient, MRN, diagnosis..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-sm"
               />
-            </div>
-
-            <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto">
-              <button
-                onClick={() => setArchiveFilter('all')}
-                className={`px-3 py-1 rounded-lg font-medium transition whitespace-nowrap ${
-                  archiveFilter === 'all' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                All Archive ({dischargedPatients.length})
-              </button>
-              <button
-                onClick={() => setArchiveFilter('ward')}
-                className={`px-3 py-1 rounded-lg font-medium transition whitespace-nowrap ${
-                  archiveFilter === 'ward' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                To Ward
-              </button>
-              <button
-                onClick={() => setArchiveFilter('home')}
-                className={`px-3 py-1 rounded-lg font-medium transition whitespace-nowrap ${
-                  archiveFilter === 'home' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Home
-              </button>
-              <button
-                onClick={() => setArchiveFilter('stepdown')}
-                className={`px-3 py-1 rounded-lg font-medium transition whitespace-nowrap ${
-                  archiveFilter === 'stepdown' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Step-Down
-              </button>
             </div>
           </div>
 
-          {/* Discharged Patients List */}
-          {filteredArchive.length === 0 ? (
-            <div className="p-12 text-center bg-slate-900/60 rounded-2xl border border-slate-800">
-              <FolderArchive className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h4 className="text-base font-bold text-slate-300">No Discharged Records Found</h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                {searchQuery
-                  ? 'No records match your search criteria. Try a different query.'
-                  : 'When active patients in bed are discharged, their beds become available while their full clinical record will appear here.'}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredArchive.length > 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
               {filteredArchive.map(patient => (
                 <div
                   key={patient.id}
-                  className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-700/60 transition shadow-lg space-y-3.5 flex flex-col justify-between"
+                  onClick={() => onSelectPatient(patient)}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition"
                 >
-                  {/* Top info */}
                   <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-base text-white hover:text-amber-300 transition cursor-pointer" onClick={() => onSelectPatient(patient)}>
-                            {patient.name}
-                          </h4>
-                          <span className="text-xs text-slate-400">
-                            ({patient.age}{patient.gender === 'Male' ? 'M' : 'F'})
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 font-mono mt-0.5">
-                          {patient.mrn} • Ex-Bed {patient.previousBedNumber || patient.bedNumber}
-                        </p>
-                      </div>
-
-                      {/* Disposition badge */}
-                      <div>
-                        {getDispositionBadge(patient.dischargeDetails?.disposition)}
-                      </div>
-                    </div>
-
-                    {/* Diagnosis */}
-                    <div className="mt-2.5">
-                      <span className="text-xs font-semibold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
-                        {patient.primaryDiagnosis}
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {patient.name}
+                      </h4>
+                      <span className="text-xs text-slate-400">
+                        ({patient.gender}, {patient.age || '—'}y)
                       </span>
+                      {patient.mrn && (
+                        <span className="text-xs font-mono text-slate-400">MRN: {patient.mrn}</span>
+                      )}
                     </div>
-
-                    {/* Admission & Discharge Timestamps */}
-                    <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px]">
-                      <div>
-                        <span className="text-slate-500 block">Admitted:</span>
-                        <span className="text-slate-300 font-mono">{patient.admissionDate}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Discharged:</span>
-                        <span className="text-amber-300 font-mono">
-                          {patient.dischargeDetails?.dischargeDate || 'Recorded'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Summary Excerpt */}
-                    {patient.dischargeDetails?.dischargeSummary && (
-                      <div className="mt-2 text-xs text-slate-300 bg-slate-950/40 p-2 rounded-lg border border-slate-800/60 line-clamp-2">
-                        <span className="text-slate-500 font-semibold">Summary: </span>
-                        {patient.dischargeDetails.dischargeSummary}
-                      </div>
-                    )}
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                      {patient.dischargePlan?.dischargeDiagnosis || patient.diagnosis || 'Cardiology Admission'}
+                    </p>
                   </div>
 
-                  {/* Actions Bar */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 self-end sm:self-center">
                     <button
-                      onClick={() => onSelectPatient(patient)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-1.5 transition"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onReadmitPatient(patient);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition"
                     >
-                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>فتح السجل الطبي</span>
+                      Readmit
                     </button>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onReadmitPatient(patient)}
-                        className="px-3 py-1.5 rounded-lg bg-cyan-600/90 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-xs"
-                        title="Re-admit this patient to an available bed"
-                      >
-                        <Bed className="w-3.5 h-3.5" />
-                        <span>إعادة تسكين</span>
-                      </button>
-                    </div>
+                    <ChevronRight size={16} className="text-slate-400" />
                   </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+              No archived patients match the search criteria.
+            </div>
           )}
         </div>
       )}
+
+      {/* Bed Management Modal */}
+      <BedManagementModal
+        isOpen={isBedModalOpen}
+        onClose={() => setIsBedModalOpen(false)}
+        beds={beds}
+        patients={patients}
+        onSaveBeds={handleSaveBeds}
+        onUpdatePatientBed={handleUpdatePatientBedInternal}
+        onSelectPatient={onSelectPatient}
+        onAdmitToBed={onAdmitToBed}
+      />
     </div>
   );
 };

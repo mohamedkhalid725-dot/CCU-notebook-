@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Activity,
   Lock,
@@ -15,7 +15,13 @@ import {
   Users,
   BedDouble,
   Archive,
-  MoreHorizontal
+  MoreHorizontal,
+  Sun,
+  Moon,
+  Laptop,
+  Wifi,
+  WifiOff,
+  Bell
 } from 'lucide-react';
 
 import {
@@ -26,6 +32,8 @@ import {
 
 import { PWAInstallButton } from '../services/pwa';
 import { User } from 'firebase/auth';
+import { getAppTheme, setAppTheme, applyThemeToDom, AppTheme } from '../services/storage';
+import { initConnectivityListener, isDeviceOnline } from '../services/connectivity';
 
 interface NavbarProps {
   specialtyMode: SpecialtyMode;
@@ -100,6 +108,24 @@ export const Navbar: React.FC<NavbarProps> = ({
       p.status === 'stable'
   ).length;
 
+  const [theme, setThemeState] = useState<AppTheme>(() => getAppTheme());
+  const [isOnline, setIsOnline] = useState<boolean>(() => isDeviceOnline());
+
+  useEffect(() => {
+    applyThemeToDom(theme);
+    const cleanup = initConnectivityListener((online) => {
+      setIsOnline(online);
+    });
+    return cleanup;
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    const nextTheme: AppTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
+    setThemeState(nextTheme);
+    setAppTheme(nextTheme);
+    applyThemeToDom(nextTheme);
+  };
+
   const tabs: {
     id: AppTab;
     label: string;
@@ -134,6 +160,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
+      {/* Offline Alert Banner */}
+      {!isOnline && (
+        <div className="bg-amber-950/90 border-b border-amber-800 text-amber-200 px-4 py-1.5 text-center text-xs flex items-center justify-center gap-2 font-medium z-50">
+          <WifiOff size={14} className="text-amber-400 animate-pulse" />
+          <span>Offline Mode Active • All changes are securely saved in encrypted local notebook storage.</span>
+        </div>
+      )}
+
       {/* =========================================================
           DESKTOP / TABLET TOP HEADER
           ========================================================= */}
@@ -308,6 +342,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               <button
+                onClick={handleToggleTheme}
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition"
+                title={`Theme: ${theme.toUpperCase()} (Click to toggle)`}
+              >
+                {theme === 'dark' ? (
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                ) : theme === 'light' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Laptop className="w-4 h-4 text-emerald-400" />
+                )}
+              </button>
+
+              <button
                 onClick={() =>
                   onTabChange('settings')
                 }
@@ -466,6 +514,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }
                   `}
                 />
+              </button>
+
+              <button
+                onClick={handleToggleTheme}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 text-slate-300"
+                title="Toggle Theme"
+              >
+                {theme === 'dark' ? (
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                ) : theme === 'light' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Laptop className="w-4 h-4 text-emerald-400" />
+                )}
               </button>
 
             </div>

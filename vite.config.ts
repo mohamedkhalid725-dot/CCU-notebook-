@@ -76,10 +76,10 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           id: '/',
-          name: 'ICU & CCU Clinical Notebook',
-          short_name: 'ICU Notebook',
-          description: 'Local-first, encrypted personal ICU & CCU patient census and timeline notes.',
-          theme_color: '#0f172a',
+          name: 'CardioVault - ICU/CCU Clinical Notebook',
+          short_name: 'CardioVault',
+          description: 'Local-first, encrypted personal ICU & CCU patient census, multi-study diagnostics, and clinical notes.',
+          theme_color: '#059669',
           background_color: '#0f172a',
           display: 'standalone',
           orientation: 'portrait-primary',
@@ -123,6 +123,8 @@ export default defineConfig(() => {
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      port: 3000,
+      host: '0.0.0.0',
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
