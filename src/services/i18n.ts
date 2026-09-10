@@ -303,7 +303,8 @@ export const translations = {
       deleted: 'Deleted successfully',
       saveFailed: 'Unable to save data',
       loadFailed: 'Unable to load data',
-      invalidData: 'Some stored data was invalid and has been safely migrated.',
+      invalidData:
+        'Some stored data was invalid and has been safely migrated.',
       offline: 'You are currently offline',
       online: 'Connection restored',
       confirmDelete: 'Are you sure you want to delete this patient?',
@@ -718,6 +719,15 @@ export function getCurrentLanguage(): AppLanguage {
   return currentLanguage;
 }
 
+/*
+ * Compatibility alias.
+ * main.tsx imports getLanguage, while the rest of the app
+ * may use getAppLanguage / getCurrentLanguage.
+ */
+export function getLanguage(): AppLanguage {
+  return getAppLanguage();
+}
+
 export function t<
   T extends TranslationTree = TranslationTree
 >(
@@ -747,7 +757,9 @@ export function t<
   return path;
 }
 
-export function getDirection(language: AppLanguage): 'rtl' | 'ltr' {
+export function getDirection(
+  language: AppLanguage
+): 'rtl' | 'ltr' {
   return language === 'ar' ? 'rtl' : 'ltr';
 }
 
