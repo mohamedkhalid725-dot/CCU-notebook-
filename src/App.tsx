@@ -18,6 +18,14 @@ import {
   savePatients
 } from './services/storage';
 
+import {
+  getAppLanguage,
+  setAppLanguage,
+  initializeLanguage,
+  applyLanguageToDom,
+  type AppLanguage
+} from './services/i18n';
+
 import { LockScreen } from './components/LockScreen';
 import { Navbar } from './components/Navbar';
 import { CensusView } from './components/CensusView';
