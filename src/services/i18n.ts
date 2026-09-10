@@ -1,4 +1,6 @@
 ```ts
+import { useCallback, useSyncExternalStore } from 'react';
+
 export type AppLanguage = 'en' | 'ar';
 
 const STORAGE_KEY_LANGUAGE = 'cardiovault_language';
@@ -624,6 +626,32 @@ type TranslationTree = typeof translations.en;
 
 let currentLanguage: AppLanguage = 'en';
 
+type LanguageListener = () => void;
+
+const languageListeners = new Set<LanguageListener>();
+
+function notifyLanguageListeners(): void {
+  languageListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // Ignore listener errors.
+    }
+  });
+}
+
+function subscribeToLanguage(listener: LanguageListener): () => void {
+  languageListeners.add(listener);
+
+  return () => {
+    languageListeners.delete(listener);
+  };
+}
+
+function getLanguageSnapshot(): AppLanguage {
+  return currentLanguage;
+}
+
 function detectDeviceLanguage(): AppLanguage {
   if (typeof navigator === 'undefined') {
     return 'en';
@@ -662,6 +690,7 @@ export function setAppLanguage(language: AppLanguage): void {
   }
 
   applyLanguageToDom(language);
+  notifyLanguageListeners();
 }
 
 export function applyLanguageToDom(language: AppLanguage): void {
@@ -680,7 +709,9 @@ export function applyLanguageToDom(language: AppLanguage): void {
 
 export function initializeLanguage(): AppLanguage {
   const language = getAppLanguage();
+
   applyLanguageToDom(language);
+
   return language;
 }
 
@@ -723,5 +754,32 @@ export function getDirection(language: AppLanguage): 'rtl' | 'ltr' {
 
 export function getLanguageName(language: AppLanguage): string {
   return language === 'ar' ? 'العربية' : 'English';
+}
+
+export function useI18n() {
+  const language = useSyncExternalStore(
+    subscribeToLanguage,
+    getLanguageSnapshot,
+    getLanguageSnapshot
+  );
+
+  const translate = useCallback(
+    (path: string): string => t(path, language),
+    [language]
+  );
+
+  const setLanguage = useCallback(
+    (nextLanguage: AppLanguage): void => {
+      setAppLanguage(nextLanguage);
+    },
+    []
+  );
+
+  return {
+    language,
+    t: translate,
+    direction: getDirection(language),
+    setLanguage,
+  };
 }
 ```
