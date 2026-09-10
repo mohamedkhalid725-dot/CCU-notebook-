@@ -1,4 +1,3 @@
-```tsx
 import React, { useState } from 'react';
 import {
   Calculator,
@@ -29,14 +28,21 @@ interface ClinicalCalculatorsModalProps {
   }) => void;
 }
 
+type CategoryId =
+  | 'critical'
+  | 'cardiology'
+  | 'thrombo'
+  | 'renal_resp'
+  | 'electrolytes'
+  | 'fluid';
+
 export const ClinicalCalculatorsModal: React.FC<
   ClinicalCalculatorsModalProps
 > = ({ onClose, onApplyScoreToPatient }) => {
   const { language, t } = useI18n();
 
-  const [activeCategory, setActiveCategory] = useState<
-    'critical' | 'cardiology' | 'thrombo' | 'renal_resp' | 'electrolytes' | 'fluid'
-  >('critical');
+  const [activeCategory, setActiveCategory] =
+    useState<CategoryId>('critical');
 
   // Fluid Calculator State
   const [ivFluids, setIvFluids] = useState<number>(1500);
@@ -101,10 +107,18 @@ export const ClinicalCalculatorsModal: React.FC<
       } else {
         primary = isArabic ? 'قلاء مختلط' : 'Mixed Alkalosis';
       }
-    } else if (abgHco3 < 22 || abgPco2 > 45 || hasHighAG) {
+    } else if (
+      abgHco3 < 22 ||
+      abgPco2 > 45 ||
+      hasHighAG
+    ) {
       primary = isArabic
-        ? 'اضطراب حمضي-قاعدي معوَّض (AG = ' + agValue + ')'
-        : 'Compensated Acid-Base Disturbance (AG = ' + agValue + ')';
+        ? 'اضطراب حمضي-قاعدي معوَّض (AG = ' +
+          agValue +
+          ')'
+        : 'Compensated Acid-Base Disturbance (AG = ' +
+          agValue +
+          ')';
     }
 
     return {
@@ -113,11 +127,18 @@ export const ClinicalCalculatorsModal: React.FC<
     };
   };
 
-  const safeIvFluids = Number.isFinite(ivFluids) ? ivFluids : 0;
-  const safeEnteralFeed = Number.isFinite(enteralFeed) ? enteralFeed : 0;
+  const safeIvFluids = Number.isFinite(ivFluids)
+    ? ivFluids
+    : 0;
+
+  const safeEnteralFeed = Number.isFinite(enteralFeed)
+    ? enteralFeed
+    : 0;
+
   const safeUrineOutput = Number.isFinite(urineOutput)
     ? urineOutput
     : 0;
+
   const safeDrainOutput = Number.isFinite(drainOutput)
     ? drainOutput
     : 0;
@@ -139,36 +160,44 @@ export const ClinicalCalculatorsModal: React.FC<
 
   const abgAnalysis = interpretAbg();
 
-  const categories = [
+  const categories: Array<{
+    id: CategoryId;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
     {
-      id: 'critical' as const,
+      id: 'critical',
       label: isArabic ? 'العناية المركزة' : 'Critical Care',
       icon: Flame,
     },
     {
-      id: 'cardiology' as const,
+      id: 'cardiology',
       label: isArabic ? 'أمراض القلب' : 'Cardiology',
       icon: HeartPulse,
     },
     {
-      id: 'thrombo' as const,
-      label: isArabic ? 'الانسداد التجلطي' : 'Thromboembolism',
+      id: 'thrombo',
+      label: isArabic
+        ? 'الانسداد التجلطي'
+        : 'Thromboembolism',
       icon: ShieldAlert,
     },
     {
-      id: 'renal_resp' as const,
-      label: isArabic ? 'الكلى والتنفس' : 'Renal & Respiratory',
+      id: 'renal_resp',
+      label: isArabic
+        ? 'الكلى والتنفس'
+        : 'Renal & Respiratory',
       icon: Wind,
     },
     {
-      id: 'electrolytes' as const,
+      id: 'electrolytes',
       label: isArabic
         ? 'الشوارد والعلامات'
         : 'Electrolytes & General',
       icon: Zap,
     },
     {
-      id: 'fluid' as const,
+      id: 'fluid',
       label: isArabic
         ? 'السوائل وغازات الدم'
         : 'Fluids & ABG',
@@ -222,15 +251,17 @@ export const ClinicalCalculatorsModal: React.FC<
           {categories.map((cat) => {
             const Icon = cat.icon;
 
+            const tabClassName =
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ' +
+              (activeCategory === cat.id
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60');
+
             return (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                  activeCategory === cat.id
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
+                className={tabClassName}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{cat.label}</span>
@@ -302,11 +333,12 @@ export const ClinicalCalculatorsModal: React.FC<
                     </div>
 
                     <div
-                      className={`text-2xl font-bold font-mono ${
-                        netBalance >= 0
+                      className={
+                        'text-2xl font-bold font-mono ' +
+                        (netBalance >= 0
                           ? 'text-cyan-400'
-                          : 'text-amber-400'
-                      }`}
+                          : 'text-amber-400')
+                      }
                     >
                       {netBalance > 0
                         ? '+' + netBalance
@@ -343,7 +375,9 @@ export const ClinicalCalculatorsModal: React.FC<
                         type="number"
                         value={ivFluids}
                         onChange={(e) =>
-                          setIvFluids(Number(e.target.value))
+                          setIvFluids(
+                            Number(e.target.value)
+                          )
                         }
                         className="w-full p-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono"
                       />
@@ -360,7 +394,9 @@ export const ClinicalCalculatorsModal: React.FC<
                         type="number"
                         value={enteralFeed}
                         onChange={(e) =>
-                          setEnteralFeed(Number(e.target.value))
+                          setEnteralFeed(
+                            Number(e.target.value)
+                          )
                         }
                         className="w-full p-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono"
                       />
@@ -386,7 +422,9 @@ export const ClinicalCalculatorsModal: React.FC<
                         type="number"
                         value={urineOutput}
                         onChange={(e) =>
-                          setUrineOutput(Number(e.target.value))
+                          setUrineOutput(
+                            Number(e.target.value)
+                          )
                         }
                         className="w-full p-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono"
                       />
@@ -403,7 +441,9 @@ export const ClinicalCalculatorsModal: React.FC<
                         type="number"
                         value={drainOutput}
                         onChange={(e) =>
-                          setDrainOutput(Number(e.target.value))
+                          setDrainOutput(
+                            Number(e.target.value)
+                          )
                         }
                         className="w-full p-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono"
                       />
@@ -423,7 +463,9 @@ export const ClinicalCalculatorsModal: React.FC<
                     min="0"
                     value={patientWeight}
                     onChange={(e) =>
-                      setPatientWeight(Number(e.target.value))
+                      setPatientWeight(
+                        Number(e.target.value)
+                      )
                     }
                     className="w-20 p-1 rounded bg-slate-900 border border-slate-800 text-white font-mono text-center"
                   />
@@ -480,7 +522,9 @@ export const ClinicalCalculatorsModal: React.FC<
                       step="0.01"
                       value={abgPh}
                       onChange={(e) =>
-                        setAbgPh(Number(e.target.value))
+                        setAbgPh(
+                          Number(e.target.value)
+                        )
                       }
                       className="w-full p-1.5 rounded bg-slate-900 border border-slate-800 text-white font-mono"
                     />
@@ -495,7 +539,9 @@ export const ClinicalCalculatorsModal: React.FC<
                       type="number"
                       value={abgPco2}
                       onChange={(e) =>
-                        setAbgPco2(Number(e.target.value))
+                        setAbgPco2(
+                          Number(e.target.value)
+                        )
                       }
                       className="w-full p-1.5 rounded bg-slate-900 border border-slate-800 text-white font-mono"
                     />
@@ -510,7 +556,9 @@ export const ClinicalCalculatorsModal: React.FC<
                       type="number"
                       value={abgHco3}
                       onChange={(e) =>
-                        setAbgHco3(Number(e.target.value))
+                        setAbgHco3(
+                          Number(e.target.value)
+                        )
                       }
                       className="w-full p-1.5 rounded bg-slate-900 border border-slate-800 text-white font-mono"
                     />
@@ -525,7 +573,9 @@ export const ClinicalCalculatorsModal: React.FC<
                       type="number"
                       value={abgNa}
                       onChange={(e) =>
-                        setAbgNa(Number(e.target.value))
+                        setAbgNa(
+                          Number(e.target.value)
+                        )
                       }
                       className="w-full p-1.5 rounded bg-slate-900 border border-slate-800 text-white font-mono"
                     />
@@ -540,7 +590,9 @@ export const ClinicalCalculatorsModal: React.FC<
                       type="number"
                       value={abgCl}
                       onChange={(e) =>
-                        setAbgCl(Number(e.target.value))
+                        setAbgCl(
+                          Number(e.target.value)
+                        )
                       }
                       className="w-full p-1.5 rounded bg-slate-900 border border-slate-800 text-white font-mono"
                     />
@@ -574,4 +626,3 @@ export const ClinicalCalculatorsModal: React.FC<
     </div>
   );
 };
-```
