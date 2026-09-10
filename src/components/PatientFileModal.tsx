@@ -1,3649 +1,2091 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  BedDouble,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  FileText,
+  HeartPulse,
+  Image as ImageIcon,
+  Info,
+  Pill,
+  Printer,
+  Scissors,
+  Stethoscope,
+  Syringe,
+  Trash2,
+  User,
+  Wind,
+  X,
+} from 'lucide-react';
+
+import {
   PatientRecord,
   FieldVisibilityConfig,
   SpecialtyMode,
-  BedStatus,
-  ProgressNote,
   VitalSignEntry,
-  IOEntry,
-  LabResults,
-  ABGEntry,
+  ProgressNote,
   Medication,
-  Infusion,
-  Procedure
+  Procedure,
 } from '../types';
-
-import {
-  X,
-  HeartPulse,
-  Activity,
-  Printer,
-  Trash2,
-  Plus,
-  Save,
-  Check,
-  Clock,
-  Droplets,
-  Wind,
-  Pill,
-  LogOut,
-  Bed,
-  FolderArchive,
-  ShieldCheck,
-  Stethoscope,
-  FileText,
-  ChevronRight,
-  AlertTriangle,
-  UserRound,
-  CalendarDays,
-  ClipboardList,
-  Syringe,
-  Gauge,
-  ScanLine,
-  Brain,
-  RefreshCw
-} from 'lucide-react';
-
-import { TimelineNotes } from './TimelineNotes';
 
 interface PatientFileModalProps {
   patient: PatientRecord;
   fieldConfig: FieldVisibilityConfig;
   specialtyMode: SpecialtyMode;
-  onUpdatePatient: (updated: PatientRecord) => void;
-  onDeletePatient: (patientId: string) => void;
+  onUpdatePatient: (patient: PatientRecord) => void;
+  onDeletePatient: (patient: PatientRecord) => void;
+  onDischargePatient: (patient: PatientRecord) => void;
+  onReadmitPatient: (patient: PatientRecord) => void;
   onPrintPatient: (patient: PatientRecord) => void;
-  onDischargePatient?: (patient: PatientRecord) => void;
-  onReadmitPatient?: (patient: PatientRecord) => void;
   onClose: () => void;
 }
 
-type PatientTab =
+type SectionKey =
   | 'overview'
-  | 'vitals_io'
-  | 'labs_abg'
-  | 'ccu'
+  | 'vitals'
+  | 'io'
+  | 'labs'
+  | 'abg'
+  | 'cardiology'
   | 'icu'
-  | 'meds'
-  | 'notes'
-  | 'procedures';
+  | 'medications'
+  | 'procedures'
+  | 'timeline';
 
-const inputClass =
-  'w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-2 text-white outline-none focus:border-cyan-500 transition';
+const formatDate = (value?: string) => {
+  if (!value) return '—';
 
-const textareaClass =
-  'w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-2 text-white outline-none focus:border-cyan-500 transition resize-y';
+  const date = new Date(value);
 
-const cardClass =
-  'rounded-xl bg-slate-950 border border-slate-800 p-4';
+  if (Number.isNaN(date.getTime())) return value;
 
-const smallLabelClass =
-  'block text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-1';
-
-const nowStamp = () => {
-  const now = new Date();
-  return now.toISOString().slice(0, 16).replace('T', ' ');
-};
-
-const displayTime = () => {
-  const now = new Date();
-  const date = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(
-    now.getDate()
-  ).padStart(2, '0')}`;
-
-  const time = now.toLocaleTimeString([], {
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   });
-
-  return `${date} ${time}`;
 };
 
-const numberOr = (value: any, fallback: number) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+const statusLabel = (status: PatientRecord['status']) => {
+  switch (status) {
+    case 'critical':
+      return 'Critical';
+    case 'deteriorating':
+      return 'Deteriorating';
+    case 'guarded':
+      return 'Guarded';
+    case 'stable':
+      return 'Stable';
+    case 'post-op':
+      return 'Post-op';
+    case 'discharged':
+      return 'Discharged';
+    default:
+      return 'Empty';
+  }
 };
 
-const calculateMAP = (sys: any, dia: any) => {
-  const s = numberOr(sys, 0);
-  const d = numberOr(dia, 0);
-
-  if (!s && !d) return '';
-
-  return Math.round((s + 2 * d) / 3);
+const statusClass = (status: PatientRecord['status']) => {
+  switch (status) {
+    case 'critical':
+      return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900';
+    case 'deteriorating':
+      return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900';
+    case 'guarded':
+      return 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900';
+    case 'stable':
+      return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900';
+    case 'post-op':
+      return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900';
+    case 'discharged':
+      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+    default:
+      return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
 };
 
-const calculateNetIO = (io: IOEntry) => {
-  const intake =
-    Number(io.intakeIV || 0) +
-    Number(io.intakeEnteral || 0) +
-    Number(io.intakeOther || 0);
+const emptyVital = (): VitalSignEntry => ({
+  timestamp: new Date().toISOString(),
+  hr: '',
+  bpSystolic: '',
+  bpDiastolic: '',
+  rr: '',
+  spo2: '',
+  temp: '',
+});
 
-  const output =
-    Number(io.outputUrine || 0) +
-    Number(io.outputDrain || 0) +
-    Number(io.outputGI || 0);
-
-  return intake - output;
-};
-
-const SectionTitle: React.FC<{
-  icon?: React.ReactNode;
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-}> = ({ icon, title, subtitle, action }) => (
-  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800">
-    <div className="flex items-start gap-2">
-      {icon && (
-        <div className="mt-0.5 text-cyan-400">
-          {icon}
-        </div>
-      )}
-
-      <div>
-        <h3 className="font-bold text-white text-sm">{title}</h3>
-
-        {subtitle && (
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            {subtitle}
-          </p>
-        )}
-      </div>
-    </div>
-
-    {action}
-  </div>
-);
-
-const EmptyState: React.FC<{
-  text: string;
-  icon?: React.ReactNode;
-}> = ({ text, icon }) => (
-  <div className="py-8 flex flex-col items-center justify-center text-center text-slate-500">
-    {icon || <FileText className="w-7 h-7 mb-2 opacity-50" />}
-    <span className="text-xs">{text}</span>
-  </div>
-);
-
-export const PatientFileModal: React.FC<PatientFileModalProps> = ({
+export default function PatientFileModal({
   patient,
   fieldConfig,
   specialtyMode,
   onUpdatePatient,
   onDeletePatient,
-  onPrintPatient,
   onDischargePatient,
   onReadmitPatient,
-  onClose
-}) => {
-  const [data, setData] = useState<PatientRecord>({
-    ...patient,
-    vitals: patient.vitals || [],
-    ioRecords: patient.ioRecords || [],
-    labs: patient.labs || [],
-    abgRecords: patient.abgRecords || [],
-    medications: patient.medications || [],
-    infusions: patient.infusions || [],
-    procedures: patient.procedures || [],
-    progressNotes: patient.progressNotes || []
-  });
+  onPrintPatient,
+  onClose,
+}: PatientFileModalProps) {
+  const [activeSection, setActiveSection] =
+    useState<SectionKey>('overview');
 
-  const [activeTab, setActiveTab] = useState<PatientTab>(
-    specialtyMode === 'ccu'
-      ? 'ccu'
-      : specialtyMode === 'icu'
-      ? 'icu'
-      : 'overview'
-  );
-
-  const [saveToast, setSaveToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
 
-  const [showAddVital, setShowAddVital] = useState(false);
-  const [showAddIO, setShowAddIO] = useState(false);
-  const [showAddLab, setShowAddLab] = useState(false);
-  const [showAddABG, setShowAddABG] = useState(false);
-  const [showAddMed, setShowAddMed] = useState(false);
-  const [showAddInfusion, setShowAddInfusion] = useState(false);
-  const [showAddProcedure, setShowAddProcedure] = useState(false);
+  const [editingBasicInfo, setEditingBasicInfo] = useState(false);
 
-  const [newVital, setNewVital] = useState<Partial<VitalSignEntry>>({
-    hr: 75,
-    bpSystolic: 120,
-    bpDiastolic: 75,
-    rr: 16,
-    spo2: 98,
-    temp: 36.8,
-    rhythm: 'Sinus'
+  const [draft, setDraft] = useState({
+    name: patient.name,
+    age: String(patient.age ?? ''),
+    gender: patient.gender,
+    bedNumber: String(patient.bedNumber ?? ''),
+    mrn: patient.mrn ?? '',
+    primaryDiagnosis: patient.primaryDiagnosis ?? '',
+    chiefComplaint: patient.chiefComplaint ?? '',
+    attendingPhysician: patient.attendingPhysician ?? '',
+    consultations: patient.consultations ?? '',
+    imagingSummary: patient.imagingSummary ?? '',
+    dischargeTransferPlan: patient.dischargeTransferPlan ?? '',
   });
 
-  const [newIO, setNewIO] = useState<Partial<IOEntry>>({
-    intakeIV: 0,
-    intakeEnteral: 0,
-    intakeOther: 0,
-    outputUrine: 0,
-    outputDrain: 0,
-    outputGI: 0,
-    notes: ''
+  const [newNote, setNewNote] = useState({
+    title: '',
+    assessment: '',
+    plan: '',
+    subjective: '',
+    objective: '',
+    tag: 'Round' as ProgressNote['tag'],
   });
 
-  const [newLab, setNewLab] = useState<Partial<LabResults>>({
-    hb: '',
-    wbc: '',
-    platelets: '',
-    na: '',
-    k: '',
-    cl: '',
-    urea: '',
-    creatinine: '',
-    glucose: '',
-    troponin: '',
-    ckmb: '',
-    bnp: '',
-    pt: '',
-    inr: '',
-    aptt: '',
-    crp: '',
-    pct: '',
-    lactate: ''
-  });
-
-  const [newABG, setNewABG] = useState<Partial<ABGEntry>>({
-    ph: '',
-    pco2: '',
-    po2: '',
-    hco3: '',
-    be: '',
-    lactate: '',
-    fio2: '',
-    interpretation: ''
-  });
-
-  const [newMed, setNewMed] = useState({
+  const [newMedication, setNewMedication] = useState({
     name: '',
     dose: '',
-    route: 'Oral',
-    frequency: 'Daily',
-    category: 'other' as Medication['category']
-  });
-
-  const [newInfusion, setNewInfusion] = useState({
-    drug: '',
-    doseRate: '',
-    concentration: '',
-    lineLocation: 'Peripheral IV'
+    route: '',
+    frequency: '',
+    category: 'other' as Medication['category'],
   });
 
   const [newProcedure, setNewProcedure] = useState({
     name: '',
-    date: '',
+    date: new Date().toISOString().slice(0, 16),
     site: '',
     performer: '',
-    notes: ''
+    notes: '',
   });
 
-  const lastVital = useMemo(
-    () => data.vitals[data.vitals.length - 1],
-    [data.vitals]
-  );
+  const [newVital, setNewVital] = useState<VitalSignEntry>(emptyVital());
 
-  const lastLab = useMemo(
-    () => data.labs[data.labs.length - 1],
-    [data.labs]
-  );
+  const latestVital = useMemo(() => {
+    if (!patient.vitals?.length) return null;
 
-  const lastABG = useMemo(
-    () => data.abgRecords[data.abgRecords.length - 1],
-    [data.abgRecords]
-  );
+    return [...patient.vitals].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() -
+        new Date(a.timestamp).getTime()
+    )[0];
+  }, [patient.vitals]);
 
-  const totalNetBalance = useMemo(
-    () => data.ioRecords.reduce((sum, io) => sum + calculateNetIO(io), 0),
-    [data.ioRecords]
-  );
+  const latestLab = useMemo(() => {
+    if (!patient.labs?.length) return null;
 
-  const updatePatient = (next: PatientRecord) => {
-    const updated = {
-      ...next,
-      lastUpdated: nowStamp()
-    };
+    return [...patient.labs].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() -
+        new Date(a.timestamp).getTime()
+    )[0];
+  }, [patient.labs]);
 
-    setData(updated);
-    onUpdatePatient(updated);
+  const latestABG = useMemo(() => {
+    if (!patient.abgRecords?.length) return null;
+
+    return [...patient.abgRecords].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() -
+        new Date(a.timestamp).getTime()
+    )[0];
+  }, [patient.abgRecords]);
+
+  const updatePatient = (changes: Partial<PatientRecord>) => {
+    onUpdatePatient({
+      ...patient,
+      ...changes,
+      lastUpdated: new Date().toISOString(),
+    });
   };
 
-  const handleFieldChange = (
-    field: keyof PatientRecord,
-    value: any
-  ) => {
+  const saveBasicInfo = () => {
     updatePatient({
-      ...data,
-      [field]: value
+      name: draft.name,
+      age: draft.age,
+      gender: draft.gender,
+      bedNumber: draft.bedNumber,
+      mrn: draft.mrn,
+      primaryDiagnosis: draft.primaryDiagnosis,
+      chiefComplaint: draft.chiefComplaint,
+      attendingPhysician: draft.attendingPhysician,
+      consultations: draft.consultations,
+      imagingSummary: draft.imagingSummary,
+      dischargeTransferPlan: draft.dischargeTransferPlan,
     });
+
+    setEditingBasicInfo(false);
   };
 
-  const handleCcuChange = (
-    field: keyof PatientRecord['ccuData'],
-    value: any
-  ) => {
-    updatePatient({
-      ...data,
-      ccuData: {
-        ...data.ccuData,
-        [field]: value
-      }
-    });
-  };
-
-  const handleVentChange = (
-    field: keyof PatientRecord['icuVentilator'],
-    value: any
-  ) => {
-    updatePatient({
-      ...data,
-      icuVentilator: {
-        ...data.icuVentilator,
-        [field]: value
-      }
-    });
-  };
-
-  const handleScoreChange = (
-    field: keyof PatientRecord['icuScores'],
-    value: any
-  ) => {
-    updatePatient({
-      ...data,
-      icuScores: {
-        ...data.icuScores,
-        [field]: value
-      }
-    });
-  };
-
-  const handleAddNote = (note: ProgressNote) => {
-    updatePatient({
-      ...data,
-      progressNotes: [...data.progressNotes, note]
-    });
-  };
-
-  const handleUpdateNote = (note: ProgressNote) => {
-    updatePatient({
-      ...data,
-      progressNotes: data.progressNotes.map(item =>
-        item.id === note.id ? note : item
-      )
-    });
-  };
-
-  const handleDeleteNote = (noteId: string) => {
-    updatePatient({
-      ...data,
-      progressNotes: data.progressNotes.filter(
-        note => note.id !== noteId
-      )
-    });
-  };
-
-  const handleSaveVital = () => {
-    const sys = numberOr(newVital.bpSystolic, 120);
-    const dia = numberOr(newVital.bpDiastolic, 80);
-
-    const entry: VitalSignEntry = {
-      timestamp: displayTime(),
-      hr: numberOr(newVital.hr, 70),
-      bpSystolic: sys,
-      bpDiastolic: dia,
-      map: calculateMAP(sys, dia),
-      rr: numberOr(newVital.rr, 16),
-      spo2: numberOr(newVital.spo2, 98),
-      temp: numberOr(newVital.temp, 37),
-      cvp: newVital.cvp,
-      rhythm: newVital.rhythm || 'Sinus'
-    };
-
-    updatePatient({
-      ...data,
-      vitals: [...data.vitals, entry]
-    });
-
-    setShowAddVital(false);
-
-    setNewVital({
-      hr: 75,
-      bpSystolic: 120,
-      bpDiastolic: 75,
-      rr: 16,
-      spo2: 98,
-      temp: 36.8,
-      rhythm: 'Sinus'
-    });
-  };
-
-  const handleSaveIO = () => {
-    const entry: IOEntry = {
-      timestamp: displayTime(),
-      intakeIV: numberOr(newIO.intakeIV, 0),
-      intakeEnteral: numberOr(newIO.intakeEnteral, 0),
-      intakeOther: numberOr(newIO.intakeOther, 0),
-      outputUrine: numberOr(newIO.outputUrine, 0),
-      outputDrain: numberOr(newIO.outputDrain, 0),
-      outputGI: numberOr(newIO.outputGI, 0),
-      notes: newIO.notes || ''
-    };
-
-    updatePatient({
-      ...data,
-      ioRecords: [...data.ioRecords, entry]
-    });
-
-    setShowAddIO(false);
-
-    setNewIO({
-      intakeIV: 0,
-      intakeEnteral: 0,
-      intakeOther: 0,
-      outputUrine: 0,
-      outputDrain: 0,
-      outputGI: 0,
-      notes: ''
-    });
-  };
-
-  const handleSaveLab = () => {
-    const entry: LabResults = {
-      timestamp: displayTime(),
-      ...newLab
-    };
-
-    updatePatient({
-      ...data,
-      labs: [...data.labs, entry]
-    });
-
-    setShowAddLab(false);
-
-    setNewLab({
-      hb: '',
-      wbc: '',
-      platelets: '',
-      na: '',
-      k: '',
-      cl: '',
-      urea: '',
-      creatinine: '',
-      glucose: '',
-      troponin: '',
-      ckmb: '',
-      bnp: '',
-      pt: '',
-      inr: '',
-      aptt: '',
-      crp: '',
-      pct: '',
-      lactate: ''
-    });
-  };
-
-  const handleSaveABG = () => {
-    if (!newABG.ph && !newABG.pco2 && !newABG.po2) return;
-
-    const fio2Number = numberOr(newABG.fio2, 0);
-    const po2Number = numberOr(newABG.po2, 0);
-
-    let ratio = '';
-
-    if (fio2Number > 0 && po2Number > 0) {
-      const fio2Decimal =
-        fio2Number > 1 ? fio2Number / 100 : fio2Number;
-
-      if (fio2Decimal > 0) {
-        ratio = String(
-          Math.round(po2Number / fio2Decimal)
-        );
-      }
+  const addVital = () => {
+    if (
+      !newVital.hr &&
+      !newVital.bpSystolic &&
+      !newVital.spo2 &&
+      !newVital.temp
+    ) {
+      return;
     }
 
-    const entry: ABGEntry = {
-      timestamp: displayTime(),
-      ph: newABG.ph || '',
-      pco2: newABG.pco2 || '',
-      po2: newABG.po2 || '',
-      hco3: newABG.hco3 || '',
-      be: newABG.be || '',
-      lactate: newABG.lactate || '',
-      fio2: newABG.fio2 || '',
-      pao2fio2Ratio: ratio,
-      interpretation: newABG.interpretation || ''
-    };
-
     updatePatient({
-      ...data,
-      abgRecords: [...data.abgRecords, entry]
+      vitals: [...(patient.vitals || []), newVital],
     });
 
-    setShowAddABG(false);
-
-    setNewABG({
-      ph: '',
-      pco2: '',
-      po2: '',
-      hco3: '',
-      be: '',
-      lactate: '',
-      fio2: '',
-      interpretation: ''
-    });
+    setNewVital(emptyVital());
   };
 
-  const handleSaveMedication = () => {
-    if (!newMed.name.trim()) return;
+  const addMedication = () => {
+    if (!newMedication.name.trim()) return;
 
     const medication: Medication = {
-      id: `med-${Date.now()}`,
-      name: newMed.name,
-      dose: newMed.dose,
-      route: newMed.route,
-      frequency: newMed.frequency,
-      category: newMed.category
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: newMedication.name,
+      dose: newMedication.dose,
+      route: newMedication.route,
+      frequency: newMedication.frequency,
+      category: newMedication.category,
     };
 
     updatePatient({
-      ...data,
-      medications: [...data.medications, medication]
+      medications: [...(patient.medications || []), medication],
     });
 
-    setShowAddMed(false);
-
-    setNewMed({
+    setNewMedication({
       name: '',
       dose: '',
-      route: 'Oral',
-      frequency: 'Daily',
-      category: 'other'
+      route: '',
+      frequency: '',
+      category: 'other',
     });
-  };
-
-  const handleSaveInfusion = () => {
-    if (!newInfusion.drug.trim()) return;
-
-    const infusion: Infusion = {
-      id: `inf-${Date.now()}`,
-      drug: newInfusion.drug,
-      doseRate: newInfusion.doseRate,
-      concentration: newInfusion.concentration,
-      lineLocation: newInfusion.lineLocation
-    };
-
-    updatePatient({
-      ...data,
-      infusions: [...data.infusions, infusion]
-    });
-
-    setShowAddInfusion(false);
-
-    setNewInfusion({
-      drug: '',
-      doseRate: '',
-      concentration: '',
-      lineLocation: 'Peripheral IV'
-    });
-  };
-
-  const handleSaveProcedure = () => {
-    if (!newProcedure.name.trim()) return;
-
-    const procedure: Procedure = {
-      id: `procedure-${Date.now()}`,
-      name: newProcedure.name,
-      date: newProcedure.date || nowStamp(),
-      site: newProcedure.site,
-      performer: newProcedure.performer,
-      notes: newProcedure.notes
-    };
-
-    updatePatient({
-      ...data,
-      procedures: [...data.procedures, procedure]
-    });
-
-    setShowAddProcedure(false);
-
-    setNewProcedure({
-      name: '',
-      date: '',
-      site: '',
-      performer: '',
-      notes: ''
-    });
-  };
-
-  const triggerSaveToast = () => {
-    onUpdatePatient({
-      ...data,
-      lastUpdated: nowStamp()
-    });
-
-    setSaveToast(true);
-
-    window.setTimeout(() => {
-      setSaveToast(false);
-    }, 1800);
   };
 
   const removeMedication = (id: string) => {
     updatePatient({
-      ...data,
-      medications: data.medications.filter(
+      medications: (patient.medications || []).filter(
         medication => medication.id !== id
-      )
+      ),
     });
   };
 
-  const removeInfusion = (id: string) => {
+  const addProcedure = () => {
+    if (!newProcedure.name.trim()) return;
+
+    const procedure: Procedure = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: newProcedure.name,
+      date: new Date(newProcedure.date).toISOString(),
+      site: newProcedure.site || undefined,
+      performer: newProcedure.performer || undefined,
+      notes: newProcedure.notes || undefined,
+    };
+
     updatePatient({
-      ...data,
-      infusions: data.infusions.filter(
-        infusion => infusion.id !== id
-      )
+      procedures: [...(patient.procedures || []), procedure],
+    });
+
+    setNewProcedure({
+      name: '',
+      date: new Date().toISOString().slice(0, 16),
+      site: '',
+      performer: '',
+      notes: '',
+    });
+  };
+
+  const addProgressNote = () => {
+    if (!newNote.assessment.trim() && !newNote.plan.trim()) return;
+
+    const note: ProgressNote = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      timestamp: new Date().toISOString(),
+      author: patient.attendingPhysician || 'Doctor',
+      title: newNote.title || 'Clinical Note',
+      subjective: newNote.subjective,
+      objective: newNote.objective,
+      assessment: newNote.assessment,
+      plan: newNote.plan,
+      tag: newNote.tag,
+    };
+
+    updatePatient({
+      progressNotes: [note, ...(patient.progressNotes || [])],
+    });
+
+    setNewNote({
+      title: '',
+      assessment: '',
+      plan: '',
+      subjective: '',
+      objective: '',
+      tag: 'Round',
+    });
+
+    setActiveSection('timeline');
+  };
+
+  const removeVital = (timestamp: string) => {
+    updatePatient({
+      vitals: (patient.vitals || []).filter(
+        vital => vital.timestamp !== timestamp
+      ),
     });
   };
 
   const removeProcedure = (id: string) => {
     updatePatient({
-      ...data,
-      procedures: data.procedures.filter(
+      procedures: (patient.procedures || []).filter(
         procedure => procedure.id !== id
-      )
+      ),
     });
   };
 
-  const statusClass = () => {
-    switch (data.status) {
-      case 'stable':
-        return 'bg-emerald-950 text-emerald-300 border-emerald-800';
-
-      case 'critical':
-        return 'bg-rose-950 text-rose-300 border-rose-800';
-
-      case 'deteriorating':
-        return 'bg-orange-950 text-orange-300 border-orange-800';
-
-      case 'post-op':
-        return 'bg-blue-950 text-blue-300 border-blue-800';
-
-      case 'guarded':
-        return 'bg-amber-950 text-amber-300 border-amber-800';
-
-      case 'discharged':
-        return 'bg-slate-800 text-slate-300 border-slate-700';
-
+  const sectionAllowed = (section: SectionKey) => {
+    switch (section) {
+      case 'overview':
+        return fieldConfig.patientInfo;
+      case 'vitals':
+        return fieldConfig.vitals;
+      case 'io':
+        return fieldConfig.ioBalance;
+      case 'labs':
+        return fieldConfig.labs;
+      case 'abg':
+        return fieldConfig.abg;
+      case 'cardiology':
+        return fieldConfig.ccuCardiology;
+      case 'icu':
+        return fieldConfig.icuVentilator || fieldConfig.icuScores;
+      case 'medications':
+        return fieldConfig.medications;
+      case 'procedures':
+        return fieldConfig.procedures;
+      case 'timeline':
+        return fieldConfig.progressNotesTimeline;
       default:
-        return 'bg-slate-800 text-slate-300 border-slate-700';
+        return true;
     }
   };
 
-  const tabs: Array<{
-    id: PatientTab;
+  const sections: {
+    key: SectionKey;
     label: string;
     icon: React.ReactNode;
-    visible?: boolean;
-  }> = [
+  }[] = [
     {
-      id: 'overview',
+      key: 'overview',
       label: 'Overview',
-      icon: <UserRound className="w-3.5 h-3.5" />
+      icon: <User size={17} />,
     },
     {
-      id: 'vitals_io',
-      label: 'Vitals & I/O',
-      icon: <Activity className="w-3.5 h-3.5" />,
-      visible: fieldConfig.vitals || fieldConfig.ioBalance
+      key: 'vitals',
+      label: 'Vitals',
+      icon: <HeartPulse size={17} />,
     },
     {
-      id: 'labs_abg',
-      label: 'Labs & ABG',
-      icon: <Droplets className="w-3.5 h-3.5" />,
-      visible: fieldConfig.labs || fieldConfig.abg
+      key: 'io',
+      label: 'I/O',
+      icon: <Activity size={17} />,
     },
     {
-      id: 'ccu',
-      label: 'CCU Cardiology',
-      icon: <HeartPulse className="w-3.5 h-3.5" />,
-      visible:
-        fieldConfig.ccuCardiology ||
-        fieldConfig.ecg ||
-        fieldConfig.echo ||
-        fieldConfig.cathStent
+      key: 'labs',
+      label: 'Labs',
+      icon: <FileText size={17} />,
     },
     {
-      id: 'icu',
-      label: 'ICU Critical Care',
-      icon: <Wind className="w-3.5 h-3.5" />,
-      visible:
-        fieldConfig.icuVentilator ||
-        fieldConfig.icuScores ||
-        fieldConfig.vasopressorsInfusions
+      key: 'abg',
+      label: 'ABG',
+      icon: <Wind size={17} />,
     },
     {
-      id: 'meds',
+      key: 'cardiology',
+      label: 'Cardiology',
+      icon: <Stethoscope size={17} />,
+    },
+    {
+      key: 'icu',
+      label: 'ICU',
+      icon: <Activity size={17} />,
+    },
+    {
+      key: 'medications',
       label: 'Medications',
-      icon: <Pill className="w-3.5 h-3.5" />,
-      visible: fieldConfig.medications || fieldConfig.vasopressorsInfusions
+      icon: <Pill size={17} />,
     },
     {
-      id: 'notes',
-      label: `Timeline (${data.progressNotes.length})`,
-      icon: <Clock className="w-3.5 h-3.5" />,
-      visible: fieldConfig.progressNotesTimeline
+      key: 'procedures',
+      label: 'Procedures',
+      icon: <Syringe size={17} />,
     },
     {
-      id: 'procedures',
-      label: 'Procedures & Plan',
-      icon: <Stethoscope className="w-3.5 h-3.5" />
-    }
+      key: 'timeline',
+      label: 'Timeline',
+      icon: <Clock size={17} />,
+    },
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-1.5 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-6xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto text-slate-100 flex flex-col max-h-[97vh]">
+  const visibleSections = sections.filter(sectionAllowed);
 
-        {/* =========================================================
-            HEADER
-        ========================================================== */}
+  const renderField = (
+    label: string,
+    value: React.ReactNode,
+    className = ''
+  ) => (
+    <div
+      className={`rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+    >
+      <div className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
 
-        <div className="px-3 sm:px-5 py-3 border-b border-slate-800 bg-slate-950 shrink-0">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+        {value || '—'}
+      </div>
+    </div>
+  );
 
-            <div className="flex items-center gap-3 min-w-0">
-
-              <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border ${
-                  data.isDischarged
-                    ? 'bg-amber-950/80 border-amber-800 text-amber-300'
-                    : data.status === 'critical'
-                    ? 'bg-rose-950 border-rose-800 text-rose-300'
-                    : 'bg-cyan-950 border-cyan-800 text-cyan-300'
-                }`}
-              >
-                {data.isDischarged ? (
-                  <FolderArchive className="w-5 h-5" />
-                ) : (
-                  data.bedNumber
-                )}
+  const renderSection = () => {
+    switch (activeSection) {
+      case 'overview':
+        return (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Patient Overview
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Main clinical information
+                </p>
               </div>
 
-              <div className="min-w-0">
+              <button
+                onClick={() => setEditingBasicInfo(value => !value)}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                {editingBasicInfo ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
 
-                <div className="flex items-center flex-wrap gap-1.5">
-
-                  <h2 className="text-base sm:text-xl font-black text-white truncate max-w-[260px] sm:max-w-none">
-                    {data.name}
-                  </h2>
-
-                  <span className="text-slate-600">•</span>
-
-                  <span className="text-cyan-300 font-semibold text-xs">
-                    {data.isDischarged
-                      ? `Ex-Bed ${data.previousBedNumber || data.bedNumber}`
-                      : `Bed ${data.bedNumber}`}
-                  </span>
-
-                  <select
-                    value={data.status}
-                    onChange={e =>
-                      handleFieldChange(
-                        'status',
-                        e.target.value as BedStatus
-                      )
+            {editingBasicInfo ? (
+              <div className="space-y-4 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Input
+                    label="Patient Name"
+                    value={draft.name}
+                    onChange={value =>
+                      setDraft({ ...draft, name: value })
                     }
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusClass()}`}
-                  >
-                    <option value="stable">Stable</option>
-                    <option value="critical">Critical</option>
-                    <option value="deteriorating">
-                      Deteriorating
-                    </option>
-                    <option value="guarded">Guarded</option>
-                    <option value="post-op">Post-Op</option>
-                    <option value="discharged">
-                      Discharged / Archived
-                    </option>
-                  </select>
+                  />
 
-                  <select
-                    value={data.codeStatus}
-                    onChange={e =>
-                      handleFieldChange(
-                        'codeStatus',
-                        e.target.value
-                      )
+                  <Input
+                    label="Age"
+                    value={draft.age}
+                    onChange={value =>
+                      setDraft({ ...draft, age: value })
                     }
-                    className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300"
-                  >
-                    <option value="Full Code">Full Code</option>
-                    <option value="DNR">DNR</option>
-                    <option value="DNI">DNI</option>
-                    <option value="Modified">Modified</option>
-                  </select>
+                  />
 
+                  <Select
+                    label="Gender"
+                    value={draft.gender}
+                    options={['Male', 'Female', 'Other']}
+                    onChange={value =>
+                      setDraft({
+                        ...draft,
+                        gender: value as PatientRecord['gender'],
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Bed Number"
+                    value={draft.bedNumber}
+                    onChange={value =>
+                      setDraft({ ...draft, bedNumber: value })
+                    }
+                  />
+
+                  <Input
+                    label="Patient ID / MRN"
+                    value={draft.mrn}
+                    onChange={value =>
+                      setDraft({ ...draft, mrn: value })
+                    }
+                  />
+
+                  <Input
+                    label="Attending Physician"
+                    value={draft.attendingPhysician}
+                    onChange={value =>
+                      setDraft({
+                        ...draft,
+                        attendingPhysician: value,
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Primary Diagnosis"
+                    value={draft.primaryDiagnosis}
+                    onChange={value =>
+                      setDraft({
+                        ...draft,
+                        primaryDiagnosis: value,
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Chief Complaint"
+                    value={draft.chiefComplaint}
+                    onChange={value =>
+                      setDraft({
+                        ...draft,
+                        chiefComplaint: value,
+                      })
+                    }
+                  />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400 mt-1">
-                  <span>
-                    MRN: <strong className="text-slate-200">{data.mrn}</strong>
-                  </span>
+                <TextArea
+                  label="Consultations"
+                  value={draft.consultations}
+                  onChange={value =>
+                    setDraft({
+                      ...draft,
+                      consultations: value,
+                    })
+                  }
+                />
 
-                  <span>•</span>
+                <TextArea
+                  label="Imaging Summary"
+                  value={draft.imagingSummary}
+                  onChange={value =>
+                    setDraft({
+                      ...draft,
+                      imagingSummary: value,
+                    })
+                  }
+                />
 
-                  <span>
-                    Age: <strong className="text-slate-200">{data.age}</strong>
-                  </span>
+                <TextArea
+                  label="Discharge / Transfer Plan"
+                  value={draft.dischargeTransferPlan}
+                  onChange={value =>
+                    setDraft({
+                      ...draft,
+                      dischargeTransferPlan: value,
+                    })
+                  }
+                />
 
-                  <span>•</span>
-
-                  <span>
-                    {data.gender}
-                  </span>
-
-                  <span>•</span>
-
-                  <span className="truncate max-w-[300px]">
-                    {data.primaryDiagnosis || 'No primary diagnosis'}
-                  </span>
+                <button
+                  onClick={saveBasicInfo}
+                  className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700"
+                >
+                  Save Patient Information
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {renderField('Age', patient.age)}
+                  {renderField('Gender', patient.gender)}
+                  {renderField('Bed', patient.bedNumber)}
+                  {renderField('Patient ID', patient.mrn)}
                 </div>
 
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {renderField(
+                    'Primary Diagnosis',
+                    patient.primaryDiagnosis
+                  )}
+
+                  {renderField(
+                    'Attending Physician',
+                    patient.attendingPhysician
+                  )}
+
+                  {fieldConfig.chiefComplaint &&
+                    renderField(
+                      'Chief Complaint',
+                      patient.chiefComplaint
+                    )}
+
+                  {renderField(
+                    'Admission',
+                    formatDate(patient.admissionDate)
+                  )}
+                </div>
+
+                {fieldConfig.history && (
+                  <InfoBox
+                    title="History of Present Illness"
+                    value={patient.historyOfPresentIllness}
+                  />
+                )}
+
+                {fieldConfig.examination && (
+                  <InfoBox
+                    title="Examination Summary"
+                    value={patient.examinationSummary}
+                  />
+                )}
+
+                {fieldConfig.patientInfo && (
+                  <InfoBox
+                    title="Past Medical History"
+                    value={patient.pastMedicalHistory}
+                  />
+                )}
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {renderField(
+                    'Code Status',
+                    patient.codeStatus
+                  )}
+
+                  {renderField(
+                    'Last Updated',
+                    formatDate(patient.lastUpdated)
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        );
+
+      case 'vitals':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Vital Signs"
+              subtitle="Record and review bedside observations"
+            />
+
+            {latestVital && (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                <MetricCard
+                  label="HR"
+                  value={`${latestVital.hr || '—'} bpm`}
+                />
+                <MetricCard
+                  label="BP"
+                  value={`${latestVital.bpSystolic || '—'}/${latestVital.bpDiastolic || '—'}`}
+                />
+                <MetricCard
+                  label="SpO₂"
+                  value={`${latestVital.spo2 || '—'}%`}
+                />
+                <MetricCard
+                  label="RR"
+                  value={`${latestVital.rr || '—'}/min`}
+                />
+                <MetricCard
+                  label="Temp"
+                  value={`${latestVital.temp || '—'} °C`}
+                />
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+              <h4 className="mb-4 font-bold text-slate-900 dark:text-white">
+                Add Vital Signs
+              </h4>
+
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Input
+                  label="HR"
+                  value={String(newVital.hr)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      hr: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="SBP"
+                  value={String(newVital.bpSystolic)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      bpSystolic: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="DBP"
+                  value={String(newVital.bpDiastolic)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      bpDiastolic: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="RR"
+                  value={String(newVital.rr)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      rr: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="SpO₂"
+                  value={String(newVital.spo2)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      spo2: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Temperature"
+                  value={String(newVital.temp)}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      temp: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="CVP"
+                  value={String(newVital.cvp ?? '')}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      cvp: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Rhythm"
+                  value={newVital.rhythm ?? ''}
+                  onChange={value =>
+                    setNewVital({
+                      ...newVital,
+                      rhythm: value,
+                    })
+                  }
+                />
+              </div>
+
+              <button
+                onClick={addVital}
+                className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
+              >
+                Add Vital Signs
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[...(patient.vitals || [])]
+                .reverse()
+                .map((vital, index) => (
+                  <div
+                    key={`${vital.timestamp}-${index}`}
+                    className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">
+                        {formatDate(vital.timestamp)}
+                      </span>
+
+                      <button
+                        onClick={() =>
+                          removeVital(vital.timestamp)
+                        }
+                        className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                      {renderField('HR', vital.hr)}
+                      {renderField(
+                        'BP',
+                        `${vital.bpSystolic}/${vital.bpDiastolic}`
+                      )}
+                      {renderField('SpO₂', vital.spo2)}
+                      {renderField('RR', vital.rr)}
+                      {renderField('Temp', vital.temp)}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        );
+
+      case 'io':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Fluid Balance"
+              subtitle="Input, output and cumulative balance"
+            />
+
+            {(patient.ioRecords || []).length === 0 ? (
+              <EmptyState text="No fluid balance records yet." />
+            ) : (
+              <div className="space-y-3">
+                {[...(patient.ioRecords || [])]
+                  .reverse()
+                  .map((entry, index) => {
+                    const intake =
+                      Number(entry.intakeIV || 0) +
+                      Number(entry.intakeEnteral || 0) +
+                      Number(entry.intakeOther || 0);
+
+                    const output =
+                      Number(entry.outputUrine || 0) +
+                      Number(entry.outputDrain || 0) +
+                      Number(entry.outputGI || 0);
+
+                    return (
+                      <div
+                        key={`${entry.timestamp}-${index}`}
+                        className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                      >
+                        <div className="mb-3 text-xs text-slate-500">
+                          {formatDate(entry.timestamp)}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                          {renderField('Total Intake', `${intake} mL`)}
+                          {renderField('Total Output', `${output} mL`)}
+                          {renderField(
+                            'Balance',
+                            `${intake - output} mL`
+                          )}
+                          {renderField(
+                            'Urine',
+                            `${entry.outputUrine || 0} mL`
+                          )}
+                        </div>
+
+                        {entry.notes && (
+                          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                            {entry.notes}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'labs':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Laboratory Results"
+              subtitle="Latest and historical laboratory data"
+            />
+
+            {latestLab && (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {renderField('Hb', latestLab.hb)}
+                {renderField('WBC', latestLab.wbc)}
+                {renderField('Platelets', latestLab.platelets)}
+                {renderField('Na', latestLab.na)}
+                {renderField('K', latestLab.k)}
+                {renderField('Creatinine', latestLab.creatinine)}
+                {renderField('Urea', latestLab.urea)}
+                {renderField('Glucose', latestLab.glucose)}
+                {renderField('Troponin', latestLab.troponin)}
+                {renderField('CK-MB', latestLab.ckmb)}
+                {renderField('BNP', latestLab.bnp)}
+                {renderField('INR', latestLab.inr)}
+                {renderField('aPTT', latestLab.aptt)}
+                {renderField('CRP', latestLab.crp)}
+                {renderField('PCT', latestLab.pct)}
+                {renderField('Lactate', latestLab.lactate)}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {[...(patient.labs || [])]
+                .reverse()
+                .map((lab, index) => (
+                  <div
+                    key={`${lab.timestamp}-${index}`}
+                    className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                  >
+                    <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+                      <Calendar size={14} />
+                      {formatDate(lab.timestamp)}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      {renderField('Hb', lab.hb)}
+                      {renderField('WBC', lab.wbc)}
+                      {renderField('PLT', lab.platelets)}
+                      {renderField('Na', lab.na)}
+                      {renderField('K', lab.k)}
+                      {renderField('Cr', lab.creatinine)}
+                      {renderField('Urea', lab.urea)}
+                      {renderField('Troponin', lab.troponin)}
+                      {renderField('CRP', lab.crp)}
+                      {renderField('Lactate', lab.lactate)}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {(patient.labs || []).length === 0 && (
+              <EmptyState text="No laboratory results recorded." />
+            )}
+          </div>
+        );
+
+      case 'abg':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Arterial Blood Gas"
+              subtitle="ABG history and oxygenation"
+            />
+
+            {latestABG && (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {renderField('pH', latestABG.ph)}
+                {renderField('PaCO₂', latestABG.pco2)}
+                {renderField('PaO₂', latestABG.po2)}
+                {renderField('HCO₃', latestABG.hco3)}
+                {renderField('BE', latestABG.be)}
+                {renderField('Lactate', latestABG.lactate)}
+                {renderField('FiO₂', latestABG.fio2)}
+                {renderField(
+                  'P/F Ratio',
+                  latestABG.pao2fio2Ratio
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {[...(patient.abgRecords || [])]
+                .reverse()
+                .map((abg, index) => (
+                  <div
+                    key={`${abg.timestamp}-${index}`}
+                    className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                  >
+                    <div className="mb-3 text-xs text-slate-500">
+                      {formatDate(abg.timestamp)}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                      {renderField('pH', abg.ph)}
+                      {renderField('PaCO₂', abg.pco2)}
+                      {renderField('PaO₂', abg.po2)}
+                      {renderField('HCO₃', abg.hco3)}
+                      {renderField('BE', abg.be)}
+                      {renderField('Lactate', abg.lactate)}
+                      {renderField('FiO₂', abg.fio2)}
+                      {renderField('P/F', abg.pao2fio2Ratio)}
+                    </div>
+
+                    {abg.interpretation && (
+                      <div className="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+                        <strong>Interpretation:</strong>{' '}
+                        {abg.interpretation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            {(patient.abgRecords || []).length === 0 && (
+              <EmptyState text="No ABG records recorded." />
+            )}
+          </div>
+        );
+
+      case 'cardiology':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Cardiology"
+              subtitle="ECG, Echo and Cath / PCI information"
+            />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {fieldConfig.ecg && (
+                <InfoBox
+                  title="ECG Summary"
+                  value={patient.ccuData?.ecgSummary}
+                  icon={<HeartPulse size={18} />}
+                />
+              )}
+
+              {fieldConfig.ecg &&
+                renderField(
+                  'ST Elevation Leads',
+                  patient.ccuData?.stElevationLeads
+                )}
+
+              {fieldConfig.ecg &&
+                renderField(
+                  'Arrhythmia',
+                  patient.ccuData?.arrhythmia
+                )}
+
+              {fieldConfig.echo &&
+                renderField(
+                  'Echo EF',
+                  patient.ccuData?.echoEF
+                    ? `${patient.ccuData.echoEF}%`
+                    : '—'
+                )}
+
+              {fieldConfig.echo && (
+                <InfoBox
+                  title="Echo Findings"
+                  value={patient.ccuData?.echoFindings}
+                />
+              )}
+
+              {fieldConfig.cathStent &&
+                renderField(
+                  'Cath Date',
+                  patient.ccuData?.cathDate
+                )}
+
+              {fieldConfig.cathStent && (
+                <InfoBox
+                  title="Cath Findings"
+                  value={patient.ccuData?.cathFindings}
+                />
+              )}
+
+              {fieldConfig.cathStent &&
+                renderField(
+                  'Culprit Lesion',
+                  patient.ccuData?.culpritLesion
+                )}
+
+              {fieldConfig.cathStent &&
+                renderField(
+                  'Stent Type',
+                  patient.ccuData?.stentType
+                )}
+
+              {fieldConfig.cathStent && (
+                <InfoBox
+                  title="Stent Details"
+                  value={patient.ccuData?.stentDetails}
+                />
+              )}
+
+              {renderField(
+                'Antiplatelets',
+                patient.ccuData?.antiplatelets
+              )}
+
+              {renderField(
+                'Anticoagulation',
+                patient.ccuData?.anticoagulation
+              )}
+
+              {renderField(
+                'TIMI Flow Post',
+                patient.ccuData?.timiFlowPost
+              )}
+            </div>
+          </div>
+        );
+
+      case 'icu':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="ICU / Critical Care"
+              subtitle="Ventilator settings and critical care scores"
+            />
+
+            {fieldConfig.icuVentilator && (
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                <div className="mb-4 flex items-center gap-2">
+                  <Wind size={19} className="text-blue-600" />
+                  <h4 className="font-bold text-slate-900 dark:text-white">
+                    Ventilator
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {renderField(
+                    'Mode',
+                    patient.icuVentilator?.mode
+                  )}
+                  {renderField(
+                    'FiO₂',
+                    patient.icuVentilator?.fio2
+                      ? `${patient.icuVentilator.fio2}%`
+                      : '—'
+                  )}
+                  {renderField(
+                    'PEEP',
+                    patient.icuVentilator?.peep
+                  )}
+                  {renderField(
+                    'Tidal Volume',
+                    patient.icuVentilator?.tv
+                  )}
+                  {renderField(
+                    'Rate',
+                    patient.icuVentilator?.rate
+                  )}
+                  {renderField(
+                    'Total Rate',
+                    patient.icuVentilator?.totalRate
+                  )}
+                  {renderField(
+                    'Ppeak',
+                    patient.icuVentilator?.pPeak
+                  )}
+                  {renderField(
+                    'Pplat',
+                    patient.icuVentilator?.pPlat
+                  )}
+                  {renderField(
+                    'ETT Size',
+                    patient.icuVentilator?.etTubeSize
+                  )}
+                  {renderField(
+                    'ETT Depth',
+                    patient.icuVentilator?.etTubeDepth
+                  )}
+                </div>
+              </div>
+            )}
+
+            {fieldConfig.icuScores && (
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                <h4 className="mb-4 font-bold text-slate-900 dark:text-white">
+                  ICU Scores
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {renderField(
+                    'GCS',
+                    patient.icuScores?.gcsTotal
+                  )}
+                  {renderField(
+                    'GCS Eye',
+                    patient.icuScores?.gcsEye
+                  )}
+                  {renderField(
+                    'GCS Verbal',
+                    patient.icuScores?.gcsVerbal
+                  )}
+                  {renderField(
+                    'GCS Motor',
+                    patient.icuScores?.gcsMotor
+                  )}
+                  {renderField(
+                    'RASS',
+                    patient.icuScores?.rass
+                  )}
+                  {renderField(
+                    'SOFA',
+                    patient.icuScores?.sofaScore
+                  )}
+                  {renderField(
+                    'Pupils',
+                    patient.icuScores?.pupils
+                  )}
+                  {renderField(
+                    'CAM-ICU',
+                    patient.icuScores?.deliriumCamICU
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'medications':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Medications"
+              subtitle="Current medication list"
+            />
+
+            <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Input
+                  label="Medication"
+                  value={newMedication.name}
+                  onChange={value =>
+                    setNewMedication({
+                      ...newMedication,
+                      name: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Dose"
+                  value={newMedication.dose}
+                  onChange={value =>
+                    setNewMedication({
+                      ...newMedication,
+                      dose: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Route"
+                  value={newMedication.route}
+                  onChange={value =>
+                    setNewMedication({
+                      ...newMedication,
+                      route: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Frequency"
+                  value={newMedication.frequency}
+                  onChange={value =>
+                    setNewMedication({
+                      ...newMedication,
+                      frequency: value,
+                    })
+                  }
+                />
+              </div>
+
+              <button
+                onClick={addMedication}
+                className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
+              >
+                Add Medication
+              </button>
+            </div>
+
+            {(patient.medications || []).length === 0 ? (
+              <EmptyState text="No medications recorded." />
+            ) : (
+              <div className="space-y-3">
+                {(patient.medications || []).map(medication => (
+                  <div
+                    key={medication.id}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="rounded-xl bg-blue-100 p-2 text-blue-600 dark:bg-blue-950/40">
+                        <Pill size={19} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-white">
+                          {medication.name}
+                        </div>
+
+                        <div className="mt-1 text-sm text-slate-500">
+                          {medication.dose || '—'} ·{' '}
+                          {medication.route || '—'} ·{' '}
+                          {medication.frequency || '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        removeMedication(medication.id)
+                      }
+                      className="rounded-xl p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'procedures':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Procedures & Interventions"
+              subtitle="Clinical procedures performed during admission"
+            />
+
+            <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Input
+                  label="Procedure"
+                  value={newProcedure.name}
+                  onChange={value =>
+                    setNewProcedure({
+                      ...newProcedure,
+                      name: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Date / Time"
+                  type="datetime-local"
+                  value={newProcedure.date}
+                  onChange={value =>
+                    setNewProcedure({
+                      ...newProcedure,
+                      date: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Site"
+                  value={newProcedure.site}
+                  onChange={value =>
+                    setNewProcedure({
+                      ...newProcedure,
+                      site: value,
+                    })
+                  }
+                />
+
+                <Input
+                  label="Operator"
+                  value={newProcedure.performer}
+                  onChange={value =>
+                    setNewProcedure({
+                      ...newProcedure,
+                      performer: value,
+                    })
+                  }
+                />
+              </div>
+
+              <TextArea
+                label="Notes"
+                value={newProcedure.notes}
+                onChange={value =>
+                  setNewProcedure({
+                    ...newProcedure,
+                    notes: value,
+                  })
+                }
+              />
+
+              <button
+                onClick={addProcedure}
+                className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
+              >
+                Add Procedure
+              </button>
+            </div>
+
+            {(patient.procedures || []).length === 0 ? (
+              <EmptyState text="No procedures recorded." />
+            ) : (
+              <div className="space-y-3">
+                {[...(patient.procedures || [])]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.date).getTime() -
+                      new Date(a.date).getTime()
+                  )
+                  .map(procedure => (
+                    <div
+                      key={procedure.id}
+                      className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white">
+                            {procedure.name}
+                          </div>
+
+                          <div className="mt-1 text-xs text-slate-500">
+                            {formatDate(procedure.date)}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            removeProcedure(procedure.id)
+                          }
+                          className="rounded-xl p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                        {renderField('Site', procedure.site)}
+                        {renderField(
+                          'Operator',
+                          procedure.performer
+                        )}
+                      </div>
+
+                      {procedure.notes && (
+                        <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800">
+                          {procedure.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'timeline':
+        return (
+          <div className="space-y-5">
+            <SectionHeader
+              title="Clinical Timeline"
+              subtitle="Daily notes, events and clinical decisions"
+            />
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+              <h4 className="mb-4 font-bold text-slate-900 dark:text-white">
+                Add Clinical Note
+              </h4>
+
+              <div className="space-y-3">
+                <Input
+                  label="Title"
+                  value={newNote.title}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      title: value,
+                    })
+                  }
+                />
+
+                <Select
+                  label="Type"
+                  value={newNote.tag || 'Round'}
+                  options={[
+                    'Round',
+                    'Event',
+                    'Procedure',
+                    'Consult',
+                    'Handover',
+                  ]}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      tag: value as ProgressNote['tag'],
+                    })
+                  }
+                />
+
+                <TextArea
+                  label="Subjective"
+                  value={newNote.subjective}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      subjective: value,
+                    })
+                  }
+                />
+
+                <TextArea
+                  label="Objective"
+                  value={newNote.objective}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      objective: value,
+                    })
+                  }
+                />
+
+                <TextArea
+                  label="Assessment"
+                  value={newNote.assessment}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      assessment: value,
+                    })
+                  }
+                />
+
+                <TextArea
+                  label="Plan"
+                  value={newNote.plan}
+                  onChange={value =>
+                    setNewNote({
+                      ...newNote,
+                      plan: value,
+                    })
+                  }
+                />
+
+                <button
+                  onClick={addProgressNote}
+                  className="w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
+                >
+                  Save Clinical Note
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 self-end lg:self-center">
+            {(patient.progressNotes || []).length === 0 ? (
+              <EmptyState text="No clinical notes yet." />
+            ) : (
+              <div className="relative space-y-4">
+                <div className="absolute bottom-0 left-[14px] top-0 w-px bg-slate-200 dark:bg-slate-700" />
 
-              {saveToast && (
-                <span className="hidden sm:flex items-center gap-1 text-xs font-semibold text-emerald-400 mr-1">
-                  <Check className="w-3.5 h-3.5" />
-                  Saved
-                </span>
-              )}
+                {[...(patient.progressNotes || [])]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.timestamp).getTime() -
+                      new Date(a.timestamp).getTime()
+                  )
+                  .map(note => (
+                    <div
+                      key={note.id}
+                      className="relative pl-9"
+                    >
+                      <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full border-4 border-white bg-blue-600 dark:border-slate-950">
+                        <Clock
+                          size={12}
+                          className="text-white"
+                        />
+                      </div>
 
-              {!data.isDischarged && onDischargePatient && (
-                <button
-                  onClick={() => onDischargePatient(data)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">
-                    Discharge
-                  </span>
-                </button>
-              )}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-slate-900 dark:text-white">
+                              {note.title || 'Clinical Note'}
+                            </h4>
 
-              {data.isDischarged && onReadmitPatient && (
-                <button
-                  onClick={() => onReadmitPatient(data)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs"
-                >
-                  <Bed className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">
-                    Re-admit
-                  </span>
-                </button>
-              )}
+                            <div className="mt-1 text-xs text-slate-500">
+                              {formatDate(note.timestamp)} ·{' '}
+                              {note.author}
+                            </div>
+                          </div>
 
+                          {note.tag && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                              {note.tag}
+                            </span>
+                          )}
+                        </div>
+
+                        {note.subjective && (
+                          <InfoBox
+                            title="Subjective"
+                            value={note.subjective}
+                            className="mt-3"
+                          />
+                        )}
+
+                        {note.objective && (
+                          <InfoBox
+                            title="Objective"
+                            value={note.objective}
+                            className="mt-3"
+                          />
+                        )}
+
+                        <InfoBox
+                          title="Assessment"
+                          value={note.assessment}
+                          className="mt-3"
+                        />
+
+                        <InfoBox
+                          title="Plan"
+                          value={note.plan}
+                          className="mt-3"
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-0 md:p-5">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl dark:bg-slate-950 md:h-[94vh] md:max-w-7xl md:rounded-3xl">
+        {/* Header */}
+        <div className="shrink-0 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
+            <div className="flex min-w-0 items-center gap-3">
               <button
-                onClick={triggerSaveToast}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700"
+                onClick={onClose}
+                className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-label="Back"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Save</span>
+                <ArrowLeft size={21} />
               </button>
 
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                <User size={22} />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-lg font-bold text-slate-900 dark:text-white">
+                    {patient.name}
+                  </h2>
+
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass(patient.status)}`}
+                  >
+                    {statusLabel(patient.status)}
+                  </span>
+                </div>
+
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <BedDouble size={13} />
+                    Bed {patient.bedNumber}
+                  </span>
+
+                  <span>MRN: {patient.mrn || '—'}</span>
+
+                  <span>
+                    Admitted: {formatDate(patient.admissionDate)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1">
               <button
-                onClick={() => onPrintPatient(data)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                title="Print"
+                onClick={() => onPrintPatient(patient)}
+                className="hidden rounded-xl p-2.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 md:block"
+                title="Print patient"
               >
-                <Printer className="w-4 h-4" />
+                <Printer size={19} />
               </button>
 
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 hover:text-rose-400 text-slate-400 border border-slate-700"
-                title="Delete"
+                className="rounded-xl p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                title="Delete patient"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 size={19} />
               </button>
 
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                title="Close"
+                className="rounded-xl p-2.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5" />
+                <X size={21} />
               </button>
-
             </div>
+          </div>
+
+          {/* Mobile section selector */}
+          <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800 md:hidden">
+            <select
+              value={activeSection}
+              onChange={event =>
+                setActiveSection(event.target.value as SectionKey)
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            >
+              {visibleSections.map(section => (
+                <option key={section.key} value={section.key}>
+                  {section.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* =========================================================
-            ARCHIVE BANNER
-        ========================================================== */}
-
-        {data.isDischarged && (
-          <div className="px-3 sm:px-5 py-2.5 bg-amber-950/30 border-b border-amber-800/40">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-
-              <div className="flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-
-                <div>
-                  <p className="text-[11px] font-bold text-amber-300">
-                    ARCHIVED MEDICAL RECORD
-                  </p>
-
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {data.dischargeDetails?.disposition || 'Discharged'}
-                    {' • '}
-                    {data.dischargeDetails?.dischargeDate || 'Recorded'}
-                    {' • '}
-                    Condition:{' '}
-                    {data.dischargeDetails?.conditionAtDischarge ||
-                      'Not specified'}
-                  </p>
-                </div>
-              </div>
-
-              {onReadmitPatient && (
-                <button
-                  onClick={() => onReadmitPatient(data)}
-                  className="self-start px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Re-admit
-                </button>
-              )}
-
+        {/* Body */}
+        <div className="flex min-h-0 flex-1">
+          {/* Sidebar */}
+          <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 md:block">
+            <div className="mb-3 px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Patient File
             </div>
-          </div>
-        )}
 
-        {/* =========================================================
-            DELETE CONFIRMATION
-        ========================================================== */}
-
-        {showDeleteConfirm && (
-          <div className="p-3 bg-rose-950 border-b border-rose-800">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-
-              <div className="flex items-start gap-2 text-xs text-rose-200">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-
-                <span>
-                  Permanently delete the complete medical record for{' '}
-                  <strong>{data.name}</strong>?
-                  <br />
-                  <span className="text-rose-400">
-                    Use Discharge instead if you want to preserve the record.
-                  </span>
-                </span>
-              </div>
-
-              <div className="flex gap-2 shrink-0">
+            <nav className="space-y-1">
+              {visibleSections.map(section => (
                 <button
-                  onClick={() => {
-                    onDeletePatient(data.id);
-                    onClose();
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
-                >
-                  Yes, Delete
-                </button>
-
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs"
-                >
-                  Cancel
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* =========================================================
-            TAB NAVIGATION
-        ========================================================== */}
-
-        <div className="border-b border-slate-800 bg-slate-950/80 shrink-0 overflow-x-auto">
-          <div className="flex min-w-max px-2 sm:px-4">
-
-            {tabs
-              .filter(tab => tab.visible !== false)
-              .map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-2.5 border-b-2 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition ${
-                    activeTab === tab.id
-                      ? 'border-cyan-400 text-cyan-300 bg-cyan-950/20'
-                      : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-900'
+                  key={section.key}
+                  onClick={() =>
+                    setActiveSection(section.key)
+                  }
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    activeSection === section.key
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
                 >
-                  {tab.icon}
-                  {tab.label}
+                  {section.icon}
+                  <span>{section.label}</span>
                 </button>
               ))}
-
-          </div>
-        </div>
-
-        {/* =========================================================
-            CONTENT
-        ========================================================== */}
-
-        <div className="p-3 sm:p-5 overflow-y-auto space-y-5 text-xs flex-1">
-
-          {/* =======================================================
-              OVERVIEW
-          ======================================================== */}
-
-          {activeTab === 'overview' && (
-            <div className="space-y-5">
-
-              {/* Quick clinical summary */}
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    Bed
-                  </span>
-                  <span className="text-lg font-black text-cyan-300">
-                    {data.bedNumber}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    Status
-                  </span>
-                  <span className="font-bold text-white">
-                    {data.status}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    Latest HR
-                  </span>
-                  <span className="text-lg font-black text-rose-300">
-                    {lastVital?.hr ?? '—'}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    Latest BP
-                  </span>
-                  <span className="text-lg font-black text-white">
-                    {lastVital
-                      ? `${lastVital.bpSystolic}/${lastVital.bpDiastolic}`
-                      : '—'}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    SpO₂
-                  </span>
-                  <span className="text-lg font-black text-cyan-300">
-                    {lastVital?.spo2
-                      ? `${lastVital.spo2}%`
-                      : '—'}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-950 border border-slate-800 p-3">
-                  <span className="text-[10px] text-slate-500 block">
-                    EF
-                  </span>
-                  <span className="text-lg font-black text-rose-300">
-                    {data.ccuData?.echoEF || '—'}
-                  </span>
-                </div>
-
-              </div>
-
-              {/* Patient information */}
-
-              {fieldConfig.patientInfo && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<UserRound className="w-4 h-4" />}
-                    title="Patient Information"
-                    subtitle="Demographics and admission details"
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Patient Name
-                      </label>
-
-                      <input
-                        value={data.name}
-                        onChange={e =>
-                          handleFieldChange(
-                            'name',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Patient ID / MRN
-                      </label>
-
-                      <input
-                        value={data.mrn}
-                        onChange={e =>
-                          handleFieldChange(
-                            'mrn',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Age
-                      </label>
-
-                      <input
-                        value={data.age}
-                        onChange={e =>
-                          handleFieldChange(
-                            'age',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Gender
-                      </label>
-
-                      <select
-                        value={data.gender}
-                        onChange={e =>
-                          handleFieldChange(
-                            'gender',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      >
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Bed Number
-                      </label>
-
-                      <input
-                        type="number"
-                        disabled={data.isDischarged}
-                        value={data.bedNumber}
-                        onChange={e =>
-                          handleFieldChange(
-                            'bedNumber',
-                            Number(e.target.value)
-                          )
-                        }
-                        className={`${inputClass} ${
-                          data.isDischarged
-                            ? 'opacity-50 cursor-not-allowed'
-                            : ''
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Admission Date & Time
-                      </label>
-
-                      <input
-                        value={data.admissionDate}
-                        onChange={e =>
-                          handleFieldChange(
-                            'admissionDate',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Attending Physician
-                      </label>
-
-                      <input
-                        value={data.attendingPhysician}
-                        onChange={e =>
-                          handleFieldChange(
-                            'attendingPhysician',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Code Status
-                      </label>
-
-                      <select
-                        value={data.codeStatus}
-                        onChange={e =>
-                          handleFieldChange(
-                            'codeStatus',
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      >
-                        <option value="Full Code">Full Code</option>
-                        <option value="DNR">DNR</option>
-                        <option value="DNI">DNI</option>
-                        <option value="Modified">Modified</option>
-                      </select>
-                    </div>
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* Diagnosis */}
-
-              <div className={cardClass}>
-
-                <SectionTitle
-                  icon={<ClipboardList className="w-4 h-4" />}
-                  title="Clinical Problem List"
-                  subtitle="Primary diagnosis and comorbidities"
-                />
-
-                <div className="space-y-3 mt-4">
-
-                  <div>
-                    <label className={smallLabelClass}>
-                      Primary Diagnosis
-                    </label>
-
-                    <input
-                      value={data.primaryDiagnosis}
-                      onChange={e =>
-                        handleFieldChange(
-                          'primaryDiagnosis',
-                          e.target.value
-                        )
-                      }
-                      className={`${inputClass} font-bold`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={smallLabelClass}>
-                      Secondary Diagnoses / Comorbidities
-                    </label>
-
-                    <input
-                      value={data.secondaryDiagnoses.join(', ')}
-                      onChange={e =>
-                        handleFieldChange(
-                          'secondaryDiagnoses',
-                          e.target.value
-                            .split(',')
-                            .map(s => s.trim())
-                            .filter(Boolean)
-                        )
-                      }
-                      placeholder="HTN, DM, CKD, CAD..."
-                      className={inputClass}
-                    />
-                  </div>
-
-                </div>
-              </div>
-
-              {/* History */}
-
-              {fieldConfig.history && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<FileText className="w-4 h-4" />}
-                    title="History"
-                  />
-
-                  <div className="space-y-3 mt-4">
-
-                    {fieldConfig.chiefComplaint && (
-                      <div>
-                        <label className={smallLabelClass}>
-                          Chief Complaint
-                        </label>
-
-                        <textarea
-                          rows={2}
-                          value={data.chiefComplaint}
-                          onChange={e =>
-                            handleFieldChange(
-                              'chiefComplaint',
-                              e.target.value
-                            )
-                          }
-                          className={textareaClass}
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        History of Present Illness
-                      </label>
-
-                      <textarea
-                        rows={4}
-                        value={data.historyOfPresentIllness}
-                        onChange={e =>
-                          handleFieldChange(
-                            'historyOfPresentIllness',
-                            e.target.value
-                          )
-                        }
-                        className={textareaClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Past Medical / Surgical History
-                      </label>
-
-                      <textarea
-                        rows={3}
-                        value={data.pastMedicalHistory}
-                        onChange={e =>
-                          handleFieldChange(
-                            'pastMedicalHistory',
-                            e.target.value
-                          )
-                        }
-                        className={textareaClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Allergies
-                      </label>
-
-                      <input
-                        value={
-                          data.customFields?.allergies || ''
-                        }
-                        onChange={e =>
-                          handleFieldChange(
-                            'customFields',
-                            {
-                              ...(data.customFields || {}),
-                              allergies: e.target.value
-                            }
-                          )
-                        }
-                        placeholder="Drug / food allergies"
-                        className={inputClass}
-                      />
-                    </div>
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* Examination */}
-
-              {fieldConfig.examination && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Stethoscope className="w-4 h-4" />}
-                    title="Physical Examination"
-                  />
-
-                  <textarea
-                    rows={6}
-                    value={data.examinationSummary}
-                    onChange={e =>
-                      handleFieldChange(
-                        'examinationSummary',
-                        e.target.value
-                      )
-                    }
-                    placeholder="General appearance..."
-                    className={`${textareaClass} mt-4`}
-                  />
-
-                </div>
-              )}
-
-              {/* Discharge summary */}
-
-              {data.isDischarged && data.dischargeDetails && (
-                <div className="rounded-xl bg-amber-950/30 border border-amber-800/60 p-4">
-
-                  <SectionTitle
-                    icon={<FolderArchive className="w-4 h-4 text-amber-400" />}
-                    title="Discharge / Transfer Summary"
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Disposition
-                      </label>
-
-                      <div className="text-white font-semibold">
-                        {data.dischargeDetails.disposition}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Date & Time
-                      </label>
-
-                      <div className="font-mono text-amber-300">
-                        {data.dischargeDetails.dischargeDate}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Condition
-                      </label>
-
-                      <div className="text-white font-semibold">
-                        {data.dischargeDetails.conditionAtDischarge}
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <div className="mt-3">
-                    <label className={smallLabelClass}>
-                      Summary
-                    </label>
-
-                    <p className="text-slate-300 whitespace-pre-wrap bg-slate-950/60 rounded-lg p-3 border border-slate-800">
-                      {data.dischargeDetails.dischargeSummary ||
-                        'No discharge summary recorded.'}
-                    </p>
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* =======================================================
-              VITALS / I&O
-          ======================================================== */}
-
-          {activeTab === 'vitals_io' && (
-            <div className="space-y-5">
-
-              {fieldConfig.vitals && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Activity className="w-4 h-4" />}
-                    title="Vital Signs"
-                    subtitle="Serial bedside observations"
-                    action={
-                      <button
-                        onClick={() => setShowAddVital(v => !v)}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Log Vitals
-                      </button>
-                    }
-                  />
-
-                  {showAddVital && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-cyan-900/60">
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-
-                        <div>
-                          <label className={smallLabelClass}>HR</label>
-                          <input
-                            type="number"
-                            value={newVital.hr}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                hr: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>SBP</label>
-                          <input
-                            type="number"
-                            value={newVital.bpSystolic}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                bpSystolic: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>DBP</label>
-                          <input
-                            type="number"
-                            value={newVital.bpDiastolic}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                bpDiastolic: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>RR</label>
-                          <input
-                            type="number"
-                            value={newVital.rr}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                rr: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>SpO₂</label>
-                          <input
-                            type="number"
-                            value={newVital.spo2}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                spo2: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Temp</label>
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={newVital.temp}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                temp: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Rhythm</label>
-                          <input
-                            value={newVital.rhythm || ''}
-                            onChange={e =>
-                              setNewVital({
-                                ...newVital,
-                                rhythm: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveVital}
-                          className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-bold"
-                        >
-                          Save
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddVital(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.vitals.length === 0 ? (
-                    <EmptyState
-                      text="No vital signs recorded yet."
-                      icon={<Activity className="w-7 h-7 mb-2" />}
-                    />
-                  ) : (
-                    <div className="overflow-x-auto mt-4">
-
-                      <table className="w-full text-left text-[11px]">
-
-                        <thead>
-                          <tr className="border-b border-slate-800 text-slate-500">
-                            <th className="py-2">Time</th>
-                            <th>HR</th>
-                            <th>BP</th>
-                            <th>MAP</th>
-                            <th>RR</th>
-                            <th>SpO₂</th>
-                            <th>Temp</th>
-                            <th>Rhythm</th>
-                          </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-800/60">
-
-                          {[...data.vitals]
-                            .reverse()
-                            .map((v, index) => (
-                              <tr
-                                key={`${v.timestamp}-${index}`}
-                                className="hover:bg-slate-900/60"
-                              >
-                                <td className="py-2 font-mono text-slate-400">
-                                  {v.timestamp}
-                                </td>
-
-                                <td className="font-bold text-rose-300">
-                                  {v.hr}
-                                </td>
-
-                                <td className="font-bold text-white">
-                                  {v.bpSystolic}/{v.bpDiastolic}
-                                </td>
-
-                                <td className="text-cyan-300 font-bold">
-                                  {v.map ||
-                                    calculateMAP(
-                                      v.bpSystolic,
-                                      v.bpDiastolic
-                                    )}
-                                </td>
-
-                                <td>{v.rr}</td>
-
-                                <td className="font-bold text-cyan-300">
-                                  {v.spo2}%
-                                </td>
-
-                                <td>{v.temp}°C</td>
-
-                                <td className="text-slate-400">
-                                  {v.rhythm || '—'}
-                                </td>
-                              </tr>
-                            ))}
-
-                        </tbody>
-
-                      </table>
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {fieldConfig.ioBalance && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Droplets className="w-4 h-4" />}
-                    title="Fluid Balance"
-                    subtitle={`Cumulative recorded balance: ${totalNetBalance > 0 ? '+' : ''}${totalNetBalance} mL`}
-                    action={
-                      <button
-                        onClick={() => setShowAddIO(v => !v)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add I/O
-                      </button>
-                    }
-                  />
-
-                  {showAddIO && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-blue-900/60">
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-
-                        <div>
-                          <label className={smallLabelClass}>IV Intake</label>
-                          <input
-                            type="number"
-                            value={newIO.intakeIV}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                intakeIV: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Enteral</label>
-                          <input
-                            type="number"
-                            value={newIO.intakeEnteral}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                intakeEnteral: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Other Intake</label>
-                          <input
-                            type="number"
-                            value={newIO.intakeOther}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                intakeOther: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Urine</label>
-                          <input
-                            type="number"
-                            value={newIO.outputUrine}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                outputUrine: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>Drain</label>
-                          <input
-                            type="number"
-                            value={newIO.outputDrain}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                outputDrain: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>GI Output</label>
-                          <input
-                            type="number"
-                            value={newIO.outputGI}
-                            onChange={e =>
-                              setNewIO({
-                                ...newIO,
-                                outputGI: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                      </div>
-
-                      <div className="mt-2">
-                        <label className={smallLabelClass}>
-                          Notes
-                        </label>
-
-                        <input
-                          value={newIO.notes || ''}
-                          onChange={e =>
-                            setNewIO({
-                              ...newIO,
-                              notes: e.target.value
-                            })
-                          }
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveIO}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold"
-                        >
-                          Save I/O
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddIO(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.ioRecords.length === 0 ? (
-                    <EmptyState text="No fluid balance entries recorded." />
-                  ) : (
-                    <div className="space-y-2 mt-4">
-
-                      {[...data.ioRecords]
-                        .reverse()
-                        .map((io, index) => {
-
-                          const intake =
-                            Number(io.intakeIV || 0) +
-                            Number(io.intakeEnteral || 0) +
-                            Number(io.intakeOther || 0);
-
-                          const output =
-                            Number(io.outputUrine || 0) +
-                            Number(io.outputDrain || 0) +
-                            Number(io.outputGI || 0);
-
-                          const net = intake - output;
-
-                          return (
-                            <div
-                              key={`${io.timestamp}-${index}`}
-                              className="p-3 rounded-lg bg-slate-900 border border-slate-800"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-
-                                <div>
-                                  <span className="font-mono text-slate-300">
-                                    {io.timestamp}
-                                  </span>
-
-                                  {io.notes && (
-                                    <p className="text-slate-500 mt-1">
-                                      {io.notes}
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-3 font-mono">
-
-                                  <span className="text-cyan-300">
-                                    IN {intake} mL
-                                  </span>
-
-                                  <span className="text-rose-300">
-                                    OUT {output} mL
-                                  </span>
-
-                                  <span
-                                    className={`font-bold ${
-                                      net >= 0
-                                        ? 'text-amber-300'
-                                        : 'text-emerald-300'
-                                    }`}
-                                  >
-                                    NET {net > 0 ? '+' : ''}
-                                    {net} mL
-                                  </span>
-
-                                </div>
-
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* =======================================================
-              LABS / ABG
-          ======================================================== */}
-
-          {activeTab === 'labs_abg' && (
-            <div className="space-y-5">
-
-              {fieldConfig.labs && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Droplets className="w-4 h-4" />}
-                    title="Laboratory Results"
-                    subtitle={
-                      lastLab
-                        ? `Latest: ${lastLab.timestamp}`
-                        : 'No laboratory data'
-                    }
-                    action={
-                      <button
-                        onClick={() => setShowAddLab(v => !v)}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add Labs
-                      </button>
-                    }
-                  />
-
-                  {showAddLab && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-cyan-900/60">
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-
-                        {[
-                          ['hb', 'Hb'],
-                          ['wbc', 'WBC'],
-                          ['platelets', 'Platelets'],
-                          ['na', 'Na'],
-                          ['k', 'K'],
-                          ['cl', 'Cl'],
-                          ['urea', 'Urea'],
-                          ['creatinine', 'Creatinine'],
-                          ['glucose', 'Glucose'],
-                          ['troponin', 'Troponin'],
-                          ['ckmb', 'CK-MB'],
-                          ['bnp', 'BNP'],
-                          ['pt', 'PT'],
-                          ['inr', 'INR'],
-                          ['aptt', 'aPTT'],
-                          ['crp', 'CRP'],
-                          ['pct', 'PCT'],
-                          ['lactate', 'Lactate']
-                        ].map(([key, label]) => (
-                          <div key={key}>
-                            <label className={smallLabelClass}>
-                              {label}
-                            </label>
-
-                            <input
-                              value={
-                                (newLab as any)[key] || ''
-                              }
-                              onChange={e =>
-                                setNewLab({
-                                  ...newLab,
-                                  [key]: e.target.value
-                                })
-                              }
-                              className={inputClass}
-                            />
-                          </div>
-                        ))}
-
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveLab}
-                          className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-bold"
-                        >
-                          Save Labs
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddLab(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.labs.length === 0 ? (
-                    <EmptyState text="No laboratory results recorded." />
-                  ) : (
-                    <div className="space-y-3 mt-4">
-
-                      {[...data.labs]
-                        .reverse()
-                        .map((lab, index) => (
-                          <div
-                            key={`${lab.timestamp}-${index}`}
-                            className="p-3 rounded-xl bg-slate-900 border border-slate-800"
-                          >
-
-                            <div className="flex items-center justify-between mb-3">
-
-                              <span className="font-mono text-[10px] text-slate-500">
-                                {lab.timestamp}
-                              </span>
-
-                              {lab.troponin && (
-                                <span className="font-bold text-rose-300">
-                                  Troponin: {lab.troponin}
-                                </span>
-                              )}
-
-                            </div>
-
-                            <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-9 gap-2">
-
-                              {[
-                                ['Hb', lab.hb],
-                                ['WBC', lab.wbc],
-                                ['Plt', lab.platelets],
-                                ['Na', lab.na],
-                                ['K', lab.k],
-                                ['Cl', lab.cl],
-                                ['Urea', lab.urea],
-                                ['Cr', lab.creatinine],
-                                ['Glucose', lab.glucose],
-                                ['CK-MB', lab.ckmb],
-                                ['BNP', lab.bnp],
-                                ['INR', lab.inr],
-                                ['aPTT', lab.aptt],
-                                ['CRP', lab.crp],
-                                ['PCT', lab.pct],
-                                ['Lactate', lab.lactate]
-                              ].map(([label, value]) => (
-                                <div
-                                  key={label}
-                                  className="rounded-lg bg-slate-950 border border-slate-800 p-2"
-                                >
-                                  <span className="text-[9px] text-slate-500 block">
-                                    {label}
-                                  </span>
-
-                                  <span className="font-bold text-white">
-                                    {value || '—'}
-                                  </span>
-                                </div>
-                              ))}
-
-                            </div>
-
-                          </div>
-                        ))}
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {fieldConfig.abg && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Wind className="w-4 h-4" />}
-                    title="ABG & Lactate"
-                    subtitle={
-                      lastABG
-                        ? `Latest: ${lastABG.timestamp}`
-                        : 'Arterial blood gas records'
-                    }
-                    action={
-                      <button
-                        onClick={() => setShowAddABG(v => !v)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add ABG
-                      </button>
-                    }
-                  />
-
-                  {showAddABG && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-blue-900/60">
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-
-                        {[
-                          ['ph', 'pH'],
-                          ['pco2', 'pCO₂'],
-                          ['po2', 'pO₂'],
-                          ['hco3', 'HCO₃'],
-                          ['be', 'BE'],
-                          ['lactate', 'Lactate'],
-                          ['fio2', 'FiO₂ %']
-                        ].map(([key, label]) => (
-                          <div key={key}>
-                            <label className={smallLabelClass}>
-                              {label}
-                            </label>
-
-                            <input
-                              value={
-                                (newABG as any)[key] || ''
-                              }
-                              onChange={e =>
-                                setNewABG({
-                                  ...newABG,
-                                  [key]: e.target.value
-                                })
-                              }
-                              className={inputClass}
-                            />
-                          </div>
-                        ))}
-
-                      </div>
-
-                      <div className="mt-2">
-
-                        <label className={smallLabelClass}>
-                          Interpretation
-                        </label>
-
-                        <textarea
-                          rows={2}
-                          value={newABG.interpretation || ''}
-                          onChange={e =>
-                            setNewABG({
-                              ...newABG,
-                              interpretation: e.target.value
-                            })
-                          }
-                          placeholder="e.g. Primary respiratory alkalosis with metabolic acidosis..."
-                          className={textareaClass}
-                        />
-
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveABG}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold"
-                        >
-                          Save ABG
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddABG(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.abgRecords.length === 0 ? (
-                    <EmptyState text="No ABG records recorded." />
-                  ) : (
-                    <div className="space-y-3 mt-4">
-
-                      {[...data.abgRecords]
-                        .reverse()
-                        .map((abg, index) => (
-                          <div
-                            key={`${abg.timestamp}-${index}`}
-                            className="p-3 rounded-xl bg-slate-900 border border-slate-800"
-                          >
-
-                            <div className="flex items-center justify-between gap-2 mb-3">
-
-                              <span className="font-mono text-[10px] text-slate-500">
-                                {abg.timestamp}
-                              </span>
-
-                              {abg.pao2fio2Ratio && (
-                                <span className="font-bold text-cyan-300">
-                                  P/F {abg.pao2fio2Ratio}
-                                </span>
-                              )}
-
-                            </div>
-
-                            <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-2">
-
-                              {[
-                                ['pH', abg.ph],
-                                ['pCO₂', abg.pco2],
-                                ['pO₂', abg.po2],
-                                ['HCO₃', abg.hco3],
-                                ['BE', abg.be],
-                                ['Lactate', abg.lactate],
-                                ['FiO₂', abg.fio2],
-                                ['P/F', abg.pao2fio2Ratio]
-                              ].map(([label, value]) => (
-                                <div
-                                  key={label}
-                                  className="rounded-lg bg-slate-950 border border-slate-800 p-2 text-center"
-                                >
-                                  <span className="text-[9px] text-slate-500 block">
-                                    {label}
-                                  </span>
-
-                                  <span className="font-bold text-white">
-                                    {value || '—'}
-                                  </span>
-                                </div>
-                              ))}
-
-                            </div>
-
-                            {abg.interpretation && (
-                              <div className="mt-3 p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
-                                <span className="text-[10px] text-slate-500 block mb-1">
-                                  Interpretation
-                                </span>
-
-                                {abg.interpretation}
-                              </div>
-                            )}
-
-                          </div>
-                        ))}
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* =======================================================
-              CCU
-          ======================================================== */}
-
-          {activeTab === 'ccu' && (
-            <div className="space-y-5">
-
-              <div className="rounded-xl bg-slate-950 border border-rose-900/50 p-4">
-
-                <SectionTitle
-                  icon={<HeartPulse className="w-5 h-5 text-rose-400" />}
-                  title="CCU / Cardiology"
-                  subtitle="ECG • Echo • Coronary angiography • PCI"
-                />
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-
-                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-                    <span className="text-[10px] text-slate-500 block">
-                      Echo EF
-                    </span>
-
-                    <input
-                      value={data.ccuData.echoEF}
-                      onChange={e =>
-                        handleCcuChange(
-                          'echoEF',
-                          e.target.value
-                        )
-                      }
-                      placeholder="45%"
-                      className={`${inputClass} mt-1 text-rose-300 font-black`}
-                    />
-                  </div>
-
-                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-                    <span className="text-[10px] text-slate-500 block">
-                      Arrhythmia
-                    </span>
-
-                    <input
-                      value={data.ccuData.arrhythmia || ''}
-                      onChange={e =>
-                        handleCcuChange(
-                          'arrhythmia',
-                          e.target.value
-                        )
-                      }
-                      placeholder="AF / VT / NSR"
-                      className={`${inputClass} mt-1`}
-                    />
-                  </div>
-
-                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-                    <span className="text-[10px] text-slate-500 block">
-                      ST Elevation
-                    </span>
-
-                    <input
-                      value={
-                        data.ccuData.stElevationLeads || ''
-                      }
-                      onChange={e =>
-                        handleCcuChange(
-                          'stElevationLeads',
-                          e.target.value
-                        )
-                      }
-                      placeholder="V1-V4"
-                      className={`${inputClass} mt-1`}
-                    />
-                  </div>
-
-                  <div className="rounded-xl bg-slate-900 border border-slate-800 p-3">
-                    <span className="text-[10px] text-slate-500 block">
-                      TIMI Flow
-                    </span>
-
-                    <input
-                      value={
-                        data.ccuData.timiFlowPost || ''
-                      }
-                      onChange={e =>
-                        handleCcuChange(
-                          'timiFlowPost',
-                          e.target.value
-                        )
-                      }
-                      placeholder="TIMI III"
-                      className={`${inputClass} mt-1`}
-                    />
-                  </div>
-
-                </div>
-
-                {fieldConfig.ecg && (
-                  <div className="mt-4">
-
-                    <label className={smallLabelClass}>
-                      ECG Findings
-                    </label>
-
-                    <textarea
-                      rows={3}
-                      value={data.ccuData.ecgSummary}
-                      onChange={e =>
-                        handleCcuChange(
-                          'ecgSummary',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Rhythm, rate, axis, ischemic changes, ST/T changes..."
-                      className={textareaClass}
-                    />
-
-                  </div>
-                )}
-
-                {fieldConfig.echo && (
-                  <div className="mt-4">
-
-                    <label className={smallLabelClass}>
-                      Echocardiography
-                    </label>
-
-                    <textarea
-                      rows={4}
-                      value={data.ccuData.echoFindings}
-                      onChange={e =>
-                        handleCcuChange(
-                          'echoFindings',
-                          e.target.value
-                        )
-                      }
-                      placeholder="LV/RV function, regional wall motion, valves, pericardium..."
-                      className={textareaClass}
-                    />
-
-                  </div>
-                )}
-
-                {fieldConfig.cathStent && (
-                  <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-slate-800">
-
-                    <div className="flex items-center gap-2 mb-3">
-                      <ScanLine className="w-4 h-4 text-cyan-400" />
-
-                      <span className="font-bold text-cyan-300">
-                        Cath Lab / PCI
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Cath Date
-                        </label>
-
-                        <input
-                          value={data.ccuData.cathDate || ''}
-                          onChange={e =>
-                            handleCcuChange(
-                              'cathDate',
-                              e.target.value
-                            )
-                          }
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Culprit Lesion
-                        </label>
-
-                        <input
-                          value={
-                            data.ccuData.culpritLesion || ''
-                          }
-                          onChange={e =>
-                            handleCcuChange(
-                              'culpritLesion',
-                              e.target.value
-                            )
-                          }
-                          placeholder="Proximal LAD"
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Stent
-                        </label>
-
-                        <input
-                          value={data.ccuData.stentType || ''}
-                          onChange={e =>
-                            handleCcuChange(
-                              'stentType',
-                              e.target.value
-                            )
-                          }
-                          placeholder="DES 3.5 × 24 mm"
-                          className={inputClass}
-                        />
-                      </div>
-
-                    </div>
-
-                    <div className="mt-3">
-
-                      <label className={smallLabelClass}>
-                        Cath Findings
-                      </label>
-
-                      <textarea
-                        rows={3}
-                        value={
-                          data.ccuData.cathFindings || ''
-                        }
-                        onChange={e =>
-                          handleCcuChange(
-                            'cathFindings',
-                            e.target.value
-                          )
-                        }
-                        className={textareaClass}
-                      />
-
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Antiplatelet Therapy
-                        </label>
-
-                        <textarea
-                          rows={2}
-                          value={data.ccuData.antiplatelets}
-                          onChange={e =>
-                            handleCcuChange(
-                              'antiplatelets',
-                              e.target.value
-                            )
-                          }
-                          className={textareaClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Anticoagulation
-                        </label>
-
-                        <textarea
-                          rows={2}
-                          value={data.ccuData.anticoagulation}
-                          onChange={e =>
-                            handleCcuChange(
-                              'anticoagulation',
-                              e.target.value
-                            )
-                          }
-                          className={textareaClass}
-                        />
-                      </div>
-
-                    </div>
-
-                    <div className="mt-3">
-
-                      <label className={smallLabelClass}>
-                        Stent Details
-                      </label>
-
-                      <textarea
-                        rows={2}
-                        value={
-                          data.ccuData.stentDetails || ''
-                        }
-                        onChange={e =>
-                          handleCcuChange(
-                            'stentDetails',
-                            e.target.value
-                          )
-                        }
-                        placeholder="Number, location, diameter, length..."
-                        className={textareaClass}
-                      />
-
-                    </div>
-
-                  </div>
-                )}
-
-              </div>
-
-            </div>
-          )}
-
-          {/* =======================================================
-              ICU
-          ======================================================== */}
-
-          {activeTab === 'icu' && (
-            <div className="space-y-5">
-
-              {fieldConfig.icuVentilator && (
-                <div className="rounded-xl bg-slate-950 border border-blue-900/50 p-4">
-
-                  <SectionTitle
-                    icon={<Wind className="w-5 h-5 text-blue-400" />}
-                    title="Mechanical Ventilation"
-                    subtitle="Current ventilator settings"
-                  />
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-4">
-
-                    {[
-                      ['mode', 'Mode'],
-                      ['fio2', 'FiO₂'],
-                      ['peep', 'PEEP'],
-                      ['tv', 'Tidal Volume'],
-                      ['rate', 'Set Rate'],
-                      ['totalRate', 'Total Rate'],
-                      ['pPeak', 'Ppeak'],
-                      ['pPlat', 'Pplat'],
-                      ['etTubeSize', 'ETT Size'],
-                      ['etTubeDepth', 'ETT Depth']
-                    ].map(([key, label]) => (
-                      <div key={key}>
-                        <label className={smallLabelClass}>
-                          {label}
-                        </label>
-
-                        <input
-                          value={
-                            (data.icuVentilator as any)[key] ??
-                            ''
-                          }
-                          onChange={e =>
-                            handleVentChange(
-                              key as keyof PatientRecord['icuVentilator'],
-                              e.target.value
-                            )
-                          }
-                          className={inputClass}
-                        />
-                      </div>
-                    ))}
-
-                  </div>
-
-                </div>
-              )}
-
-              {fieldConfig.icuScores && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Brain className="w-5 h-5 text-purple-400" />}
-                    title="Neurological / ICU Scores"
-                    subtitle="GCS • RASS • SOFA"
-                  />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-
-                    <div className="rounded-xl bg-slate-900 border border-slate-800 p-4">
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-semibold">
-                          GCS
-                        </span>
-
-                        <span className="text-2xl font-black text-cyan-300">
-                          {data.icuScores.gcsTotal}/15
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 mt-3">
-
-                        {[
-                          ['gcsEye', 'E'],
-                          ['gcsVerbal', 'V'],
-                          ['gcsMotor', 'M']
-                        ].map(([key, label]) => (
-                          <div key={key}>
-
-                            <label className={smallLabelClass}>
-                              {label}
-                            </label>
-
-                            <input
-                              type="number"
-                              value={
-                                (data.icuScores as any)[key]
-                              }
-                              onChange={e =>
-                                handleScoreChange(
-                                  key as keyof PatientRecord['icuScores'],
-                                  Number(e.target.value)
-                                )
-                              }
-                              className={inputClass}
-                            />
-
-                          </div>
-                        ))}
-
-                      </div>
-
-                    </div>
-
-                    <div className="rounded-xl bg-slate-900 border border-slate-800 p-4">
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-semibold">
-                          RASS
-                        </span>
-
-                        <span className="text-2xl font-black text-purple-300">
-                          {data.icuScores.rass > 0
-                            ? `+${data.icuScores.rass}`
-                            : data.icuScores.rass}
-                        </span>
-                      </div>
-
-                      <input
-                        type="number"
-                        min="-5"
-                        max="4"
-                        value={data.icuScores.rass}
-                        onChange={e =>
-                          handleScoreChange(
-                            'rass',
-                            Number(e.target.value)
-                          )
-                        }
-                        className={`${inputClass} mt-3`}
-                      />
-
-                      <p className="text-[10px] text-slate-500 mt-2">
-                        -5 unarousable → +4 combative
-                      </p>
-
-                    </div>
-
-                    <div className="rounded-xl bg-slate-900 border border-slate-800 p-4">
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-semibold">
-                          SOFA
-                        </span>
-
-                        <span className="text-2xl font-black text-amber-300">
-                          {data.icuScores.sofaScore}/24
-                        </span>
-                      </div>
-
-                      <input
-                        type="number"
-                        min="0"
-                        max="24"
-                        value={data.icuScores.sofaScore}
-                        onChange={e =>
-                          handleScoreChange(
-                            'sofaScore',
-                            Number(e.target.value)
-                          )
-                        }
-                        className={`${inputClass} mt-3`}
-                      />
-
-                    </div>
-
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        Pupils / Neurological Exam
-                      </label>
-
-                      <input
-                        value={data.icuScores.pupils || ''}
-                        onChange={e =>
-                          handleScoreChange(
-                            'pupils',
-                            e.target.value
-                          )
-                        }
-                        placeholder="3 mm equal and reactive bilaterally"
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={smallLabelClass}>
-                        CAM-ICU
-                      </label>
-
-                      <select
-                        value={
-                          data.icuScores.deliriumCamICU || ''
-                        }
-                        onChange={e =>
-                          handleScoreChange(
-                            'deliriumCamICU',
-                            e.target.value || undefined
-                          )
-                        }
-                        className={inputClass}
-                      >
-                        <option value="">Not assessed</option>
-                        <option value="positive">Positive</option>
-                        <option value="negative">Negative</option>
-                        <option value="unassessable">
-                          Unassessable
-                        </option>
-                      </select>
-                    </div>
-
-                  </div>
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* =======================================================
-              MEDICATIONS
-          ======================================================== */}
-
-          {activeTab === 'meds' && (
-            <div className="space-y-5">
-
-              {fieldConfig.vasopressorsInfusions && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Syringe className="w-4 h-4 text-rose-400" />}
-                    title="Continuous Infusions"
-                    subtitle="Vasopressors • Sedation • Insulin • Other infusions"
-                    action={
-                      <button
-                        onClick={() =>
-                          setShowAddInfusion(v => !v)
-                        }
-                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add
-                      </button>
-                    }
-                  />
-
-                  {showAddInfusion && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-rose-900/60">
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Drug
-                          </label>
-
-                          <input
-                            value={newInfusion.drug}
-                            onChange={e =>
-                              setNewInfusion({
-                                ...newInfusion,
-                                drug: e.target.value
-                              })
-                            }
-                            placeholder="Norepinephrine"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Dose / Rate
-                          </label>
-
-                          <input
-                            value={newInfusion.doseRate}
-                            onChange={e =>
-                              setNewInfusion({
-                                ...newInfusion,
-                                doseRate: e.target.value
-                              })
-                            }
-                            placeholder="0.1 mcg/kg/min"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Concentration
-                          </label>
-
-                          <input
-                            value={newInfusion.concentration}
-                            onChange={e =>
-                              setNewInfusion({
-                                ...newInfusion,
-                                concentration: e.target.value
-                              })
-                            }
-                            placeholder="4 mg / 50 mL"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Line
-                          </label>
-
-                          <input
-                            value={newInfusion.lineLocation}
-                            onChange={e =>
-                              setNewInfusion({
-                                ...newInfusion,
-                                lineLocation: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          />
-                        </div>
-
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveInfusion}
-                          className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold"
-                        >
-                          Add Infusion
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddInfusion(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.infusions.length === 0 ? (
-                    <EmptyState text="No continuous infusions recorded." />
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-
-                      {data.infusions.map(infusion => (
-                        <div
-                          key={infusion.id}
-                          className="p-3 rounded-xl bg-slate-900 border border-slate-800"
-                        >
-
-                          <div className="flex items-center justify-between gap-2">
-
-                            <div>
-                              <p className="font-bold text-white">
-                                {infusion.drug}
-                              </p>
-
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                {infusion.lineLocation || 'Line not specified'}
-                              </p>
-                            </div>
-
-                            <button
-                              onClick={() =>
-                                removeInfusion(infusion.id)
-                              }
-                              className="text-slate-600 hover:text-rose-400"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-
-                            <span className="px-2 py-1 rounded-lg bg-rose-950 border border-rose-900 text-rose-300 font-mono font-bold">
-                              {infusion.doseRate || 'Dose not specified'}
-                            </span>
-
-                            {infusion.concentration && (
-                              <span className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 font-mono">
-                                {infusion.concentration}
-                              </span>
-                            )}
-
-                          </div>
-
-                        </div>
-                      ))}
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {fieldConfig.medications && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<Pill className="w-4 h-4 text-purple-400" />}
-                    title="Medications"
-                    subtitle="Scheduled and regular medications"
-                    action={
-                      <button
-                        onClick={() => setShowAddMed(v => !v)}
-                        className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Add Medication
-                      </button>
-                    }
-                  />
-
-                  {showAddMed && (
-                    <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-purple-900/60">
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-
-                        <div className="lg:col-span-2">
-                          <label className={smallLabelClass}>
-                            Medication
-                          </label>
-
-                          <input
-                            value={newMed.name}
-                            onChange={e =>
-                              setNewMed({
-                                ...newMed,
-                                name: e.target.value
-                              })
-                            }
-                            placeholder="Aspirin"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Dose
-                          </label>
-
-                          <input
-                            value={newMed.dose}
-                            onChange={e =>
-                              setNewMed({
-                                ...newMed,
-                                dose: e.target.value
-                              })
-                            }
-                            placeholder="100 mg"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Route
-                          </label>
-
-                          <select
-                            value={newMed.route}
-                            onChange={e =>
-                              setNewMed({
-                                ...newMed,
-                                route: e.target.value
-                              })
-                            }
-                            className={inputClass}
-                          >
-                            <option>Oral</option>
-                            <option>IV</option>
-                            <option>IM</option>
-                            <option>SC</option>
-                            <option>SL</option>
-                            <option>Inhaled</option>
-                            <option>Topical</option>
-                            <option>Other</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className={smallLabelClass}>
-                            Frequency
-                          </label>
-
-                          <input
-                            value={newMed.frequency}
-                            onChange={e =>
-                              setNewMed({
-                                ...newMed,
-                                frequency: e.target.value
-                              })
-                            }
-                            placeholder="BID"
-                            className={inputClass}
-                          />
-                        </div>
-
-                      </div>
-
-                      <div className="flex justify-end gap-2 mt-3">
-
-                        <button
-                          onClick={handleSaveMedication}
-                          className="px-3 py-1.5 rounded-lg bg-purple-600 text-white font-bold"
-                        >
-                          Add Medication
-                        </button>
-
-                        <button
-                          onClick={() => setShowAddMed(false)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                        >
-                          Cancel
-                        </button>
-
-                      </div>
-
-                    </div>
-                  )}
-
-                  {data.medications.length === 0 ? (
-                    <EmptyState text="No medications recorded." />
-                  ) : (
-                    <div className="overflow-x-auto mt-4">
-
-                      <table className="w-full text-left">
-
-                        <thead>
-                          <tr className="border-b border-slate-800 text-slate-500 text-[10px]">
-                            <th className="py-2">Medication</th>
-                            <th>Dose</th>
-                            <th>Route</th>
-                            <th>Frequency</th>
-                            <th>Category</th>
-                            <th />
-                          </tr>
-                        </thead>
-
-                        <tbody className="divide-y divide-slate-800/60">
-
-                          {data.medications.map(med => (
-                            <tr
-                              key={med.id}
-                              className="hover:bg-slate-900/60"
-                            >
-
-                              <td className="py-2 font-bold text-white">
-                                {med.name}
-                              </td>
-
-                              <td className="font-mono text-cyan-300">
-                                {med.dose || '—'}
-                              </td>
-
-                              <td className="text-slate-300">
-                                {med.route}
-                              </td>
-
-                              <td className="text-slate-300">
-                                {med.frequency}
-                              </td>
-
-                              <td className="text-slate-500">
-                                {med.category || 'other'}
-                              </td>
-
-                              <td className="text-right">
-
-                                <button
-                                  onClick={() =>
-                                    removeMedication(med.id)
-                                  }
-                                  className="text-slate-600 hover:text-rose-400"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-
-                              </td>
-
-                            </tr>
-                          ))}
-
-                        </tbody>
-
-                      </table>
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* =======================================================
-              TIMELINE
-          ======================================================== */}
-
-          {activeTab === 'notes' && (
-            <div className={cardClass}>
-
-              <SectionTitle
-                icon={<Clock className="w-4 h-4 text-amber-400" />}
-                title="Clinical Timeline"
-                subtitle="Progress notes, events, handovers and consultations"
-              />
-
-              <div className="mt-4">
-
-                <TimelineNotes
-                  notes={data.progressNotes}
-                  onAddNote={handleAddNote}
-                  onUpdateNote={handleUpdateNote}
-                  onDeleteNote={handleDeleteNote}
-                  patientName={data.name}
-                />
-
-              </div>
-
-            </div>
-          )}
-
-          {/* =======================================================
-              PROCEDURES / PLAN
-          ======================================================== */}
-
-          {activeTab === 'procedures' && (
-            <div className="space-y-5">
-
-              <div className={cardClass}>
-
-                <SectionTitle
-                  icon={<Stethoscope className="w-4 h-4" />}
-                  title="Procedures & Interventions"
-                  subtitle="Bedside and invasive procedures"
-                  action={
-                    <button
-                      onClick={() =>
-                        setShowAddProcedure(v => !v)
-                      }
-                      className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add Procedure
-                    </button>
+            </nav>
+
+            <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+              {!patient.isDischarged ? (
+                <button
+                  onClick={() =>
+                    setShowDischargeConfirm(true)
                   }
-                />
-
-                {showAddProcedure && (
-                  <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-cyan-900/60">
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-
-                      <div className="lg:col-span-2">
-                        <label className={smallLabelClass}>
-                          Procedure
-                        </label>
-
-                        <input
-                          value={newProcedure.name}
-                          onChange={e =>
-                            setNewProcedure({
-                              ...newProcedure,
-                              name: e.target.value
-                            })
-                          }
-                          placeholder="Central line / Intubation / PCI..."
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Date & Time
-                        </label>
-
-                        <input
-                          value={newProcedure.date}
-                          onChange={e =>
-                            setNewProcedure({
-                              ...newProcedure,
-                              date: e.target.value
-                            })
-                          }
-                          placeholder={nowStamp()}
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Site
-                        </label>
-
-                        <input
-                          value={newProcedure.site}
-                          onChange={e =>
-                            setNewProcedure({
-                              ...newProcedure,
-                              site: e.target.value
-                            })
-                          }
-                          placeholder="Right IJ"
-                          className={inputClass}
-                        />
-                      </div>
-
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Operator
-                        </label>
-
-                        <input
-                          value={newProcedure.performer}
-                          onChange={e =>
-                            setNewProcedure({
-                              ...newProcedure,
-                              performer: e.target.value
-                            })
-                          }
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={smallLabelClass}>
-                          Notes / Findings / Complications
-                        </label>
-
-                        <input
-                          value={newProcedure.notes}
-                          onChange={e =>
-                            setNewProcedure({
-                              ...newProcedure,
-                              notes: e.target.value
-                            })
-                          }
-                          className={inputClass}
-                        />
-                      </div>
-
-                    </div>
-
-                    <div className="flex justify-end gap-2 mt-3">
-
-                      <button
-                        onClick={handleSaveProcedure}
-                        className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-bold"
-                      >
-                        Save Procedure
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          setShowAddProcedure(false)
-                        }
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300"
-                      >
-                        Cancel
-                      </button>
-
-                    </div>
-
-                  </div>
-                )}
-
-                {data.procedures.length === 0 ? (
-                  <EmptyState text="No procedures recorded." />
-                ) : (
-                  <div className="space-y-2 mt-4">
-
-                    {[...data.procedures]
-                      .reverse()
-                      .map(procedure => (
-                        <div
-                          key={procedure.id}
-                          className="p-3 rounded-xl bg-slate-900 border border-slate-800"
-                        >
-
-                          <div className="flex items-start justify-between gap-3">
-
-                            <div>
-
-                              <p className="font-bold text-white">
-                                {procedure.name}
-                              </p>
-
-                              <div className="flex flex-wrap gap-2 text-[10px] text-slate-500 mt-1">
-
-                                {procedure.date && (
-                                  <span>
-                                    {procedure.date}
-                                  </span>
-                                )}
-
-                                {procedure.site && (
-                                  <span>
-                                    • Site: {procedure.site}
-                                  </span>
-                                )}
-
-                                {procedure.performer && (
-                                  <span>
-                                    • Operator: {procedure.performer}
-                                  </span>
-                                )}
-
-                              </div>
-
-                              {procedure.notes && (
-                                <p className="text-slate-400 mt-2 whitespace-pre-wrap">
-                                  {procedure.notes}
-                                </p>
-                              )}
-
-                            </div>
-
-                            <button
-                              onClick={() =>
-                                removeProcedure(procedure.id)
-                              }
-                              className="text-slate-600 hover:text-rose-400 shrink-0"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-
-                          </div>
-
-                        </div>
-                      ))}
-
-                  </div>
-                )}
-
-              </div>
-
-              {/* Imaging */}
-
-              {fieldConfig.imaging && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<ScanLine className="w-4 h-4" />}
-                    title="Imaging & Diagnostics"
-                    subtitle="CXR • CT • MRI • Ultrasound • Other diagnostics"
-                  />
-
-                  <textarea
-                    rows={5}
-                    value={data.imagingSummary}
-                    onChange={e =>
-                      handleFieldChange(
-                        'imagingSummary',
-                        e.target.value
-                      )
-                    }
-                    placeholder="Record imaging findings, dates, impressions..."
-                    className={`${textareaClass} mt-4`}
-                  />
-
-                </div>
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2.5 text-sm font-bold text-orange-700 hover:bg-orange-100 dark:border-orange-900 dark:bg-orange-950/20 dark:text-orange-300"
+                >
+                  <Scissors size={16} />
+                  Discharge
+                </button>
+              ) : (
+                <button
+                  onClick={() => onReadmitPatient(patient)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-300"
+                >
+                  <CheckCircle2 size={16} />
+                  Readmit
+                </button>
               )}
-
-              {/* Consultations */}
-
-              {fieldConfig.consultations && (
-                <div className={cardClass}>
-
-                  <SectionTitle
-                    icon={<UsersIcon />}
-                    title="Consultations"
-                    subtitle="Specialty and multidisciplinary recommendations"
-                  />
-
-                  <textarea
-                    rows={5}
-                    value={data.consultations}
-                    onChange={e =>
-                      handleFieldChange(
-                        'consultations',
-                        e.target.value
-                      )
-                    }
-                    placeholder="Cardiology / Neurology / Nephrology / ID / Surgery..."
-                    className={`${textareaClass} mt-4`}
-                  />
-
-                </div>
-              )}
-
-              {/* Plan */}
-
-              {fieldConfig.dischargePlan && (
-                <div className="rounded-xl bg-amber-950/30 border border-amber-900/60 p-4">
-
-                  <SectionTitle
-                    icon={<ClipboardList className="w-4 h-4 text-amber-400" />}
-                    title="Current Plan / Discharge / Transfer"
-                  />
-
-                  <textarea
-                    rows={5}
-                    value={data.dischargeTransferPlan}
-                    onChange={e =>
-                      handleFieldChange(
-                        'dischargeTransferPlan',
-                        e.target.value
-                      )
-                    }
-                    placeholder="Current clinical plan, step-down criteria, discharge planning..."
-                    className={`${textareaClass} mt-4`}
-                  />
-
-                </div>
-              )}
-
             </div>
+          </aside>
+
+          {/* Content */}
+          <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="mx-auto max-w-5xl">
+              {renderSection()}
+            </div>
+          </main>
+        </div>
+
+        {/* Mobile bottom actions */}
+        <div className="flex shrink-0 gap-2 border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 md:hidden">
+          {!patient.isDischarged ? (
+            <button
+              onClick={() =>
+                setShowDischargeConfirm(true)
+              }
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-3 text-sm font-bold text-white"
+            >
+              <Scissors size={16} />
+              Discharge
+            </button>
+          ) : (
+            <button
+              onClick={() => onReadmitPatient(patient)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white"
+            >
+              <CheckCircle2 size={16} />
+              Readmit
+            </button>
           )}
 
+          <button
+            onClick={() => onPrintPatient(patient)}
+            className="rounded-xl border border-slate-200 px-4 py-3 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          >
+            <Printer size={18} />
+          </button>
         </div>
 
-        {/* =========================================================
-            FOOTER
-        ========================================================== */}
+        {/* Delete confirmation */}
+        {showDeleteConfirm && (
+          <ConfirmDialog
+            title="Delete Patient?"
+            message="This will permanently remove the patient record from the current app data."
+            confirmText="Delete"
+            confirmClass="bg-red-600 hover:bg-red-700"
+            onCancel={() => setShowDeleteConfirm(false)}
+            onConfirm={() => {
+              setShowDeleteConfirm(false);
+              onDeletePatient(patient);
+            }}
+          />
+        )}
 
-        <div className="px-3 sm:px-5 py-2.5 border-t border-slate-800 bg-slate-950 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-
-          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-
-            <Clock className="w-3.5 h-3.5" />
-
-            <span>
-              Last modified: {data.lastUpdated}
-            </span>
-
-          </div>
-
-          <div className="flex items-center gap-2">
-
-            {saveToast && (
-              <span className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold">
-                <Check className="w-3.5 h-3.5" />
-                Saved
-              </span>
-            )}
-
-            <button
-              onClick={triggerSaveToast}
-              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5"
-            >
-              <Save className="w-3.5 h-3.5" />
-              Save Changes
-            </button>
-
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-            >
-              Close
-            </button>
-
-          </div>
-
-        </div>
-
+        {/* Discharge confirmation */}
+        {showDischargeConfirm && (
+          <ConfirmDialog
+            title="Discharge Patient?"
+            message="The patient will be moved to the discharge/archive workflow."
+            confirmText="Continue"
+            confirmClass="bg-orange-500 hover:bg-orange-600"
+            onCancel={() => setShowDischargeConfirm(false)}
+            onConfirm={() => {
+              setShowDischargeConfirm(false);
+              onDischargePatient(patient);
+            }}
+          />
+        )}
       </div>
     </div>
   );
-};
+}
 
-/* Small local icon component to avoid another dependency. */
-const UsersIcon: React.FC = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    className="w-4 h-4"
-  >
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
+/* -------------------------------------------------------------------------- */
+/* Reusable UI                                                                */
+/* -------------------------------------------------------------------------- */
+
+function Input({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
+
+      <input
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:ring-blue-950"
+      />
+    </label>
+  );
+}
+
+function TextArea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="mt-3 block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
+
+      <textarea
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        rows={4}
+        className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:focus:ring-blue-950"
+      />
+    </label>
+  );
+}
+
+function Select({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
+
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+      >
+        {options.map(option => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div>
+      <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+        {title}
+      </h3>
+
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+      <div className="text-xs font-medium text-slate-500">
+        {label}
+      </div>
+
+      <div className="mt-1 text-xl font-bold text-slate-900 dark:text-white">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function InfoBox({
+  title,
+  value,
+  icon,
+  className = '',
+}: {
+  title: string;
+  value?: string;
+  icon?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+    >
+      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+        {icon}
+        {title}
+      </div>
+
+      <div className="whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-200">
+        {value || 'No information recorded.'}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-3 rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-slate-800">
+        <FileText size={22} />
+      </div>
+
+      <p className="text-sm font-medium text-slate-500">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  confirmText,
+  confirmClass,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  message: string;
+  confirmText: string;
+  confirmClass: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300">
+          <AlertTriangle size={23} />
+        </div>
+
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+          {title}
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {message}
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={onConfirm}
+            className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white ${confirmClass}`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
