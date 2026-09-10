@@ -1,4 +1,4 @@
-name: Build CCU Notebook APK
+name: Build CardioVault APK
 
 on:
   push:
@@ -43,7 +43,7 @@ jobs:
 
           const config: CapacitorConfig = {
             appId: 'com.ccunotebook.app',
-            appName: 'CCU Notebook',
+            appName: 'CardioVault',
             webDir: 'dist',
             server: {
               androidScheme: 'https'
@@ -153,5 +153,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CCU-Notebook-APK
+          name: CardioVault-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
