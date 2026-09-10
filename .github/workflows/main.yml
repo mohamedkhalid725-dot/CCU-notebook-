@@ -1,4 +1,4 @@
-name: Build Vite App
+name: Build CCU Notebook APK
 
 on:
   push:
@@ -7,26 +7,76 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # 1. Download the project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
+      # 3. Install Java
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # 4. Install web dependencies
       - name: Install dependencies
         run: npm install
 
+      # 5. Build the Vite application
       - name: Build Vite
         run: npm run build
 
-      - name: Upload Vite build
+      # 6. Install Capacitor
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      # 7. Create Capacitor configuration
+      - name: Create Capacitor config
+        run: |
+          cat > capacitor.config.ts <<'EOF'
+          import type { CapacitorConfig } from '@capacitor/cli';
+
+          const config: CapacitorConfig = {
+            appId: 'com.ccunotebook.app',
+            appName: 'CCU Notebook',
+            webDir: 'dist',
+            server: {
+              androidScheme: 'https'
+            }
+          };
+
+          export default config;
+          EOF
+
+      # 8. Create Android project
+      - name: Add Android platform
+        run: npx cap add android
+
+      # 9. Sync web app with Android
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # 10. Build APK
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      # 11. Upload APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: vite-build
-          path: dist
+          name: CCU-Notebook-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
