@@ -1,6 +1,13 @@
-export type BedStatus = 'stable' | 'critical' | 'guarded' | 'deteriorating' | 'post-op' | 'discharged' | 'empty';
+export type BedStatus =
+  | 'stable'
+  | 'critical'
+  | 'guarded'
+  | 'deteriorating'
+  | 'post-op'
+  | 'discharged'
+  | 'empty';
 
-export type DischargeDisposition = 
+export type DischargeDisposition =
   | 'Discharged Home'
   | 'Transferred to Ward'
   | 'Transferred to Step-Down Unit'
@@ -10,9 +17,9 @@ export type DischargeDisposition =
   | 'Other';
 
 export interface DischargeDetails {
-  dischargeDate: string; // e.g. "2026-09-09 15:30"
+  dischargeDate: string;
   disposition: DischargeDisposition;
-  conditionAtDischarge: string; // e.g. "Stable & Improved", "Guarded", "Deceased"
+  conditionAtDischarge: string;
   dischargeSummary: string;
   dischargeMedications?: string;
   followUpInstructions?: string;
@@ -20,6 +27,16 @@ export interface DischargeDetails {
 }
 
 export type SpecialtyMode = 'all' | 'ccu' | 'icu';
+
+/**
+ * Main application bottom-navigation tabs.
+ */
+export type AppTab =
+  | 'home'
+  | 'patients'
+  | 'beds'
+  | 'archive'
+  | 'settings';
 
 export interface VitalSignEntry {
   timestamp: string;
@@ -47,28 +64,33 @@ export interface IOEntry {
 
 export interface LabResults {
   timestamp: string;
+
   // CBC
   hb?: string;
   wbc?: string;
   platelets?: string;
-  // Chem
+
+  // Chemistry
   na?: string;
   k?: string;
   cl?: string;
   urea?: string;
   creatinine?: string;
   glucose?: string;
-  // Cardiac (CCU)
+
+  // Cardiac / CCU
   troponin?: string;
   ckmb?: string;
   bnp?: string;
-  // Coag
+
+  // Coagulation
   pt?: string;
   inr?: string;
   aptt?: string;
+
   // Inflammatory
   crp?: string;
-  pct?: string; // Procalcitonin
+  pct?: string;
   lactate?: string;
 }
 
@@ -78,7 +100,7 @@ export interface ABGEntry {
   pco2: string;
   po2: string;
   hco3: string;
-  be: string; // Base Excess
+  be: string;
   lactate: string;
   fio2: string;
   pao2fio2Ratio?: string;
@@ -89,15 +111,19 @@ export interface CCUCardiology {
   ecgSummary: string;
   stElevationLeads?: string;
   arrhythmia?: string;
-  echoEF: string; // Ejection Fraction %
+
+  echoEF: string;
   echoFindings: string;
+
   cathDate?: string;
   cathFindings?: string;
-  culpritLesion?: string; // e.g. LAD, RCA
-  stentType?: string; // e.g. DES, BMS
-  stentDetails?: string; // size x length
-  antiplatelets: string; // e.g. Aspirin 81mg + Ticagrelor 90mg BID
-  anticoagulation: string; // e.g. Enoxaparin 1mg/kg or Heparin drip
+  culpritLesion?: string;
+  stentType?: string;
+  stentDetails?: string;
+
+  antiplatelets: string;
+  anticoagulation: string;
+
   timiFlowPost?: string;
 }
 
@@ -106,21 +132,33 @@ export interface ICUScores {
   gcsEye: number;
   gcsVerbal: number;
   gcsMotor: number;
-  rass: number; // -5 to +4
+
+  rass: number;
+
   sofaScore: number;
+
   pupils?: string;
-  deliriumCamICU?: 'positive' | 'negative' | 'unassessable';
+
+  deliriumCamICU?:
+    | 'positive'
+    | 'negative'
+    | 'unassessable';
 }
 
 export interface VentilatorSettings {
-  mode: string; // e.g. VCV, PCV, PSV, PRVC, High Flow, BiPAP
-  fio2: number | string; // %
-  peep: number | string; // cmH2O
-  tv: number | string; // Tidal volume ml
-  rate: number | string; // Set RR
-  totalRate?: number | string; // Total RR
+  mode: string;
+
+  fio2: number | string;
+  peep: number | string;
+
+  tv: number | string;
+  rate: number | string;
+
+  totalRate?: number | string;
+
   pPeak?: number | string;
   pPlat?: number | string;
+
   etTubeSize?: string;
   etTubeDepth?: string;
 }
@@ -131,33 +169,50 @@ export interface Medication {
   dose: string;
   route: string;
   frequency: string;
-  category?: 'antibiotic' | 'cardiac' | 'sedation' | 'gi' | 'other';
+
+  category?:
+    | 'antibiotic'
+    | 'cardiac'
+    | 'sedation'
+    | 'gi'
+    | 'other';
 }
 
 export interface Infusion {
   id: string;
   drug: string;
-  doseRate: string; // e.g. 0.1 mcg/kg/min or 5 ml/hr
+  doseRate: string;
   concentration?: string;
   lineLocation?: string;
 }
 
 export interface ProgressNote {
   id: string;
-  timestamp: string; // formatted e.g. "09/09 — 08:00 PM"
+
+  timestamp: string;
   author: string;
+
   title?: string;
+
   subjective?: string;
   objective?: string;
+
   assessment: string;
   plan: string;
-  tag?: 'Round' | 'Event' | 'Procedure' | 'Consult' | 'Handover';
+
+  tag?:
+    | 'Round'
+    | 'Event'
+    | 'Procedure'
+    | 'Consult'
+    | 'Handover';
 }
 
 export interface Procedure {
   id: string;
   name: string;
   date: string;
+
   site?: string;
   performer?: string;
   notes?: string;
@@ -165,78 +220,19 @@ export interface Procedure {
 
 export interface PatientRecord {
   id: string;
+
+  // Basic patient information
   bedNumber: number | string;
   name: string;
   age: number | string;
+
   gender: 'Male' | 'Female' | 'Other';
+
   mrn: string;
+
   admissionDate: string;
+
   status: BedStatus;
+
   primaryDiagnosis: string;
-  secondaryDiagnoses: string[];
-  chiefComplaint: string;
-  historyOfPresentIllness: string;
-  pastMedicalHistory: string;
-  examinationSummary: string;
-  codeStatus: 'Full Code' | 'DNR' | 'DNI' | 'Modified';
-  attendingPhysician: string;
-  
-  // Clinical Sub-systems
-  vitals: VitalSignEntry[];
-  ioRecords: IOEntry[];
-  labs: LabResults[];
-  abgRecords: ABGEntry[];
-  ccuData: CCUCardiology;
-  icuVentilator: VentilatorSettings;
-  icuScores: ICUScores;
-  medications: Medication[];
-  infusions: Infusion[];
-  procedures: Procedure[];
-  progressNotes: ProgressNote[];
-  consultations: string;
-  imagingSummary: string;
-  dischargeTransferPlan: string;
-
-  // Discharge & Medical Records Archive
-  isDischarged?: boolean;
-  dischargeDetails?: DischargeDetails;
-  previousBedNumber?: number | string;
-
-  // Custom Fields (user-defined)
-  customFields?: Record<string, string>;
-  
-  lastUpdated: string;
-}
-
-export interface FieldVisibilityConfig {
-  patientInfo: boolean;
-  chiefComplaint: boolean;
-  history: boolean;
-  examination: boolean;
-  vitals: boolean;
-  ioBalance: boolean;
-  labs: boolean;
-  abg: boolean;
-  ccuCardiology: boolean;
-  ecg: boolean;
-  echo: boolean;
-  cathStent: boolean;
-  icuScores: boolean;
-  icuVentilator: boolean;
-  vasopressorsInfusions: boolean;
-  medications: boolean;
-  procedures: boolean;
-  progressNotesTimeline: boolean;
-  consultations: boolean;
-  imaging: boolean;
-  dischargePlan: boolean;
-}
-
-export interface AppSecuritySettings {
-  isPinSet: boolean;
-  hashedPin: string;
-  pinSalt: string;
-  autoLockMinutes: number; // 0 = immediate on blur, 1, 5, 15, -1 = disabled
-  biometricEnabled: boolean;
-  lastUnlockedTimestamp: number;
-}
+  secondary
