@@ -21,7 +21,7 @@ import {
 import { LockScreen } from './components/LockScreen';
 import { Navbar } from './components/Navbar';
 import { CensusView } from './components/CensusView';
-import { PatientFileModal } from './components/PatientFileModal';
+import PatientFileModal from './components/PatientFileModal';
 import { ClinicalCalculatorsModal } from './components/ClinicalCalculatorsModal';
 import { FieldCustomizerModal } from './components/FieldCustomizerModal';
 import { SecuritySettingsModal } from './components/SecuritySettingsModal';
