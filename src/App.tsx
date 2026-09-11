@@ -15,19 +15,8 @@ import {
   getFieldConfig,
   saveFieldConfig,
   loadPatients,
-  savePatients,
-  getAppTheme,
-  applyThemeToDom,
-  type AppTheme
+  savePatients
 } from './services/storage';
-
-import {
-  setAppLanguage,
-  initializeLanguage,
-  applyLanguageToDom,
-  type AppLanguage,
-  t
-} from './services/i18n';
 
 import { LockScreen } from './components/LockScreen';
 import { Navbar } from './components/Navbar';
@@ -51,6 +40,7 @@ import {
   Users,
   BedDouble,
   Archive,
+  Settings,
   Search,
   Plus,
   Activity,
@@ -63,8 +53,7 @@ import {
   Cloud,
   RefreshCw,
   LogOut,
-  SlidersHorizontal,
-  Languages
+  SlidersHorizontal
 } from 'lucide-react';
 
 import {
@@ -82,99 +71,23 @@ export default function App() {
   // =========================================================
 
   const [securitySettings, setSecuritySettings] =
-    useState<AppSecuritySettings>(() => {
-      try {
-        return getSecuritySettings();
-      } catch {
-        return {
-          pinEnabled: false,
-          autoLockMinutes: 0
-        } as AppSecuritySettings;
-      }
-    });
+    useState<AppSecuritySettings>(() => getSecuritySettings());
 
-  // =========================================================
-  // Language
-  // =========================================================
-
-  const [language, setLanguageState] =
-    useState<AppLanguage>(() => {
-      try {
-        return initializeLanguage();
-      } catch {
-        return 'en';
-      }
-    });
-
-  // =========================================================
-  // Theme
-  // =========================================================
-
-  const [theme, setTheme] =
-    useState<AppTheme>(() => {
-      try {
-        return getAppTheme();
-      } catch {
-        return 'dark';
-      }
-    });
-
-  const [isDarkTheme, setIsDarkTheme] =
-    useState<boolean>(() => {
-      try {
-        if (
-          typeof window === 'undefined' ||
-          typeof window.matchMedia !== 'function'
-        ) {
-          return true;
-        }
-
-        const savedTheme = getAppTheme();
-
-        return (
-          savedTheme === 'dark' ||
-          (
-            savedTheme === 'system' &&
-            window.matchMedia(
-              '(prefers-color-scheme: dark)'
-            ).matches
-          )
-        );
-      } catch {
-        return true;
-      }
-    });
-
-  // =========================================================
-  // Session
-  // =========================================================
-
-  const [isUnlocked, setIsUnlocked] =
-    useState<boolean>(false);
-
-  const [activePin, setActivePin] =
-    useState<string>('');
-
-  const [lastActivity, setLastActivity] =
-    useState<number>(Date.now());
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [activePin, setActivePin] = useState<string>('');
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
   // =========================================================
   // Firebase / Cloud
   // =========================================================
 
-  const [currentUser, setCurrentUser] =
-    useState<User | null>(null);
-
-  const [authLoading, setAuthLoading] =
-    useState<boolean>(true);
-
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isOfflineBypassed, setIsOfflineBypassed] =
     useState<boolean>(false);
 
   const [cloudSyncStatus, setCloudSyncStatus] =
-    useState<'synced' | 'syncing' | 'offline' | 'error'>(
-      'offline'
-    );
+    useState<'synced' | 'syncing' | 'offline' | 'error'>('offline');
 
   const [showCloudAccountModal, setShowCloudAccountModal] =
     useState<boolean>(false);
@@ -183,30 +96,13 @@ export default function App() {
   // Clinical State
   // =========================================================
 
-  const [patients, setPatients] =
-    useState<PatientRecord[]>([]);
+  const [patients, setPatients] = useState<PatientRecord[]>([]);
 
-  const [totalBeds, setTotalBeds] =
-    useState<number>(() => {
-      try {
-        const saved =
-          localStorage.getItem('icu_total_beds');
-
-        const parsed =
-          saved ? Number(saved) : 6;
-
-        if (!Number.isFinite(parsed)) {
-          return 6;
-        }
-
-        return Math.max(
-          3,
-          Math.floor(parsed)
-        );
-      } catch {
-        return 6;
-      }
-    });
+  const [totalBeds, setTotalBeds] = useState<number>(() => {
+    const saved = localStorage.getItem('icu_total_beds');
+    const parsed = saved ? Number(saved) : 6;
+    return Number.isFinite(parsed) ? Math.max(3, parsed) : 6;
+  });
 
   const [specialtyMode, setSpecialtyMode] =
     useState<SpecialtyMode>('all');
@@ -215,13 +111,7 @@ export default function App() {
     useState<AppTab>('home');
 
   const [fieldConfig, setFieldConfig] =
-    useState<FieldVisibilityConfig>(() => {
-      try {
-        return getFieldConfig();
-      } catch {
-        return {} as FieldVisibilityConfig;
-      }
-    });
+    useState<FieldVisibilityConfig>(() => getFieldConfig());
 
   const [patientSearch, setPatientSearch] =
     useState<string>('');
@@ -261,176 +151,19 @@ export default function App() {
     useState<PatientRecord | null>(null);
 
   // =========================================================
-  // Language Initialization
-  // =========================================================
-
-  useEffect(() => {
-    try {
-      setAppLanguage(language);
-      applyLanguageToDom(language);
-    } catch (err) {
-      console.error(
-        'Language initialization failed:',
-        err
-      );
-    }
-  }, [language]);
-
-  // =========================================================
-  // Theme Synchronization
-  //
-  // Supports:
-  // - Dark
-  // - Light
-  // - System
-  // - Navbar theme changes
-  // - OS theme changes
-  // =========================================================
-
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return;
-    }
-
-    const updateTheme = () => {
-      try {
-        const currentTheme =
-          getAppTheme();
-
-        setTheme(currentTheme);
-
-        const systemDark =
-          typeof window !== 'undefined' &&
-          typeof window.matchMedia === 'function'
-            ? window.matchMedia(
-                '(prefers-color-scheme: dark)'
-              ).matches
-            : false;
-
-        const dark =
-          currentTheme === 'dark' ||
-          (
-            currentTheme === 'system' &&
-            systemDark
-          );
-
-        setIsDarkTheme(dark);
-
-        applyThemeToDom(
-          currentTheme
-        );
-      } catch (err) {
-        console.error(
-          'Theme synchronization failed:',
-          err
-        );
-      }
-    };
-
-    updateTheme();
-
-    let mediaQuery: MediaQueryList | null = null;
-
-    if (
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function'
-    ) {
-      mediaQuery =
-        window.matchMedia(
-          '(prefers-color-scheme: dark)'
-        );
-
-      mediaQuery.addEventListener?.(
-        'change',
-        updateTheme
-      );
-    }
-
-    /*
-     * Navbar changes the theme directly in localStorage
-     * and on document.documentElement.
-     *
-     * MutationObserver makes App react immediately,
-     * even though localStorage "storage" events do not
-     * fire in the same browser tab.
-     */
-    const observer =
-      new MutationObserver(() => {
-        updateTheme();
-      });
-
-    observer.observe(
-      document.documentElement,
-      {
-        attributes: true,
-        attributeFilter: ['class']
-      }
-    );
-
-    const handleStorage =
-      (event: StorageEvent) => {
-        if (
-          event.key === 'cardiovault_theme' ||
-          event.key === 'icu_total_beds'
-        ) {
-          updateTheme();
-        }
-      };
-
-    window.addEventListener(
-      'storage',
-      handleStorage
-    );
-
-    return () => {
-      mediaQuery?.removeEventListener?.(
-        'change',
-        updateTheme
-      );
-
-      observer.disconnect();
-
-      window.removeEventListener(
-        'storage',
-        handleStorage
-      );
-    };
-  }, []);
-
-  // =========================================================
   // Unlock
   // =========================================================
 
-  const handleUnlockSuccess = async (
-    pin: string
-  ) => {
-    setActivePin(
-      typeof pin === 'string'
-        ? pin
-        : ''
-    );
-
+  const handleUnlockSuccess = async (pin: string) => {
+    setActivePin(pin);
     setIsUnlocked(true);
-    setLastActivity(
-      Date.now()
-    );
+    setLastActivity(Date.now());
 
     try {
-      const loaded =
-        await loadPatients(pin);
-
-      setPatients(
-        Array.isArray(loaded)
-          ? loaded.filter(Boolean)
-          : []
-      );
+      const loaded = await loadPatients(pin);
+      setPatients(loaded);
     } catch (err) {
-      console.error(
-        'Failed to load patient records:',
-        err
-      );
-
-      setPatients([]);
+      console.error('Failed to load patient records', err);
     }
   };
 
@@ -439,150 +172,45 @@ export default function App() {
   // =========================================================
 
   useEffect(() => {
-    let mounted = true;
-
-    let unsubscribe:
-      | (() => void)
-      | undefined;
-
-    try {
-      unsubscribe =
-        subscribeToAuth(
-          async (user) => {
-            if (!mounted) return;
-
-            setCurrentUser(user);
-            setAuthLoading(false);
-
-            if (!user) {
-              setCloudSyncStatus(
-                'offline'
-              );
-
-              return;
-            }
-
-            setIsUnlocked(true);
-            setCloudSyncStatus(
-              'syncing'
-            );
-
-            try {
-              const cloudData =
-                await fetchCloudPatients(
-                  user.uid
-                );
-
-              if (!mounted) return;
-
-              const safeCloudData =
-                Array.isArray(cloudData)
-                  ? cloudData.filter(Boolean)
-                  : [];
-
-              if (
-                safeCloudData.length > 0
-              ) {
-                setPatients(
-                  safeCloudData
-                );
-
-                if (activePin) {
-                  try {
-                    await savePatients(
-                      safeCloudData,
-                      activePin
-                    );
-                  } catch (
-                    storageError
-                  ) {
-                    console.error(
-                      'Failed to save cloud data locally:',
-                      storageError
-                    );
-                  }
-                }
-              } else {
-                setPatients(
-                  (localPatients) => {
-                    const safeLocalPatients =
-                      Array.isArray(
-                        localPatients
-                      )
-                        ? localPatients.filter(
-                            Boolean
-                          )
-                        : [];
-
-                    if (
-                      safeLocalPatients.length >
-                      0
-                    ) {
-                      syncAllPatientsToCloud(
-                        user.uid,
-                        safeLocalPatients
-                      ).catch(
-                        (syncError) => {
-                          console.error(
-                            'Initial cloud sync failed:',
-                            syncError
-                          );
-
-                          if (mounted) {
-                            setCloudSyncStatus(
-                              'error'
-                            );
-                          }
-                        }
-                      );
-                    }
-
-                    return safeLocalPatients;
-                  }
-                );
-              }
-
-              if (mounted) {
-                setCloudSyncStatus(
-                  'synced'
-                );
-              }
-            } catch (err) {
-              console.error(
-                'Failed to sync cloud patients:',
-                err
-              );
-
-              if (mounted) {
-                setCloudSyncStatus(
-                  'error'
-                );
-              }
-            }
-          }
-        );
-    } catch (err) {
-      console.error(
-        'Auth subscription failed:',
-        err
-      );
-
+    const unsubscribe = subscribeToAuth(async (user) => {
+      setCurrentUser(user);
       setAuthLoading(false);
-      setCurrentUser(null);
-    }
 
-    return () => {
-      mounted = false;
+      if (user) {
+        setIsUnlocked(true);
+        setCloudSyncStatus('syncing');
 
-      try {
-        unsubscribe?.();
-      } catch (err) {
-        console.error(
-          'Auth unsubscribe failed:',
-          err
-        );
+        try {
+          const cloudData = await fetchCloudPatients(user.uid);
+
+          if (cloudData && cloudData.length > 0) {
+            setPatients(cloudData);
+
+            if (activePin) {
+              await savePatients(cloudData, activePin);
+            }
+          } else if (patients.length > 0) {
+            await syncAllPatientsToCloud(
+              user.uid,
+              patients
+            );
+          }
+
+          setCloudSyncStatus('synced');
+        } catch (err) {
+          console.error(
+            'Failed to sync cloud patients:',
+            err
+          );
+
+          setCloudSyncStatus('error');
+        }
+      } else {
+        setCloudSyncStatus('offline');
       }
-    };
+    });
+
+    return () => unsubscribe();
   }, [activePin]);
 
   // =========================================================
@@ -596,117 +224,64 @@ export default function App() {
     setSelectedPatientId(null);
     setAdmitBedNumber(null);
 
-    setPatientToDischarge(null);
-    setPatientToReadmit(null);
-    setPatientToPrint(null);
-
     setShowCalculators(false);
     setShowCustomizer(false);
     setShowSecurityModal(false);
     setShowPrintView(false);
     setShowCloudAccountModal(false);
 
-    try {
-      setSecuritySettings(
-        getSecuritySettings()
-      );
-    } catch (err) {
-      console.error(
-        'Failed to reload security settings:',
-        err
-      );
-    }
+    setSecuritySettings(getSecuritySettings());
   }, []);
 
   // =========================================================
   // Logout
   // =========================================================
 
-  const handleLogout = useCallback(
-    async () => {
-      try {
-        await logoutUser();
-      } catch (err) {
-        console.error(
-          'Logout error:',
-          err
-        );
-      }
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
 
-      setCurrentUser(null);
-      setIsOfflineBypassed(false);
-      setIsUnlocked(false);
-      setActivePin('');
-      setPatients([]);
+    setCurrentUser(null);
+    setIsOfflineBypassed(false);
+    setIsUnlocked(false);
+    setActivePin('');
+    setPatients([]);
 
-      setSelectedPatientId(null);
-      setAdmitBedNumber(null);
-      setPatientToDischarge(null);
-      setPatientToReadmit(null);
-      setPatientToPrint(null);
+    setSelectedPatientId(null);
+    setAdmitBedNumber(null);
+    setShowCloudAccountModal(false);
 
-      setShowCloudAccountModal(false);
-      setShowPrintView(false);
-
-      setActiveTab('home');
-    },
-    []
-  );
+    setActiveTab('home');
+  }, []);
 
   // =========================================================
-  // Save Patients
+  // Save patients
   // =========================================================
 
   const updatePatients = useCallback(
-    async (
-      newPatients: PatientRecord[]
-    ) => {
-      const safePatients =
-        Array.isArray(newPatients)
-          ? newPatients.filter(Boolean)
-          : [];
-
-      setPatients(
-        safePatients
-      );
+    async (newPatients: PatientRecord[]) => {
+      setPatients(newPatients);
 
       if (activePin) {
-        try {
-          await savePatients(
-            safePatients,
-            activePin
-          );
-        } catch (err) {
-          console.error(
-            'Local patient save failed:',
-            err
-          );
-        }
+        await savePatients(newPatients, activePin);
       }
 
       if (currentUser) {
-        setCloudSyncStatus(
-          'syncing'
-        );
+        setCloudSyncStatus('syncing');
 
         try {
           await syncAllPatientsToCloud(
             currentUser.uid,
-            safePatients
+            newPatients
           );
 
-          setCloudSyncStatus(
-            'synced'
-          );
-        } catch (err) {
-          console.error(
-            'Cloud batch sync error:',
-            err
-          );
-
-          setCloudSyncStatus(
-            'error'
-          );
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error('Cloud batch sync error:', e);
+          setCloudSyncStatus('error');
         }
       }
     },
@@ -714,832 +289,461 @@ export default function App() {
   );
 
   // =========================================================
-  // Update Patient
+  // Update patient
   // =========================================================
 
-  const handleUpdatePatient =
-    useCallback(
-      async (
-        updatedPatient: PatientRecord
-      ) => {
-        if (!updatedPatient?.id) {
-          console.warn(
-            'Invalid patient update ignored.'
+  const handleUpdatePatient = useCallback(
+    async (updatedPatient: PatientRecord) => {
+      const nextPatients = patients.map((p) =>
+        p.id === updatedPatient.id
+          ? updatedPatient
+          : p
+      );
+
+      setPatients(nextPatients);
+
+      if (activePin) {
+        await savePatients(nextPatients, activePin);
+      }
+
+      if (currentUser) {
+        setCloudSyncStatus('syncing');
+
+        try {
+          await savePatientToCloud(
+            currentUser.uid,
+            updatedPatient
           );
 
-          return;
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error('Cloud save failed:', e);
+          setCloudSyncStatus('error');
         }
-
-        const nextPatients =
-          patients.map((p) =>
-            p?.id === updatedPatient.id
-              ? updatedPatient
-              : p
-          );
-
-        setPatients(
-          nextPatients
-        );
-
-        if (activePin) {
-          try {
-            await savePatients(
-              nextPatients,
-              activePin
-            );
-          } catch (err) {
-            console.error(
-              'Local patient update failed:',
-              err
-            );
-          }
-        }
-
-        if (currentUser) {
-          setCloudSyncStatus(
-            'syncing'
-          );
-
-          try {
-            await savePatientToCloud(
-              currentUser.uid,
-              updatedPatient
-            );
-
-            setCloudSyncStatus(
-              'synced'
-            );
-          } catch (err) {
-            console.error(
-              'Cloud save failed:',
-              err
-            );
-
-            setCloudSyncStatus(
-              'error'
-            );
-          }
-        }
-      },
-      [
-        patients,
-        activePin,
-        currentUser
-      ]
-    );
+      }
+    },
+    [patients, activePin, currentUser]
+  );
 
   // =========================================================
-  // Delete Patient
+  // Delete patient
   // =========================================================
 
-  const handleDeletePatient =
-    useCallback(
-      async (
-        patientId: string
-      ) => {
-        if (!patientId) return;
+  const handleDeletePatient = useCallback(
+    async (patientId: string) => {
+      const nextPatients = patients.filter(
+        (p) => p.id !== patientId
+      );
 
-        const nextPatients =
-          patients.filter(
-            (p) =>
-              p?.id !== patientId
+      setPatients(nextPatients);
+
+      if (activePin) {
+        await savePatients(nextPatients, activePin);
+      }
+
+      if (selectedPatientId === patientId) {
+        setSelectedPatientId(null);
+      }
+
+      if (currentUser) {
+        setCloudSyncStatus('syncing');
+
+        try {
+          await deletePatientFromCloud(
+            currentUser.uid,
+            patientId
           );
 
-        setPatients(
-          nextPatients
-        );
-
-        if (activePin) {
-          try {
-            await savePatients(
-              nextPatients,
-              activePin
-            );
-          } catch (err) {
-            console.error(
-              'Local patient delete failed:',
-              err
-            );
-          }
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error('Cloud delete failed:', e);
+          setCloudSyncStatus('error');
         }
-
-        if (
-          selectedPatientId ===
-          patientId
-        ) {
-          setSelectedPatientId(
-            null
-          );
-        }
-
-        if (
-          patientToPrint?.id ===
-          patientId
-        ) {
-          setPatientToPrint(
-            null
-          );
-
-          setShowPrintView(
-            false
-          );
-        }
-
-        if (currentUser) {
-          setCloudSyncStatus(
-            'syncing'
-          );
-
-          try {
-            await deletePatientFromCloud(
-              currentUser.uid,
-              patientId
-            );
-
-            setCloudSyncStatus(
-              'synced'
-            );
-          } catch (err) {
-            console.error(
-              'Cloud delete failed:',
-              err
-            );
-
-            setCloudSyncStatus(
-              'error'
-            );
-          }
-        }
-      },
-      [
-        patients,
-        activePin,
-        selectedPatientId,
-        currentUser,
-        patientToPrint
-      ]
-    );
+      }
+    },
+    [
+      patients,
+      activePin,
+      selectedPatientId,
+      currentUser
+    ]
+  );
 
   // =========================================================
   // Admit
   // =========================================================
 
-  const handleAdmitPatient =
-    useCallback(
-      async (
-        newPatient: PatientRecord
-      ) => {
-        if (!newPatient?.id) {
-          console.warn(
-            'Invalid patient admission ignored.'
+  const handleAdmitPatient = useCallback(
+    async (newPatient: PatientRecord) => {
+      const filtered = patients.filter(
+        (p) =>
+          p.isDischarged ||
+          Number(p.bedNumber) !==
+            Number(newPatient.bedNumber)
+      );
+
+      const next = [...filtered, newPatient];
+
+      setPatients(next);
+
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
+
+      setAdmitBedNumber(null);
+
+      if (currentUser) {
+        setCloudSyncStatus('syncing');
+
+        try {
+          await savePatientToCloud(
+            currentUser.uid,
+            newPatient
           );
 
-          return;
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error(
+            'Cloud admit save failed:',
+            e
+          );
+
+          setCloudSyncStatus('error');
         }
-
-        const newBedNumber =
-          Number(
-            newPatient.bedNumber
-          );
-
-        const filtered =
-          patients.filter(
-            (p) =>
-              p?.isDischarged ||
-              !Number.isFinite(
-                newBedNumber
-              ) ||
-              Number(p?.bedNumber) !==
-                newBedNumber
-          );
-
-        const next = [
-          ...filtered,
-          newPatient
-        ];
-
-        setPatients(next);
-
-        if (activePin) {
-          try {
-            await savePatients(
-              next,
-              activePin
-            );
-          } catch (err) {
-            console.error(
-              'Local admit save failed:',
-              err
-            );
-          }
-        }
-
-        setAdmitBedNumber(
-          null
-        );
-
-        if (currentUser) {
-          setCloudSyncStatus(
-            'syncing'
-          );
-
-          try {
-            await savePatientToCloud(
-              currentUser.uid,
-              newPatient
-            );
-
-            setCloudSyncStatus(
-              'synced'
-            );
-          } catch (err) {
-            console.error(
-              'Cloud admit save failed:',
-              err
-            );
-
-            setCloudSyncStatus(
-              'error'
-            );
-          }
-        }
-      },
-      [
-        patients,
-        activePin,
-        currentUser
-      ]
-    );
+      }
+    },
+    [patients, activePin, currentUser]
+  );
 
   // =========================================================
   // Discharge
   // =========================================================
 
-  const handleDischargePatient =
-    useCallback(
-      async (
-        patientId: string,
-        details: DischargeDetails
-      ) => {
-        if (
-          !patientId ||
-          !details
-        ) {
-          return;
-        }
+  const handleDischargePatient = useCallback(
+    async (
+      patientId: string,
+      details: DischargeDetails
+    ) => {
+      let dischargedRecord: PatientRecord | null = null;
 
-        let dischargedRecord:
-          | PatientRecord
-          | null = null;
+      const now = new Date();
 
-        const now =
-          new Date();
+      const mm = String(
+        now.getMonth() + 1
+      ).padStart(2, '0');
 
-        const mm =
-          String(
-            now.getMonth() + 1
-          ).padStart(2, '0');
+      const dd = String(
+        now.getDate()
+      ).padStart(2, '0');
 
-        const dd =
-          String(
-            now.getDate()
-          ).padStart(2, '0');
+      const timeStr =
+        now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
 
-        const timeStr =
-          now.toLocaleTimeString(
-            [],
-            {
-              hour: '2-digit',
-              minute: '2-digit'
-            }
+      const next = patients.map((p) => {
+        if (p.id !== patientId) return p;
+
+        const dischargeNote: ProgressNote = {
+          id: `note-${Date.now()}`,
+
+          timestamp:
+            `${mm}/${dd} — ${timeStr}`,
+
+          author:
+            details.dischargedBy ||
+            p.attendingPhysician ||
+            'Attending Physician',
+
+          tag: 'Handover',
+
+          subjective:
+            `Discharge protocol executed. Destination: ${details.disposition}.`,
+
+          objective:
+            `Condition at discharge: ${details.conditionAtDischarge}. Discharged from Bed ${p.bedNumber}.`,
+
+          assessment:
+            `Discharged from ICU/CCU. Diagnosis: ${p.primaryDiagnosis}.`,
+
+          plan:
+            `Summary: ${details.dischargeSummary}\n` +
+            `Floor/Discharge Meds: ${details.dischargeMedications || 'See list'}\n` +
+            `Follow-up: ${details.followUpInstructions || 'Routine follow-up'}`
+        };
+
+        const updated: PatientRecord = {
+          ...p,
+          isDischarged: true,
+          previousBedNumber: p.bedNumber,
+          bedNumber: '',
+          status: 'discharged' as BedStatus,
+          dischargeDetails: details,
+          progressNotes: [
+            ...p.progressNotes,
+            dischargeNote
+          ],
+          lastUpdated:
+            `${now.toISOString().slice(0, 10)} ${timeStr}`
+        };
+
+        dischargedRecord = updated;
+
+        return updated;
+      });
+
+      setPatients(next);
+
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
+
+      setPatientToDischarge(null);
+
+      if (currentUser && dischargedRecord) {
+        setCloudSyncStatus('syncing');
+
+        try {
+          await savePatientToCloud(
+            currentUser.uid,
+            dischargedRecord
           );
 
-        const next =
-          patients.map((p) => {
-            if (
-              p?.id !== patientId
-            ) {
-              return p;
-            }
-
-            const existingNotes =
-              Array.isArray(
-                p.progressNotes
-              )
-                ? p.progressNotes
-                : [];
-
-            const dischargeNote:
-              ProgressNote = {
-                id:
-                  `note-${Date.now()}`,
-
-                timestamp:
-                  `${mm}/${dd} — ${timeStr}`,
-
-                author:
-                  details.dischargedBy ||
-                  p.attendingPhysician ||
-                  'Attending Physician',
-
-                tag:
-                  'Handover',
-
-                subjective:
-                  `Discharge protocol executed. Destination: ${details.disposition}.`,
-
-                objective:
-                  `Condition at discharge: ${details.conditionAtDischarge}. Discharged from Bed ${p.bedNumber}.`,
-
-                assessment:
-                  `Discharged from ICU/CCU. Diagnosis: ${p.primaryDiagnosis || 'Not documented'}.`,
-
-                plan:
-                  `Summary: ${details.dischargeSummary || ''}\n` +
-                  `Floor/Discharge Meds: ${details.dischargeMedications || 'See list'}\n` +
-                  `Follow-up: ${details.followUpInstructions || 'Routine follow-up'}`
-              };
-
-            const updated:
-              PatientRecord = {
-                ...p,
-
-                isDischarged:
-                  true,
-
-                previousBedNumber:
-                  p.bedNumber,
-
-                bedNumber:
-                  '',
-
-                status:
-                  'discharged' as BedStatus,
-
-                dischargeDetails:
-                  details,
-
-                progressNotes: [
-                  ...existingNotes,
-                  dischargeNote
-                ],
-
-                lastUpdated:
-                  `${now.toISOString().slice(0, 10)} ${timeStr}`
-              };
-
-            dischargedRecord =
-              updated;
-
-            return updated;
-          });
-
-        setPatients(next);
-
-        if (activePin) {
-          try {
-            await savePatients(
-              next,
-              activePin
-            );
-          } catch (err) {
-            console.error(
-              'Local discharge save failed:',
-              err
-            );
-          }
-        }
-
-        setPatientToDischarge(
-          null
-        );
-
-        if (
-          currentUser &&
-          dischargedRecord
-        ) {
-          setCloudSyncStatus(
-            'syncing'
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error(
+            'Cloud discharge save failed:',
+            e
           );
 
-          try {
-            await savePatientToCloud(
-              currentUser.uid,
-              dischargedRecord
-            );
-
-            setCloudSyncStatus(
-              'synced'
-            );
-          } catch (err) {
-            console.error(
-              'Cloud discharge save failed:',
-              err
-            );
-
-            setCloudSyncStatus(
-              'error'
-            );
-          }
+          setCloudSyncStatus('error');
         }
-      },
-      [
-        patients,
-        activePin,
-        currentUser
-      ]
-    );
+      }
+    },
+    [patients, activePin, currentUser]
+  );
 
   // =========================================================
   // Readmit
   // =========================================================
 
-  const handleReadmitPatient =
-    useCallback(
-      async (
-        patientId: string,
-        targetBedNumber: number,
-        status: BedStatus
-      ) => {
-        if (!patientId) return;
+  const handleReadmitPatient = useCallback(
+    async (
+      patientId: string,
+      targetBedNumber: number,
+      status: BedStatus
+    ) => {
+      const isOccupied = patients.some(
+        (p) =>
+          !p.isDischarged &&
+          Number(p.bedNumber) ===
+            Number(targetBedNumber)
+      );
 
-        const safeBedNumber =
-          Number(
-            targetBedNumber
-          );
-
-        if (
-          !Number.isFinite(
-            safeBedNumber
-          )
-        ) {
-          return;
-        }
-
-        const isOccupied =
-          patients.some(
-            (p) =>
-              !p?.isDischarged &&
-              Number(
-                p?.bedNumber
-              ) ===
-                safeBedNumber
-          );
-
-        if (isOccupied) {
-          alert(
-            `Bed ${safeBedNumber} is currently occupied! Please select an empty bed.`
-          );
-
-          return;
-        }
-
-        let readmittedRecord:
-          | PatientRecord
-          | null = null;
-
-        const now =
-          new Date();
-
-        const mm =
-          String(
-            now.getMonth() + 1
-          ).padStart(2, '0');
-
-        const dd =
-          String(
-            now.getDate()
-          ).padStart(2, '0');
-
-        const timeStr =
-          now.toLocaleTimeString(
-            [],
-            {
-              hour: '2-digit',
-              minute: '2-digit'
-            }
-          );
-
-        const next =
-          patients.map((p) => {
-            if (
-              p?.id !== patientId
-            ) {
-              return p;
-            }
-
-            const existingNotes =
-              Array.isArray(
-                p.progressNotes
-              )
-                ? p.progressNotes
-                : [];
-
-            const readmitNote:
-              ProgressNote = {
-                id:
-                  `note-${Date.now()}`,
-
-                timestamp:
-                  `${mm}/${dd} — ${timeStr}`,
-
-                author:
-                  p.attendingPhysician ||
-                  'Attending Physician',
-
-                tag:
-                  'Round',
-
-                subjective:
-                  `Patient re-admitted to intensive care (Assigned Bed ${safeBedNumber}).`,
-
-                objective:
-                  `Re-admission evaluation. Continuous hemodynamic monitoring initiated.`,
-
-                assessment:
-                  `Active ICU/CCU clinical management resumed for ${p.primaryDiagnosis || 'patient'}.`,
-
-                plan:
-                  '1. Connected to bedside telemetry & monitoring\n' +
-                  '2. Vital signs and laboratory panel reassessment\n' +
-                  '3. Continue targeted protocol'
-              };
-
-            const updated:
-              PatientRecord = {
-                ...p,
-
-                isDischarged:
-                  false,
-
-                bedNumber:
-                  safeBedNumber,
-
-                status,
-
-                progressNotes: [
-                  ...existingNotes,
-                  readmitNote
-                ],
-
-                lastUpdated:
-                  `${now.toISOString().slice(0, 10)} ${timeStr}`
-              };
-
-            readmittedRecord =
-              updated;
-
-            return updated;
-          });
-
-        setPatients(next);
-
-        if (activePin) {
-          try {
-            await savePatients(
-              next,
-              activePin
-            );
-          } catch (err) {
-            console.error(
-              'Local readmit save failed:',
-              err
-            );
-          }
-        }
-
-        setPatientToReadmit(
-          null
+      if (isOccupied) {
+        alert(
+          `Bed ${targetBedNumber} is currently occupied! Please select an empty bed.`
         );
+        return;
+      }
 
-        if (
-          currentUser &&
-          readmittedRecord
-        ) {
-          setCloudSyncStatus(
-            'syncing'
+      let readmittedRecord: PatientRecord | null = null;
+
+      const now = new Date();
+
+      const mm = String(
+        now.getMonth() + 1
+      ).padStart(2, '0');
+
+      const dd = String(
+        now.getDate()
+      ).padStart(2, '0');
+
+      const timeStr =
+        now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+      const next = patients.map((p) => {
+        if (p.id !== patientId) return p;
+
+        const readmitNote: ProgressNote = {
+          id: `note-${Date.now()}`,
+
+          timestamp:
+            `${mm}/${dd} — ${timeStr}`,
+
+          author:
+            p.attendingPhysician ||
+            'Attending Physician',
+
+          tag: 'Round',
+
+          subjective:
+            `Patient re-admitted to intensive care (Assigned Bed ${targetBedNumber}).`,
+
+          objective:
+            `Re-admission evaluation. Continuous hemodynamic monitoring initiated.`,
+
+          assessment:
+            `Active ICU/CCU clinical management resumed for ${p.primaryDiagnosis}.`,
+
+          plan:
+            '1. Connected to bedside telemetry & monitoring\n' +
+            '2. Vital signs and laboratory panel reassessment\n' +
+            '3. Continue targeted protocol'
+        };
+
+        const updated: PatientRecord = {
+          ...p,
+
+          isDischarged: false,
+
+          bedNumber: targetBedNumber,
+
+          status,
+
+          progressNotes: [
+            ...p.progressNotes,
+            readmitNote
+          ],
+
+          lastUpdated:
+            `${now.toISOString().slice(0, 10)} ${timeStr}`
+        };
+
+        readmittedRecord = updated;
+
+        return updated;
+      });
+
+      setPatients(next);
+
+      if (activePin) {
+        await savePatients(next, activePin);
+      }
+
+      setPatientToReadmit(null);
+
+      if (currentUser && readmittedRecord) {
+        setCloudSyncStatus('syncing');
+
+        try {
+          await savePatientToCloud(
+            currentUser.uid,
+            readmittedRecord
           );
 
-          try {
-            await savePatientToCloud(
-              currentUser.uid,
-              readmittedRecord
-            );
+          setCloudSyncStatus('synced');
+        } catch (e) {
+          console.error(
+            'Cloud readmit save failed:',
+            e
+          );
 
-            setCloudSyncStatus(
-              'synced'
-            );
-          } catch (err) {
-            console.error(
-              'Cloud readmit save failed:',
-              err
-            );
-
-            setCloudSyncStatus(
-              'error'
-            );
-          }
+          setCloudSyncStatus('error');
         }
-      },
-      [
-        patients,
-        activePin,
-        currentUser
-      ]
-    );
+      }
+    },
+    [patients, activePin, currentUser]
+  );
 
   // =========================================================
   // Cloud Sync
   // =========================================================
 
-  const handleManualSync =
-    async () => {
-      if (!currentUser) return;
+  const handleManualSync = async () => {
+    if (!currentUser) return;
 
-      setCloudSyncStatus(
-        'syncing'
+    setCloudSyncStatus('syncing');
+
+    try {
+      await syncAllPatientsToCloud(
+        currentUser.uid,
+        patients
       );
 
-      try {
-        await syncAllPatientsToCloud(
-          currentUser.uid,
-          safePatients
-        );
+      setCloudSyncStatus('synced');
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+      setCloudSyncStatus('error');
+    }
+  };
 
-        setCloudSyncStatus(
-          'synced'
-        );
-      } catch (err) {
-        console.error(
-          'Manual sync failed:',
-          err
-        );
+  const handlePullCloudData = async () => {
+    if (!currentUser) return;
 
-        setCloudSyncStatus(
-          'error'
+    setCloudSyncStatus('syncing');
+
+    try {
+      const cloudData =
+        await fetchCloudPatients(currentUser.uid);
+
+      setPatients(cloudData);
+
+      if (activePin) {
+        await savePatients(
+          cloudData,
+          activePin
         );
       }
-    };
 
-  const handlePullCloudData =
-    async () => {
-      if (!currentUser) return;
-
-      setCloudSyncStatus(
-        'syncing'
+      setCloudSyncStatus('synced');
+    } catch (err) {
+      console.error(
+        'Pull cloud data failed:',
+        err
       );
 
-      try {
-        const cloudData =
-          await fetchCloudPatients(
-            currentUser.uid
-          );
-
-        const safeCloudData =
-          Array.isArray(cloudData)
-            ? cloudData.filter(Boolean)
-            : [];
-
-        setPatients(
-          safeCloudData
-        );
-
-        if (activePin) {
-          try {
-            await savePatients(
-              safeCloudData,
-              activePin
-            );
-          } catch (
-            storageError
-          ) {
-            console.error(
-              'Failed to cache cloud data:',
-              storageError
-            );
-          }
-        }
-
-        setCloudSyncStatus(
-          'synced'
-        );
-      } catch (err) {
-        console.error(
-          'Pull cloud data failed:',
-          err
-        );
-
-        setCloudSyncStatus(
-          'error'
-        );
-      }
-    };
+      setCloudSyncStatus('error');
+    }
+  };
 
   // =========================================================
   // Beds
   // =========================================================
 
-  const handleChangeTotalBeds =
-    (newCount: number) => {
-      const numeric =
-        Number(newCount);
-
-      if (
-        !Number.isFinite(
-          numeric
-        )
-      ) {
-        return;
-      }
-
-      const safeCount =
-        Math.max(
-          3,
-          Math.floor(numeric)
-        );
-
-      setTotalBeds(
-        safeCount
-      );
-
-      try {
-        localStorage.setItem(
-          'icu_total_beds',
-          String(safeCount)
-        );
-      } catch (err) {
-        console.error(
-          'Failed to save bed count:',
-          err
-        );
-      }
-    };
-
-  const handleUpdatePatientBed =
-    useCallback(
-      async (
-        patientId: string,
-        newBedNumber:
-          | string
-          | number
-      ) => {
-        const targetPatient =
-          patients.find(
-            (p) =>
-              p?.id === patientId
-          );
-
-        if (!targetPatient) {
-          return;
-        }
-
-        const updated:
-          PatientRecord = {
-            ...targetPatient,
-            bedNumber:
-              String(
-                newBedNumber
-              )
-          };
-
-        await handleUpdatePatient(
-          updated
-        );
-      },
-      [
-        patients,
-        handleUpdatePatient
-      ]
+  const handleChangeTotalBeds = (
+    newCount: number
+  ) => {
+    const safeCount = Math.max(
+      3,
+      Math.floor(newCount)
     );
+
+    setTotalBeds(safeCount);
+
+    localStorage.setItem(
+      'icu_total_beds',
+      String(safeCount)
+    );
+  };
+
+  const handleUpdatePatientBed = useCallback(
+    async (patientId: string, newBedNumber: string | number) => {
+      const targetPatient = patients.find((p) => p.id === patientId);
+      if (!targetPatient) return;
+      const updated: PatientRecord = {
+        ...targetPatient,
+        bedNumber: String(newBedNumber)
+      };
+      await handleUpdatePatient(updated);
+    },
+    [patients, handleUpdatePatient]
+  );
 
   // =========================================================
   // Field Config
   // =========================================================
 
-  const handleSaveFieldConfig =
-    (
-      newConfig:
-        FieldVisibilityConfig
-    ) => {
-      if (!newConfig) {
-        return;
-      }
-
-      setFieldConfig(
-        newConfig
-      );
-
-      try {
-        saveFieldConfig(
-          newConfig
-        );
-      } catch (err) {
-        console.error(
-          'Failed to save field configuration:',
-          err
-        );
-      }
-    };
+  const handleSaveFieldConfig = (
+    newConfig: FieldVisibilityConfig
+  ) => {
+    setFieldConfig(newConfig);
+    saveFieldConfig(newConfig);
+  };
 
   // =========================================================
   // Auto Lock
@@ -1548,11 +752,8 @@ export default function App() {
   useEffect(() => {
     if (!isUnlocked) return;
 
-    const updateActivity =
-      () =>
-        setLastActivity(
-          Date.now()
-        );
+    const updateActivity = () =>
+      setLastActivity(Date.now());
 
     window.addEventListener(
       'mousemove',
@@ -1578,45 +779,38 @@ export default function App() {
       { passive: true }
     );
 
-    const handleVisibilityChange =
-      () => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
         if (
-          document.hidden &&
-          securitySettings.autoLockMinutes ===
-            0
+          securitySettings.autoLockMinutes === 0
         ) {
           handleLockApp();
         }
-      };
+      }
+    };
 
     document.addEventListener(
       'visibilitychange',
       handleVisibilityChange
     );
 
-    const interval =
-      window.setInterval(() => {
-        if (
-          securitySettings.autoLockMinutes >
-          0
-        ) {
-          const inactiveMs =
-            Date.now() -
-            lastActivity;
+    const interval = setInterval(() => {
+      if (
+        securitySettings.autoLockMinutes > 0
+      ) {
+        const inactiveMs =
+          Date.now() - lastActivity;
 
-          const limitMs =
-            securitySettings.autoLockMinutes *
-            60 *
-            1000;
+        const limitMs =
+          securitySettings.autoLockMinutes *
+          60 *
+          1000;
 
-          if (
-            inactiveMs >=
-            limitMs
-          ) {
-            handleLockApp();
-          }
+        if (inactiveMs >= limitMs) {
+          handleLockApp();
         }
-      }, 10000);
+      }
+    }, 10000);
 
     return () => {
       window.removeEventListener(
@@ -1644,9 +838,7 @@ export default function App() {
         handleVisibilityChange
       );
 
-      window.clearInterval(
-        interval
-      );
+      clearInterval(interval);
     };
   }, [
     isUnlocked,
@@ -1659,224 +851,84 @@ export default function App() {
   // Derived Data
   // =========================================================
 
-  const safePatients =
-    Array.isArray(patients)
-      ? patients.filter(Boolean)
-      : [];
+  const activePatients = patients.filter(
+    (p) => !p.isDischarged
+  );
 
-  const activePatients =
-    safePatients.filter(
-      (p) =>
-        !p.isDischarged
-    );
+  const archivedPatients = patients.filter(
+    (p) => p.isDischarged
+  );
 
-  const archivedPatients =
-    safePatients.filter(
-      (p) =>
-        p.isDischarged
-    );
+  const occupiedPatients = activePatients.filter(
+    (p) =>
+      p.bedNumber !== '' &&
+      p.bedNumber !== null &&
+      p.bedNumber !== undefined
+  );
 
-  const occupiedPatients =
-    activePatients.filter(
-      (p) =>
-        p.bedNumber !== '' &&
-        p.bedNumber !== null &&
-        p.bedNumber !== undefined
-    );
-
-  const occupiedCount =
-    occupiedPatients.length;
+  const occupiedCount = occupiedPatients.length;
 
   const availableCount =
     Math.max(
       0,
-      totalBeds -
-        occupiedCount
+      totalBeds - occupiedCount
     );
 
   const criticalCount =
     activePatients.filter(
       (p) =>
-        p.status ===
-          'critical' ||
-        p.status ===
-          'deteriorating'
+        p.status === 'critical' ||
+        p.status === 'deteriorating'
     ).length;
 
   const stableCount =
     activePatients.filter(
-      (p) =>
-        p.status ===
-        'stable'
+      (p) => p.status === 'stable'
     ).length;
 
   const guardedCount =
     activePatients.filter(
-      (p) =>
-        p.status ===
-        'guarded'
+      (p) => p.status === 'guarded'
     ).length;
 
-  const occupiedBedNumbers =
-    new Set(
-      occupiedPatients
-        .map(
-          (p) =>
-            Number(
-              p.bedNumber
-            )
-        )
-        .filter(
-          (n) =>
-            Number.isFinite(n)
-        )
-    );
-
-  const availableBeds =
-    Array.from(
-      {
-        length: Math.max(
-          0,
-          totalBeds
-        )
-      },
-      (_, i) =>
-        i + 1
-    ).filter(
-      (b) =>
-        !occupiedBedNumbers.has(
-          b
-        )
-    );
-
-  const activePatientRecord =
-    selectedPatientId
-      ? safePatients.find(
-          (p) =>
-            p.id ===
-            selectedPatientId
-        ) || null
-      : null;
-
-  const normalizedSearch =
-    String(
-      patientSearch || ''
+  const occupiedBedNumbers = new Set(
+    occupiedPatients.map(
+      (p) => Number(p.bedNumber)
     )
-      .trim()
-      .toLowerCase();
+  );
 
-  const filteredPatients =
-    safePatients.filter(
-      (p) => {
-        if (
-          !normalizedSearch
-        ) {
-          return true;
-        }
+  const availableBeds = Array.from(
+    { length: totalBeds },
+    (_, i) => i + 1
+  ).filter(
+    (b) => !occupiedBedNumbers.has(b)
+  );
 
-        return (
-          String(
-            p?.name || ''
-          )
-            .toLowerCase()
-            .includes(
-              normalizedSearch
-            ) ||
+  const activePatientRecord = selectedPatientId
+    ? patients.find(
+        (p) => p.id === selectedPatientId
+      ) || null
+    : null;
 
-          String(
-            p?.mrn || ''
-          )
-            .toLowerCase()
-            .includes(
-              normalizedSearch
-            ) ||
+  const filteredPatients = patients.filter((p) => {
+    const q =
+      patientSearch
+        .trim()
+        .toLowerCase();
 
-          String(
-            p?.primaryDiagnosis ||
-              ''
-          )
-            .toLowerCase()
-            .includes(
-              normalizedSearch
-            ) ||
+    if (!q) return true;
 
-          String(
-            p?.bedNumber ??
-              ''
-          )
-            .toLowerCase()
-            .includes(
-              normalizedSearch
-            )
-        );
-      }
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.mrn.toLowerCase().includes(q) ||
+      p.primaryDiagnosis
+        .toLowerCase()
+        .includes(q) ||
+      String(p.bedNumber)
+        .toLowerCase()
+        .includes(q)
     );
-
-  // =========================================================
-  // UI Helpers
-  // =========================================================
-
-  const tr = (
-    path: string,
-    fallback: string
-  ) => {
-    try {
-      const translated =
-        t(
-          path,
-          language
-        );
-
-      return translated ===
-        path
-        ? fallback
-        : translated;
-    } catch {
-      return fallback;
-    }
-  };
-
-  const surface =
-    isDarkTheme
-      ? 'bg-slate-900/70 border-slate-800'
-      : 'bg-white border-slate-200';
-
-  const surfaceSolid =
-    isDarkTheme
-      ? 'bg-slate-900 border-slate-800'
-      : 'bg-white border-slate-200';
-
-  const secondarySurface =
-    isDarkTheme
-      ? 'bg-slate-800/70'
-      : 'bg-slate-100';
-
-  const primaryText =
-    isDarkTheme
-      ? 'text-white'
-      : 'text-slate-900';
-
-  const secondaryText =
-    isDarkTheme
-      ? 'text-slate-400'
-      : 'text-slate-600';
-
-  const mutedText =
-    'text-slate-500';
-
-  const textAlign =
-    language === 'ar'
-      ? 'text-right'
-      : 'text-left';
-
-  const direction =
-    language === 'ar'
-      ? 'rtl'
-      : 'ltr';
-
-  // Prevent unused state warnings while still
-  // keeping theme synchronized for future settings.
-  void theme;
+  });
 
   // =========================================================
   // Small UI Components
@@ -1890,64 +942,41 @@ export default function App() {
     onClick
   }: {
     title: string;
-    value:
-      | number
-      | string;
+    value: number | string;
     icon: React.ElementType;
     subtitle: string;
     onClick?: () => void;
   }) => (
     <button
-      type="button"
       onClick={onClick}
-      className={`
-        w-full ${textAlign}
+      className="
+        w-full text-left
         rounded-2xl
-        border
-        ${surfaceSolid}
+        border border-slate-800
+        bg-slate-900/80
         p-4
+        hover:bg-slate-800/80
         transition
-        ${
-          isDarkTheme
-            ? 'hover:bg-slate-800/80'
-            : 'hover:bg-slate-50'
-        }
-      `}
+      "
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-
-          <p
-            className={`text-xs ${secondaryText}`}
-          >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-slate-400">
             {title}
           </p>
 
-          <p
-            className={`text-2xl font-bold mt-1 ${primaryText}`}
-          >
+          <p className="text-2xl font-bold text-white mt-1">
             {value}
           </p>
 
-          <p
-            className={`text-[11px] mt-1 ${mutedText}`}
-          >
+          <p className="text-[11px] text-slate-500 mt-1">
             {subtitle}
           </p>
-
         </div>
 
-        <div
-          className={`
-            w-10 h-10 rounded-xl
-            flex items-center justify-center
-            shrink-0
-            ${secondarySurface}
-          `}
-        >
+        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
           <Icon className="w-5 h-5 text-cyan-400" />
         </div>
-
       </div>
     </button>
   );
@@ -1959,170 +988,83 @@ export default function App() {
     patient: PatientRecord;
     archived?: boolean;
     key?: React.Key;
-  }) => {
-    const patientName =
-      String(
-        patient?.name || ''
-      ).trim();
+  }) => (
+    <button
+      onClick={() =>
+        setSelectedPatientId(patient.id)
+      }
+      className="
+        w-full
+        text-left
+        p-4
+        rounded-2xl
+        border border-slate-800
+        bg-slate-900/80
+        hover:bg-slate-800
+        transition
+      "
+    >
+      <div className="flex items-center gap-3">
+        <div className="
+          w-11 h-11
+          rounded-xl
+          bg-slate-800
+          flex items-center justify-center
+          shrink-0
+        ">
+          <HeartPulse className="w-5 h-5 text-cyan-400" />
+        </div>
 
-    const diagnosis =
-      String(
-        patient?.primaryDiagnosis ||
-          ''
-      ).trim();
-
-    const status =
-      String(
-        patient?.status ||
-          'unknown'
-      );
-
-    return (
-      <button
-        type="button"
-        onClick={() =>
-          patient?.id &&
-          setSelectedPatientId(
-            patient.id
-          )
-        }
-        className={`
-          w-full ${textAlign}
-          p-4 rounded-2xl
-          border
-          ${surfaceSolid}
-          transition
-          ${
-            isDarkTheme
-              ? 'hover:bg-slate-800'
-              : 'hover:bg-slate-50'
-          }
-        `}
-      >
-        <div className="flex items-center gap-3">
-
-          <div
-            className={`
-              w-11 h-11
-              rounded-xl
-              flex items-center justify-center
-              shrink-0
-              ${secondarySurface}
-            `}
-          >
-            <HeartPulse className="w-5 h-5 text-cyan-400" />
-          </div>
-
-          <div className="min-w-0 flex-1">
-
-            <div className="flex items-center gap-2 min-w-0">
-
-              <p
-                className={`font-semibold truncate ${primaryText}`}
-              >
-                {patientName ||
-                  tr(
-                    'patients.unnamed',
-                    'Unnamed Patient'
-                  )}
-              </p>
-
-              {!archived && (
-                <span
-                  className={`
-                    text-[9px]
-                    px-2 py-0.5
-                    rounded-full
-                    shrink-0
-                    ${
-                      status ===
-                        'critical' ||
-                      status ===
-                        'deteriorating'
-                        ? isDarkTheme
-                          ? 'bg-rose-950 text-rose-300'
-                          : 'bg-rose-100 text-rose-700'
-                        : status ===
-                            'stable'
-                          ? isDarkTheme
-                            ? 'bg-emerald-950 text-emerald-300'
-                            : 'bg-emerald-100 text-emerald-700'
-                          : isDarkTheme
-                            ? 'bg-amber-950 text-amber-300'
-                            : 'bg-amber-100 text-amber-700'
-                    }
-                  `}
-                >
-                  {status}
-                </span>
-              )}
-
-            </div>
-
-            <p
-              className={`text-xs mt-1 truncate ${secondaryText}`}
-            >
-              {diagnosis ||
-                tr(
-                  'patients.noDiagnosis',
-                  'No diagnosis recorded'
-                )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-white truncate">
+              {patient.name || 'Unnamed Patient'}
             </p>
 
-            <div
-              className={`
-                flex flex-wrap
-                gap-x-3 gap-y-1
-                mt-2 text-[10px]
-                ${mutedText}
-              `}
-            >
-              <span>
-                ID:{' '}
-                {patient?.mrn ||
-                  '—'}
+            {!archived && (
+              <span className={`
+                text-[9px]
+                px-2 py-0.5
+                rounded-full
+                ${
+                  patient.status === 'critical' ||
+                  patient.status === 'deteriorating'
+                    ? 'bg-rose-950 text-rose-300'
+                    : patient.status === 'stable'
+                      ? 'bg-emerald-950 text-emerald-300'
+                      : 'bg-amber-950 text-amber-300'
+                }
+              `}>
+                {patient.status}
               </span>
-
-              <span>
-                {patient?.age ||
-                  '—'}{' '}
-                {tr(
-                  'common.years',
-                  'yrs'
-                )}
-              </span>
-
-              {patient?.bedNumber !==
-                '' && (
-                <span>
-                  {tr(
-                    'common.bed',
-                    'Bed'
-                  )}{' '}
-                  {patient?.bedNumber ??
-                    '—'}
-                </span>
-              )}
-            </div>
-
+            )}
           </div>
 
-          <ChevronRight
-            className={`
-              w-4 h-4 shrink-0
-              ${mutedText}
-              ${
-                language === 'ar'
-                  ? 'rotate-180'
-                  : ''
-              }
-            `}
-          />
+          <p className="text-xs text-slate-400 mt-1 truncate">
+            {patient.primaryDiagnosis || 'No diagnosis recorded'}
+          </p>
 
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500">
+            <span>
+              ID: {patient.mrn || '—'}
+            </span>
+
+            <span>
+              {patient.age || '—'} yrs
+            </span>
+
+            {patient.bedNumber !== '' && (
+              <span>
+                Bed {patient.bedNumber}
+              </span>
+            )}
+          </div>
         </div>
-      </button>
-    );
-  };
+
+        <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+      </div>
+    </button>
+  );
 
   // =========================================================
   // Home Page
@@ -2132,39 +1074,24 @@ export default function App() {
     <div className="space-y-6">
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-
-        <div className={textAlign}>
-
+        <div>
           <p className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">
-            {tr(
-              'dashboard.title',
-              'Clinical Dashboard'
-            )}
+            Clinical Dashboard
           </p>
 
-          <h2
-            className={`text-2xl font-bold mt-1 ${primaryText}`}
-          >
+          <h2 className="text-2xl font-bold text-white mt-1">
             CardioVault
           </h2>
 
-          <p
-            className={`text-sm mt-1 ${secondaryText}`}
-          >
-            {tr(
-              'dashboard.subtitle',
-              'ICU & CCU patient management'
-            )}
+          <p className="text-sm text-slate-400 mt-1">
+            ICU & CCU patient management
           </p>
-
         </div>
 
         <button
-          type="button"
           onClick={() =>
             setAdmitBedNumber(
-              availableBeds[0] ||
-                1
+              availableBeds[0] || 1
             )
           }
           className="
@@ -2179,261 +1106,129 @@ export default function App() {
           "
         >
           <Plus className="w-4 h-4" />
-
-          {tr(
-            'patients.admit',
-            'Admit Patient'
-          )}
+          Admit Patient
         </button>
-
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
         <StatCard
-          title={tr(
-            'dashboard.totalBeds',
-            'Total Beds'
-          )}
-          value={
-            totalBeds
-          }
-          subtitle={`${occupiedCount} ${tr(
-            'dashboard.occupied',
-            'occupied'
-          )}`}
+          title="Total Beds"
+          value={totalBeds}
+          subtitle={`${occupiedCount} occupied`}
           icon={BedDouble}
           onClick={() =>
-            setActiveTab(
-              'beds'
-            )
+            setActiveTab('beds')
           }
         />
 
         <StatCard
-          title={tr(
-            'dashboard.available',
-            'Available'
-          )}
-          value={
-            availableCount
-          }
-          subtitle={tr(
-            'dashboard.bedsAvailable',
-            'Beds available'
-          )}
+          title="Available"
+          value={availableCount}
+          subtitle="Beds available"
           icon={CheckCircle2}
           onClick={() =>
-            setActiveTab(
-              'beds'
-            )
+            setActiveTab('beds')
           }
         />
 
         <StatCard
-          title={tr(
-            'dashboard.critical',
-            'Critical'
-          )}
-          value={
-            criticalCount
-          }
-          subtitle={tr(
-            'dashboard.criticalSubtitle',
-            'Critical / deteriorating'
-          )}
+          title="Critical"
+          value={criticalCount}
+          subtitle="Critical / deteriorating"
           icon={AlertTriangle}
           onClick={() =>
-            setActiveTab(
-              'patients'
-            )
+            setActiveTab('patients')
           }
         />
 
         <StatCard
-          title={tr(
-            'dashboard.archive',
-            'Archive'
-          )}
-          value={
-            archivedPatients.length
-          }
-          subtitle={tr(
-            'dashboard.dischargedCases',
-            'Discharged cases'
-          )}
+          title="Archive"
+          value={archivedPatients.length}
+          subtitle="Discharged cases"
           icon={Archive}
           onClick={() =>
-            setActiveTab(
-              'archive'
-            )
+            setActiveTab('archive')
           }
         />
-
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
 
-        <div
-          className={`
-            lg:col-span-2
-            rounded-2xl border
-            ${surface}
-            p-4
-          `}
-        >
+        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
 
-          <div className="flex items-center justify-between gap-3 mb-4">
-
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'dashboard.currentPatients',
-                  'Current Patients'
-                )}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-white">
+                Current Patients
               </h3>
 
-              <p
-                className={`text-xs mt-1 ${mutedText}`}
-              >
-                {tr(
-                  'dashboard.activeCases',
-                  'Active ICU / CCU cases'
-                )}
+              <p className="text-xs text-slate-500 mt-1">
+                Active ICU / CCU cases
               </p>
-
             </div>
 
             <button
-              type="button"
               onClick={() =>
-                setActiveTab(
-                  'patients'
-                )
+                setActiveTab('patients')
               }
-              className="text-xs text-cyan-400 hover:text-cyan-300 whitespace-nowrap"
+              className="text-xs text-cyan-400 hover:text-cyan-300"
             >
-              {tr(
-                'common.viewAll',
-                'View all'
-              )}
+              View all
             </button>
-
           </div>
 
-          {activePatients.length ===
-          0 ? (
+          {activePatients.length === 0 ? (
             <div className="py-12 text-center">
+              <Users className="w-10 h-10 text-slate-700 mx-auto" />
 
-              <Users
-                className={`
-                  w-10 h-10 mx-auto
-                  ${
-                    isDarkTheme
-                      ? 'text-slate-700'
-                      : 'text-slate-300'
-                  }
-                `}
-              />
-
-              <p
-                className={`text-sm mt-3 ${secondaryText}`}
-              >
-                {tr(
-                  'dashboard.noActivePatients',
-                  'No active patients'
-                )}
+              <p className="text-sm text-slate-400 mt-3">
+                No active patients
               </p>
 
               <button
-                type="button"
                 onClick={() =>
                   setAdmitBedNumber(
-                    availableBeds[0] ||
-                      1
+                    availableBeds[0] || 1
                   )
                 }
                 className="text-xs text-cyan-400 mt-2"
               >
-                {tr(
-                  'dashboard.addFirstPatient',
-                  'Add first patient'
-                )}
+                Add first patient
               </button>
-
             </div>
           ) : (
             <div className="space-y-2">
               {activePatients
                 .slice(0, 5)
-                .map(
-                  (
-                    patient
-                  ) => (
-                    <PatientRow
-                      key={
-                        patient.id
-                      }
-                      patient={
-                        patient
-                      }
-                    />
-                  )
-                )}
+                .map((patient) => (
+                  <PatientRow
+                    key={patient.id}
+                    patient={patient}
+                  />
+                ))}
             </div>
           )}
-
         </div>
 
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-4
-          `}
-        >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
 
-          <h3
-            className={`font-semibold ${primaryText}`}
-          >
-            {tr(
-              'dashboard.bedOverview',
-              'Bed Overview'
-            )}
+          <h3 className="font-semibold text-white">
+            Bed Overview
           </h3>
 
           <div className="mt-4 space-y-3">
 
             <div className="flex items-center justify-between">
-
-              <span
-                className={`text-xs ${secondaryText}`}
-              >
-                {tr(
-                  'dashboard.occupied',
-                  'Occupied'
-                )}
+              <span className="text-xs text-slate-400">
+                Occupied
               </span>
 
               <span className="text-sm font-semibold text-cyan-300">
                 {occupiedCount}
               </span>
-
             </div>
 
-            <div
-              className={`
-                h-2 rounded-full overflow-hidden
-                ${
-                  isDarkTheme
-                    ? 'bg-slate-800'
-                    : 'bg-slate-200'
-                }
-              `}
-            >
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-cyan-500 rounded-full"
                 style={{
@@ -2441,10 +1236,8 @@ export default function App() {
                     totalBeds
                       ? Math.min(
                           100,
-                          (
-                            occupiedCount /
-                            totalBeds
-                          ) *
+                          (occupiedCount /
+                            totalBeds) *
                             100
                         )
                       : 0
@@ -2455,19 +1248,9 @@ export default function App() {
 
             <div className="grid grid-cols-2 gap-2 pt-2">
 
-              <div
-                className={`
-                  rounded-xl p-3
-                  ${secondarySurface}
-                `}
-              >
-                <p
-                  className={`text-[10px] ${mutedText}`}
-                >
-                  {tr(
-                    'dashboard.stable',
-                    'Stable'
-                  )}
+              <div className="rounded-xl bg-slate-800/70 p-3">
+                <p className="text-[10px] text-slate-500">
+                  Stable
                 </p>
 
                 <p className="text-lg font-bold text-emerald-400">
@@ -2475,19 +1258,9 @@ export default function App() {
                 </p>
               </div>
 
-              <div
-                className={`
-                  rounded-xl p-3
-                  ${secondarySurface}
-                `}
-              >
-                <p
-                  className={`text-[10px] ${mutedText}`}
-                >
-                  {tr(
-                    'dashboard.guarded',
-                    'Guarded'
-                  )}
+              <div className="rounded-xl bg-slate-800/70 p-3">
+                <p className="text-[10px] text-slate-500">
+                  Guarded
                 </p>
 
                 <p className="text-lg font-bold text-amber-400">
@@ -2499,176 +1272,87 @@ export default function App() {
           </div>
 
           <button
-            type="button"
             onClick={() =>
-              setActiveTab(
-                'beds'
-              )
+              setActiveTab('beds')
             }
-            className={`
-              w-full mt-4 py-2.5
-              rounded-xl border
+            className="
+              w-full
+              mt-4
+              py-2.5
+              rounded-xl
+              border border-slate-700
               text-xs
-              ${
-                isDarkTheme
-                  ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }
-            `}
+              text-slate-300
+              hover:bg-slate-800
+            "
           >
-            {tr(
-              'dashboard.openBedBoard',
-              'Open Bed Board'
-            )}
+            Open Bed Board
           </button>
-
         </div>
       </div>
 
-      <div
-        className={`
-          rounded-2xl border
-          ${surface}
-          p-4
-        `}
-      >
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
 
         <div className="flex items-center gap-2 mb-4">
-
           <Activity className="w-4 h-4 text-cyan-400" />
 
-          <h3
-            className={`font-semibold ${primaryText}`}
-          >
-            {tr(
-              'dashboard.quickTools',
-              'Quick Clinical Tools'
-            )}
+          <h3 className="font-semibold text-white">
+            Quick Clinical Tools
           </h3>
-
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
 
           <button
-            type="button"
             onClick={() =>
-              setShowCalculators(
-                true
-              )
+              setShowCalculators(true)
             }
-            className={`
-              p-3 rounded-xl
-              ${textAlign}
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
           >
             <Activity className="w-4 h-4 text-amber-400" />
-
-            <p
-              className={`text-xs font-semibold mt-2 ${primaryText}`}
-            >
-              {tr(
-                'dashboard.calculators',
-                'Calculators'
-              )}
+            <p className="text-xs font-semibold text-white mt-2">
+              Calculators
             </p>
           </button>
 
           <button
-            type="button"
             onClick={() =>
-              setShowCustomizer(
-                true
-              )
+              setShowCustomizer(true)
             }
-            className={`
-              p-3 rounded-xl
-              ${textAlign}
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
           >
             <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
-
-            <p
-              className={`text-xs font-semibold mt-2 ${primaryText}`}
-            >
-              {tr(
-                'dashboard.customize',
-                'Customize'
-              )}
+            <p className="text-xs font-semibold text-white mt-2">
+              Customize
             </p>
           </button>
 
           <button
-            type="button"
             onClick={() =>
-              setShowCloudAccountModal(
-                true
-              )
+              setShowCloudAccountModal(true)
             }
-            className={`
-              p-3 rounded-xl
-              ${textAlign}
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
           >
             <Cloud className="w-4 h-4 text-emerald-400" />
-
-            <p
-              className={`text-xs font-semibold mt-2 ${primaryText}`}
-            >
-              {tr(
-                'dashboard.cloudSync',
-                'Cloud Sync'
-              )}
+            <p className="text-xs font-semibold text-white mt-2">
+              Cloud Sync
             </p>
           </button>
 
           <button
-            type="button"
             onClick={() =>
-              setShowSecurityModal(
-                true
-              )
+              setShowSecurityModal(true)
             }
-            className={`
-              p-3 rounded-xl
-              ${textAlign}
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
           >
             <ShieldCheck className="w-4 h-4 text-violet-400" />
-
-            <p
-              className={`text-xs font-semibold mt-2 ${primaryText}`}
-            >
-              {tr(
-                'dashboard.security',
-                'Security'
-              )}
+            <p className="text-xs font-semibold text-white mt-2">
+              Security
             </p>
           </button>
 
         </div>
       </div>
-
     </div>
   );
 
@@ -2676,204 +1360,80 @@ export default function App() {
   // Patients Page
   // =========================================================
 
-  const PatientsPage = () => {
-    const visiblePatients =
-      filteredPatients.filter(
-        (p) =>
-          !p.isDischarged
-      );
+  const PatientsPage = () => (
+    <div className="space-y-5">
 
-    return (
-      <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Patients
+        </h2>
 
-        <div className={textAlign}>
-
-          <h2
-            className={`text-2xl font-bold ${primaryText}`}
-          >
-            {tr(
-              'patients.title',
-              'Patients'
-            )}
-          </h2>
-
-          <p
-            className={`text-sm mt-1 ${secondaryText}`}
-          >
-            {tr(
-              'patients.subtitle',
-              'Active ICU / CCU patient records'
-            )}
-          </p>
-
-        </div>
-
-        <div className="relative">
-
-          <Search
-            className={`
-              absolute
-              ${
-                language === 'ar'
-                  ? 'right-3'
-                  : 'left-3'
-              }
-              top-1/2
-              -translate-y-1/2
-              w-4 h-4
-              ${mutedText}
-            `}
-          />
-
-          <input
-            value={
-              patientSearch
-            }
-            onChange={(e) =>
-              setPatientSearch(
-                e.target.value
-              )
-            }
-            placeholder={tr(
-              'patients.search',
-              'Search by name, ID, diagnosis or bed...'
-            )}
-            dir={direction}
-            className={`
-              w-full
-              border
-              rounded-xl
-              ${
-                isDarkTheme
-                  ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-500'
-                  : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
-              }
-              ${
-                language === 'ar'
-                  ? 'pr-10 pl-4'
-                  : 'pl-10 pr-4'
-              }
-              py-3
-              text-sm
-              outline-none
-              focus:border-cyan-600
-            `}
-          />
-
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1">
-
-          <span
-            className={`
-              px-3 py-1.5 rounded-full
-              ${
-                isDarkTheme
-                  ? 'bg-cyan-950 text-cyan-300'
-                  : 'bg-cyan-100 text-cyan-700'
-              }
-              text-xs whitespace-nowrap
-            `}
-          >
-            {tr(
-              'patients.active',
-              'Active'
-            )}
-            : {activePatients.length}
-          </span>
-
-          <span
-            className={`
-              px-3 py-1.5 rounded-full
-              ${
-                isDarkTheme
-                  ? 'bg-rose-950 text-rose-300'
-                  : 'bg-rose-100 text-rose-700'
-              }
-              text-xs whitespace-nowrap
-            `}
-          >
-            {tr(
-              'patients.critical',
-              'Critical'
-            )}
-            : {criticalCount}
-          </span>
-
-          <span
-            className={`
-              px-3 py-1.5 rounded-full
-              ${
-                isDarkTheme
-                  ? 'bg-emerald-950 text-emerald-300'
-                  : 'bg-emerald-100 text-emerald-700'
-              }
-              text-xs whitespace-nowrap
-            `}
-          >
-            {tr(
-              'patients.stable',
-              'Stable'
-            )}
-            : {stableCount}
-          </span>
-
-        </div>
-
-        {visiblePatients.length ===
-        0 ? (
-
-          <div
-            className={`
-              rounded-2xl border
-              ${surface}
-              py-16 text-center
-            `}
-          >
-            <Users
-              className={`
-                w-12 h-12 mx-auto
-                ${
-                  isDarkTheme
-                    ? 'text-slate-700'
-                    : 'text-slate-300'
-                }
-              `}
-            />
-
-            <p
-              className={`text-sm mt-3 ${secondaryText}`}
-            >
-              {tr(
-                'patients.noMatching',
-                'No matching active patients'
-              )}
-            </p>
-          </div>
-
-        ) : (
-
-          <div className="grid md:grid-cols-2 gap-3">
-
-            {visiblePatients.map(
-              (patient) => (
-                <PatientRow
-                  key={
-                    patient.id
-                  }
-                  patient={
-                    patient
-                  }
-                />
-              )
-            )}
-
-          </div>
-        )}
-
+        <p className="text-sm text-slate-400 mt-1">
+          Active ICU / CCU patient records
+        </p>
       </div>
-    );
-  };
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+
+        <input
+          value={patientSearch}
+          onChange={(e) =>
+            setPatientSearch(e.target.value)
+          }
+          placeholder="Search by name, ID, diagnosis or bed..."
+          className="
+            w-full
+            bg-slate-900
+            border border-slate-800
+            rounded-xl
+            pl-10 pr-4 py-3
+            text-sm
+            text-white
+            outline-none
+            focus:border-cyan-600
+          "
+        />
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <span className="px-3 py-1.5 rounded-full bg-cyan-950 text-cyan-300 text-xs whitespace-nowrap">
+          Active: {activePatients.length}
+        </span>
+
+        <span className="px-3 py-1.5 rounded-full bg-rose-950 text-rose-300 text-xs whitespace-nowrap">
+          Critical: {criticalCount}
+        </span>
+
+        <span className="px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 text-xs whitespace-nowrap">
+          Stable: {stableCount}
+        </span>
+      </div>
+
+      {filteredPatients.filter(
+        (p) => !p.isDischarged
+      ).length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
+          <Users className="w-12 h-12 text-slate-700 mx-auto" />
+
+          <p className="text-sm text-slate-400 mt-3">
+            No matching active patients
+          </p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-3">
+          {filteredPatients
+            .filter((p) => !p.isDischarged)
+            .map((patient) => (
+              <PatientRow
+                key={patient.id}
+                patient={patient}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
 
   // =========================================================
   // Beds Page
@@ -2881,44 +1441,15 @@ export default function App() {
 
   const BedsPage = () => (
     <CensusView
-      patients={
-        safePatients
-      }
-      totalBeds={
-        totalBeds
-      }
-      specialtyMode={
-        specialtyMode
-      }
-      onSelectPatient={(pt) =>
-        pt?.id &&
-        setSelectedPatientId(
-          pt.id
-        )
-      }
-      onAdmitToBed={(bedNum) =>
-        setAdmitBedNumber(
-          Number(bedNum) || 1
-        )
-      }
-      onDischargePatient={(pt) =>
-        pt &&
-        setPatientToDischarge(
-          pt
-        )
-      }
-      onReadmitPatient={(pt) =>
-        pt &&
-        setPatientToReadmit(
-          pt
-        )
-      }
-      onChangeTotalBeds={
-        handleChangeTotalBeds
-      }
-      onUpdatePatientBed={
-        handleUpdatePatientBed
-      }
+      patients={patients}
+      totalBeds={totalBeds}
+      specialtyMode={specialtyMode}
+      onSelectPatient={(pt) => setSelectedPatientId(pt.id)}
+      onAdmitToBed={(bedNum) => setAdmitBedNumber(Number(bedNum) || 1)}
+      onDischargePatient={(pt) => setPatientToDischarge(pt)}
+      onReadmitPatient={(pt) => setPatientToReadmit(pt)}
+      onChangeTotalBeds={handleChangeTotalBeds}
+      onUpdatePatientBed={handleUpdatePatientBed}
     />
   );
 
@@ -2926,149 +1457,67 @@ export default function App() {
   // Archive Page
   // =========================================================
 
-  const ArchivePage = () => {
-    const visiblePatients =
-      filteredPatients.filter(
-        (p) =>
-          p.isDischarged
-      );
+  const ArchivePage = () => (
+    <div className="space-y-5">
 
-    return (
-      <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Archive
+        </h2>
 
-        <div className={textAlign}>
-
-          <h2
-            className={`text-2xl font-bold ${primaryText}`}
-          >
-            {tr(
-              'archive.title',
-              'Archive'
-            )}
-          </h2>
-
-          <p
-            className={`text-sm mt-1 ${secondaryText}`}
-          >
-            {tr(
-              'archive.subtitle',
-              'Discharged patients and completed cases'
-            )}
-          </p>
-
-        </div>
-
-        <div className="relative">
-
-          <Search
-            className={`
-              absolute
-              ${
-                language === 'ar'
-                  ? 'right-3'
-                  : 'left-3'
-              }
-              top-1/2
-              -translate-y-1/2
-              w-4 h-4
-              ${mutedText}
-            `}
-          />
-
-          <input
-            value={
-              patientSearch
-            }
-            onChange={(e) =>
-              setPatientSearch(
-                e.target.value
-              )
-            }
-            placeholder={tr(
-              'archive.search',
-              'Search archived patients...'
-            )}
-            dir={direction}
-            className={`
-              w-full
-              border
-              rounded-xl
-              ${
-                isDarkTheme
-                  ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-500'
-                  : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
-              }
-              ${
-                language === 'ar'
-                  ? 'pr-10 pl-4'
-                  : 'pl-10 pr-4'
-              }
-              py-3
-              text-sm
-              outline-none
-              focus:border-cyan-600
-            `}
-          />
-
-        </div>
-
-        {visiblePatients.length ===
-        0 ? (
-
-          <div
-            className={`
-              rounded-2xl border
-              ${surface}
-              py-16 text-center
-            `}
-          >
-
-            <Archive
-              className={`
-                w-12 h-12 mx-auto
-                ${
-                  isDarkTheme
-                    ? 'text-slate-700'
-                    : 'text-slate-300'
-                }
-              `}
-            />
-
-            <p
-              className={`text-sm mt-3 ${secondaryText}`}
-            >
-              {tr(
-                'archive.empty',
-                'Archive is empty'
-              )}
-            </p>
-
-          </div>
-
-        ) : (
-
-          <div className="grid md:grid-cols-2 gap-3">
-
-            {visiblePatients.map(
-              (patient) => (
-                <PatientRow
-                  key={
-                    patient.id
-                  }
-                  patient={
-                    patient
-                  }
-                  archived
-                />
-              )
-            )}
-
-          </div>
-        )}
-
+        <p className="text-sm text-slate-400 mt-1">
+          Discharged patients and completed cases
+        </p>
       </div>
-    );
-  };
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+
+        <input
+          value={patientSearch}
+          onChange={(e) =>
+            setPatientSearch(e.target.value)
+          }
+          placeholder="Search archived patients..."
+          className="
+            w-full
+            bg-slate-900
+            border border-slate-800
+            rounded-xl
+            pl-10 pr-4 py-3
+            text-sm
+            text-white
+            outline-none
+            focus:border-cyan-600
+          "
+        />
+      </div>
+
+      {filteredPatients.filter(
+        (p) => p.isDischarged
+      ).length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
+          <Archive className="w-12 h-12 text-slate-700 mx-auto" />
+
+          <p className="text-sm text-slate-400 mt-3">
+            Archive is empty
+          </p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-3">
+          {filteredPatients
+            .filter((p) => p.isDischarged)
+            .map((patient) => (
+              <PatientRow
+                key={patient.id}
+                patient={patient}
+                archived
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
 
   // =========================================================
   // Settings Page
@@ -3077,75 +1526,36 @@ export default function App() {
   const SettingsPage = () => (
     <div className="space-y-5">
 
-      <div className={textAlign}>
-
-        <h2
-          className={`text-2xl font-bold ${primaryText}`}
-        >
-          {tr(
-            'settings.title',
-            'Settings'
-          )}
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          Settings
         </h2>
 
-        <p
-          className={`text-sm mt-1 ${secondaryText}`}
-        >
-          {tr(
-            'settings.subtitle',
-            'CardioVault configuration'
-          )}
+        <p className="text-sm text-slate-400 mt-1">
+          CardioVault configuration
         </p>
-
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
 
-        {/* Bed Configuration */}
-
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-5
-          `}
-        >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
 
           <div className="flex items-center gap-3 mb-4">
-
             <BedDouble className="w-5 h-5 text-cyan-400" />
 
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'settings.bedConfiguration',
-                  'Bed Configuration'
-                )}
+            <div>
+              <h3 className="font-semibold text-white">
+                Bed Configuration
               </h3>
 
-              <p
-                className={`text-[11px] ${mutedText}`}
-              >
-                {tr(
-                  'settings.bedDescription',
-                  'Set the total number of ICU/CCU beds'
-                )}
+              <p className="text-[11px] text-slate-500">
+                Set the total number of ICU/CCU beds
               </p>
-
             </div>
-
           </div>
 
-          <label
-            className={`text-xs ${secondaryText}`}
-          >
-            {tr(
-              'settings.totalBeds',
-              'Total Beds'
-            )}
+          <label className="text-xs text-slate-400">
+            Total Beds
           </label>
 
           <div className="flex gap-2 mt-2">
@@ -3153,544 +1563,221 @@ export default function App() {
             <input
               type="number"
               min={3}
-              value={
-                totalBeds
-              }
+              value={totalBeds}
               onChange={(e) =>
                 handleChangeTotalBeds(
-                  Number(
-                    e.target.value
-                  )
+                  Number(e.target.value)
                 )
               }
-              className={`
+              className="
                 flex-1
-                border
+                bg-slate-950
+                border border-slate-700
                 rounded-xl
                 px-3 py-3
+                text-white
                 outline-none
                 focus:border-cyan-600
-                ${
-                  isDarkTheme
-                    ? 'bg-slate-950 border-slate-700 text-white'
-                    : 'bg-white border-slate-200 text-slate-900'
-                }
-              `}
+              "
             />
 
-            <div
-              className={`
-                px-4 rounded-xl
-                flex items-center
-                text-xs
-                ${secondaryText}
-                ${secondarySurface}
-              `}
-            >
-              {tr(
-                'settings.beds',
-                'beds'
-              )}
+            <div className="px-4 rounded-xl bg-slate-800 flex items-center text-xs text-slate-400">
+              beds
             </div>
 
           </div>
 
-          <p
-            className={`text-[10px] mt-2 ${mutedText}`}
-          >
-            {tr(
-              'settings.minimumBeds',
-              'Minimum 3 beds.'
-            )}
+          <p className="text-[10px] text-slate-600 mt-2">
+            Minimum 3 beds.
           </p>
-
         </div>
 
-        {/* Security */}
-
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-5
-          `}
-        >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
 
           <div className="flex items-center gap-3 mb-4">
-
             <ShieldCheck className="w-5 h-5 text-violet-400" />
 
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'settings.security',
-                  'Security'
-                )}
+            <div>
+              <h3 className="font-semibold text-white">
+                Security
               </h3>
 
-              <p
-                className={`text-[11px] ${mutedText}`}
-              >
-                {tr(
-                  'settings.securityDescription',
-                  'PIN and automatic lock'
-                )}
+              <p className="text-[11px] text-slate-500">
+                PIN and automatic lock
               </p>
-
             </div>
-
           </div>
 
           <button
-            type="button"
             onClick={() =>
-              setShowSecurityModal(
-                true
-              )
+              setShowSecurityModal(true)
             }
-            className={`
+            className="
               w-full
               flex items-center justify-between
-              p-3 rounded-xl
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+            "
           >
-            <span
-              className={`text-sm ${primaryText}`}
-            >
-              {tr(
-                'settings.securitySettings',
-                'Security Settings'
-              )}
+            <span className="text-sm text-slate-200">
+              Security Settings
             </span>
 
-            <ChevronRight
-              className={`
-                w-4 h-4 ${mutedText}
-                ${
-                  language === 'ar'
-                    ? 'rotate-180'
-                    : ''
-                }
-              `}
-            />
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           </button>
-
         </div>
 
-        {/* Patient Fields */}
-
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-5
-          `}
-        >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
 
           <div className="flex items-center gap-3 mb-4">
-
             <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
 
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'settings.patientFields',
-                  'Patient Fields'
-                )}
+            <div>
+              <h3 className="font-semibold text-white">
+                Patient Fields
               </h3>
 
-              <p
-                className={`text-[11px] ${mutedText}`}
-              >
-                {tr(
-                  'settings.patientFieldsDescription',
-                  'Customize visible clinical sections'
-                )}
+              <p className="text-[11px] text-slate-500">
+                Customize visible clinical sections
               </p>
-
             </div>
-
           </div>
 
           <button
-            type="button"
             onClick={() =>
-              setShowCustomizer(
-                true
-              )
+              setShowCustomizer(true)
             }
-            className={`
+            className="
               w-full
               flex items-center justify-between
-              p-3 rounded-xl
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700'
-                  : 'bg-slate-100 hover:bg-slate-200'
-              }
-            `}
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
+            "
           >
-            <span
-              className={`text-sm ${primaryText}`}
-            >
-              {tr(
-                'settings.customizeFields',
-                'Customize Fields'
-              )}
+            <span className="text-sm text-slate-200">
+              Customize Fields
             </span>
 
-            <ChevronRight
-              className={`
-                w-4 h-4 ${mutedText}
-                ${
-                  language === 'ar'
-                    ? 'rotate-180'
-                    : ''
-                }
-              `}
-            />
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           </button>
-
         </div>
 
-        {/* Language */}
-
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-5
-          `}
-        >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
 
           <div className="flex items-center gap-3 mb-4">
-
-            <Languages className="w-5 h-5 text-cyan-400" />
-
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'settings.language',
-                  language === 'ar'
-                    ? 'اللغة'
-                    : 'Language'
-                )}
-              </h3>
-
-              <p
-                className={`text-[11px] ${mutedText}`}
-              >
-                {tr(
-                  'settings.languageDescription',
-                  language === 'ar'
-                    ? 'اختر لغة واجهة التطبيق'
-                    : 'Choose the application language'
-                )}
-              </p>
-
-            </div>
-
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-
-            <button
-              type="button"
-              onClick={() =>
-                setLanguageState(
-                  'en'
-                )
-              }
-              className={`
-                p-3 rounded-xl
-                border
-                text-sm
-                font-semibold
-                transition
-                ${
-                  language ===
-                  'en'
-                    ? isDarkTheme
-                      ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
-                      : 'border-cyan-600 bg-cyan-50 text-cyan-700'
-                    : isDarkTheme
-                      ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }
-              `}
-            >
-              English
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setLanguageState(
-                  'ar'
-                )
-              }
-              className={`
-                p-3 rounded-xl
-                border
-                text-sm
-                font-semibold
-                transition
-                ${
-                  language ===
-                  'ar'
-                    ? isDarkTheme
-                      ? 'border-cyan-600 bg-cyan-950 text-cyan-300'
-                      : 'border-cyan-600 bg-cyan-50 text-cyan-700'
-                    : isDarkTheme
-                      ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }
-              `}
-            >
-              العربية
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* Cloud Sync */}
-
-        <div
-          className={`
-            rounded-2xl border
-            ${surface}
-            p-5
-          `}
-        >
-
-          <div className="flex items-center gap-3 mb-4">
-
             <Cloud className="w-5 h-5 text-emerald-400" />
 
-            <div className={textAlign}>
-
-              <h3
-                className={`font-semibold ${primaryText}`}
-              >
-                {tr(
-                  'settings.cloudSync',
-                  'Cloud Sync'
-                )}
+            <div>
+              <h3 className="font-semibold text-white">
+                Cloud Sync
               </h3>
 
-              <p
-                className={`text-[11px] ${mutedText}`}
-              >
-                {tr(
-                  'settings.cloudDescription',
-                  'Backup and multi-device sync'
-                )}
+              <p className="text-[11px] text-slate-500">
+                Backup and multi-device sync
               </p>
-
             </div>
-
           </div>
 
           <div className="flex items-center gap-2 mb-3">
 
-            {cloudSyncStatus ===
-            'syncing' ? (
+            {cloudSyncStatus === 'syncing' ? (
               <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
-            ) : cloudSyncStatus ===
-              'synced' ? (
+            ) : cloudSyncStatus === 'synced' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : cloudSyncStatus ===
-              'error' ? (
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
             ) : (
               <Clock3 className="w-4 h-4 text-slate-500" />
             )}
 
-            <span
-              className={`text-xs ${secondaryText}`}
-            >
-              {cloudSyncStatus ===
-              'syncing'
-                ? tr(
-                    'settings.syncing',
-                    'Syncing...'
-                  )
-                : cloudSyncStatus ===
-                    'synced'
-                  ? tr(
-                      'settings.synced',
-                      'Synced'
-                    )
-                  : cloudSyncStatus ===
-                      'error'
-                    ? tr(
-                        'settings.syncError',
-                        'Sync error'
-                      )
-                    : tr(
-                        'settings.offline',
-                        'Offline'
-                      )}
+            <span className="text-xs text-slate-400">
+              {cloudSyncStatus === 'syncing'
+                ? 'Syncing...'
+                : cloudSyncStatus === 'synced'
+                  ? 'Synced'
+                  : cloudSyncStatus === 'error'
+                    ? 'Sync error'
+                    : 'Offline'}
             </span>
-
           </div>
 
           <button
-            type="button"
             onClick={() =>
-              setShowCloudAccountModal(
-                true
-              )
+              setShowCloudAccountModal(true)
             }
-            className={`
-              w-full p-3 rounded-xl
+            className="
+              w-full
+              p-3
+              rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
               text-sm
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }
-            `}
+              text-slate-200
+            "
           >
-            {tr(
-              'settings.cloudAccount',
-              'Cloud Account'
-            )}
+            Cloud Account
           </button>
-
         </div>
 
       </div>
 
-      {/* Session */}
-
-      <div
-        className={`
-          rounded-2xl border
-          ${surface}
-          p-5
-        `}
-      >
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
 
         <div className="flex items-center gap-3">
-
           <LogOut className="w-5 h-5 text-rose-400" />
 
-          <div className={`flex-1 ${textAlign}`}>
-
-            <h3
-              className={`font-semibold ${primaryText}`}
-            >
-              {tr(
-                'settings.session',
-                'Session'
-              )}
+          <div className="flex-1">
+            <h3 className="font-semibold text-white">
+              Session
             </h3>
 
-            <p
-              className={`text-[11px] ${mutedText}`}
-            >
-              {currentUser?.email ||
-                tr(
-                  'settings.offlineLocal',
-                  'Offline / Local mode'
-                )}
+            <p className="text-[11px] text-slate-500">
+              {currentUser?.email || 'Offline / Local mode'}
             </p>
-
           </div>
 
           <button
-            type="button"
-            onClick={
-              handleLockApp
-            }
-            className={`
+            onClick={handleLockApp}
+            className="
               px-3 py-2
               rounded-xl
+              bg-slate-800
+              hover:bg-slate-700
               text-xs
-              ${
-                isDarkTheme
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }
-            `}
+              text-slate-300
+            "
           >
-            {tr(
-              'settings.lock',
-              'Lock'
-            )}
+            Lock
           </button>
 
           {currentUser && (
             <button
-              type="button"
-              onClick={
-                handleLogout
-              }
-              className={`
+              onClick={handleLogout}
+              className="
                 px-3 py-2
                 rounded-xl
+                bg-rose-950
+                hover:bg-rose-900
                 text-xs
-                ${
-                  isDarkTheme
-                    ? 'bg-rose-950 hover:bg-rose-900 text-rose-300'
-                    : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
-                }
-              `}
+                text-rose-300
+              "
             >
-              {tr(
-                'settings.logout',
-                'Logout'
-              )}
+              Logout
             </button>
           )}
-
         </div>
       </div>
 
-      {/* Footer */}
-
-      <div
-        className={`
-          rounded-2xl border
-          ${
-            isDarkTheme
-              ? 'border-slate-800 bg-slate-900/50'
-              : 'border-slate-200 bg-slate-50'
-          }
-          p-4
-        `}
-      >
-
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
         <div className="flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-slate-500" />
 
-          <Wrench
-            className={`w-4 h-4 ${mutedText}`}
-          />
-
-          <p
-            className={`text-xs ${mutedText}`}
-          >
+          <p className="text-xs text-slate-500">
             CardioVault • ICU & CCU Clinical Notebook
           </p>
-
         </div>
-
       </div>
 
     </div>
@@ -3700,36 +1787,25 @@ export default function App() {
   // Render Active Page
   // =========================================================
 
-  const renderActivePage =
-    () => {
-      switch (activeTab) {
-        case 'patients':
-          return (
-            <PatientsPage />
-          );
+  const renderActivePage = () => {
+    switch (activeTab) {
+      case 'patients':
+        return <PatientsPage />;
 
-        case 'beds':
-          return (
-            <BedsPage />
-          );
+      case 'beds':
+        return <BedsPage />;
 
-        case 'archive':
-          return (
-            <ArchivePage />
-          );
+      case 'archive':
+        return <ArchivePage />;
 
-        case 'settings':
-          return (
-            <SettingsPage />
-          );
+      case 'settings':
+        return <SettingsPage />;
 
-        case 'home':
-        default:
-          return (
-            <HomePage />
-          );
-      }
-    };
+      case 'home':
+      default:
+        return <HomePage />;
+    }
+  };
 
   // =========================================================
   // Auth Loading
@@ -3737,58 +1813,21 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div
-        dir={direction}
-        className={`
-          min-h-screen
-          flex flex-col
-          items-center justify-center
-          p-4
-          ${
-            isDarkTheme
-              ? 'bg-slate-950 text-slate-100'
-              : 'bg-slate-50 text-slate-900'
-          }
-        `}
-      >
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
 
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl mb-4 animate-pulse">
-
-          <div
-            className={`
-              w-full h-full
-              rounded-[14px]
-              flex items-center justify-center
-              ${
-                isDarkTheme
-                  ? 'bg-slate-900'
-                  : 'bg-white'
-              }
-            `}
-          >
+          <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
             <HeartPulse className="w-7 h-7 text-cyan-400" />
           </div>
-
         </div>
 
-        <p
-          className={`text-sm font-semibold ${
-            isDarkTheme
-              ? 'text-slate-200'
-              : 'text-slate-700'
-          }`}
-        >
-          {language === 'ar'
-            ? 'جاري التحقق من جلسة العمل السريرية...'
-            : 'Checking clinical session...'}
+        <p className="text-sm font-semibold text-slate-200">
+          جاري التحقق من جلسة العمل السريرية...
         </p>
 
-        <p
-          className={`text-xs mt-1 ${mutedText}`}
-        >
+        <p className="text-xs text-slate-500 mt-1">
           CardioVault
         </p>
-
       </div>
     );
   }
@@ -3797,65 +1836,34 @@ export default function App() {
   // Login
   // =========================================================
 
-  if (
-    !currentUser &&
-    !isOfflineBypassed
-  ) {
+  if (!currentUser && !isOfflineBypassed) {
     return (
       <LoginScreen
         onLoginSuccess={() => {
-          setIsUnlocked(
-            true
-          );
+          setIsUnlocked(true);
         }}
-        onContinueOffline={
-          async (pin) => {
-            setIsOfflineBypassed(
-              true
+        onContinueOffline={async (pin) => {
+          setIsOfflineBypassed(true);
+
+          const pinToUse =
+            pin || '0000';
+
+          setActivePin(pinToUse);
+          setIsUnlocked(true);
+
+          try {
+            const loaded =
+              await loadPatients(pinToUse);
+
+            setPatients(loaded);
+          } catch (err) {
+            console.error(
+              'Failed to load offline patients:',
+              err
             );
-
-            const pinToUse =
-              typeof pin === 'string' &&
-              pin.length > 0
-                ? pin
-                : '0000';
-
-            setActivePin(
-              pinToUse
-            );
-
-            setIsUnlocked(
-              true
-            );
-
-            try {
-              const loaded =
-                await loadPatients(
-                  pinToUse
-                );
-
-              setPatients(
-                Array.isArray(
-                  loaded
-                )
-                  ? loaded.filter(
-                      Boolean
-                    )
-                  : []
-              );
-            } catch (err) {
-              console.error(
-                'Failed to load offline patients:',
-                err
-              );
-
-              setPatients([]);
-            }
           }
-        }
-        securitySettings={
-          securitySettings
-        }
+        }}
+        securitySettings={securitySettings}
       />
     );
   }
@@ -3867,12 +1875,8 @@ export default function App() {
   if (!isUnlocked) {
     return (
       <LockScreen
-        securitySettings={
-          securitySettings
-        }
-        onUnlockSuccess={
-          handleUnlockSuccess
-        }
+        securitySettings={securitySettings}
+        onUnlockSuccess={handleUnlockSuccess}
       />
     );
   }
@@ -3882,101 +1886,61 @@ export default function App() {
   // =========================================================
 
   return (
-    <div
-      dir={direction}
-      lang={language}
-      className={`
-        min-h-screen
-        flex flex-col
-        selection:bg-cyan-500/30
-        selection:text-cyan-200
-        ${
-          isDarkTheme
-            ? 'bg-slate-950 text-slate-100'
-            : 'bg-slate-50 text-slate-900'
-        }
-      `}
-    >
+    <div className="
+      min-h-screen
+      bg-slate-950
+      text-slate-100
+      flex flex-col
+      selection:bg-cyan-500/30
+      selection:text-cyan-200
+    ">
 
       <Navbar
-        specialtyMode={
-          specialtyMode
-        }
-        onSetSpecialtyMode={
-          setSpecialtyMode
-        }
+        specialtyMode={specialtyMode}
+        onSetSpecialtyMode={setSpecialtyMode}
 
-        activeTab={
-          activeTab
-        }
-        onTabChange={
-          setActiveTab
-        }
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
 
-        patients={
-          safePatients
-        }
-        totalBeds={
-          totalBeds
-        }
+        patients={patients}
+        totalBeds={totalBeds}
 
-        currentUser={
-          currentUser
-        }
-        cloudSyncStatus={
-          cloudSyncStatus
-        }
+        currentUser={currentUser}
+        cloudSyncStatus={cloudSyncStatus}
 
         onOpenCloudAccount={() =>
-          setShowCloudAccountModal(
-            true
-          )
+          setShowCloudAccountModal(true)
         }
 
         onOpenNewPatientModal={() =>
           setAdmitBedNumber(
-            availableBeds[0] ||
-              1
+            availableBeds[0] || 1
           )
         }
 
         onOpenCalculators={() =>
-          setShowCalculators(
-            true
-          )
+          setShowCalculators(true)
         }
 
         onOpenCustomizer={() =>
-          setShowCustomizer(
-            true
-          )
+          setShowCustomizer(true)
         }
 
         onOpenSecurity={() =>
-          setShowSecurityModal(
-            true
-          )
+          setShowSecurityModal(true)
         }
 
         onOpenApkGuide={() =>
-          setShowApkModal(
-            true
-          )
+          setShowApkModal(true)
         }
 
         onOpenPrintHandover={() =>
-          setShowPrintView(
-            true
-          )
+          setShowPrintView(true)
         }
 
-        onLockSession={
-          handleLockApp
-        }
+        onLockSession={handleLockApp}
 
-        onLogout={
-          handleLogout
-        }
+        onLogout={handleLogout}
       />
 
       <main
@@ -3993,7 +1957,9 @@ export default function App() {
           md:pb-6
         "
       >
+
         {renderActivePage()}
+
       </main>
 
       {/* =====================================================
@@ -4002,15 +1968,9 @@ export default function App() {
 
       {activePatientRecord && (
         <PatientFileModal
-          patient={
-            activePatientRecord
-          }
-          fieldConfig={
-            fieldConfig
-          }
-          specialtyMode={
-            specialtyMode
-          }
+          patient={activePatientRecord}
+          fieldConfig={fieldConfig}
+          specialtyMode={specialtyMode}
 
           onUpdatePatient={
             handleUpdatePatient
@@ -4020,62 +1980,34 @@ export default function App() {
             handleDeletePatient
           }
 
-          onDischargePatient={
-            (pt) =>
-              pt &&
-              setPatientToDischarge(
-                pt
-              )
+          onDischargePatient={(pt) =>
+            setPatientToDischarge(pt)
           }
 
-          onReadmitPatient={
-            (pt) =>
-              pt &&
-              setPatientToReadmit(
-                pt
-              )
+          onReadmitPatient={(pt) =>
+            setPatientToReadmit(pt)
           }
 
-          onPrintPatient={
-            (pt) => {
-              if (!pt) return;
-
-              setPatientToPrint(
-                pt
-              );
-
-              setShowPrintView(
-                true
-              );
-            }
-          }
+          onPrintPatient={(pt) => {
+            setPatientToPrint(pt);
+            setShowPrintView(true);
+          }}
 
           onClose={() =>
-            setSelectedPatientId(
-              null
-            )
+            setSelectedPatientId(null)
           }
         />
       )}
 
       {/* Admit */}
 
-      {admitBedNumber !==
-        null && (
+      {admitBedNumber !== null && (
         <AdmitPatientModal
-          bedNumber={
-            admitBedNumber
-          }
-          specialtyMode={
-            specialtyMode
-          }
-          onAdmit={
-            handleAdmitPatient
-          }
+          bedNumber={admitBedNumber}
+          specialtyMode={specialtyMode}
+          onAdmit={handleAdmitPatient}
           onClose={() =>
-            setAdmitBedNumber(
-              null
-            )
+            setAdmitBedNumber(null)
           }
         />
       )}
@@ -4085,9 +2017,7 @@ export default function App() {
       {showCalculators && (
         <ClinicalCalculatorsModal
           onClose={() =>
-            setShowCalculators(
-              false
-            )
+            setShowCalculators(false)
           }
         />
       )}
@@ -4096,16 +2026,12 @@ export default function App() {
 
       {showCustomizer && (
         <FieldCustomizerModal
-          config={
-            fieldConfig
-          }
+          config={fieldConfig}
           onSaveConfig={
             handleSaveFieldConfig
           }
           onClose={() =>
-            setShowCustomizer(
-              false
-            )
+            setShowCustomizer(false)
           }
         />
       )}
@@ -4118,36 +2044,22 @@ export default function App() {
             securitySettings
           }
 
-          patients={
-            safePatients
+          patients={patients}
+
+          currentActivePin={activePin}
+
+          onUpdateSecurity={(newSettings) =>
+            setSecuritySettings(
+              newSettings
+            )
           }
 
-          currentActivePin={
-            activePin
-          }
-
-          onUpdateSecurity={
-            (newSettings) =>
-              setSecuritySettings(
-                newSettings
-              )
-          }
-
-          onRestorePatients={
-            (restored) =>
-              updatePatients(
-                Array.isArray(
-                  restored
-                )
-                  ? restored
-                  : []
-              )
+          onRestorePatients={(restored) =>
+            updatePatients(restored)
           }
 
           onClose={() =>
-            setShowSecurityModal(
-              false
-            )
+            setShowSecurityModal(false)
           }
         />
       )}
@@ -4157,9 +2069,7 @@ export default function App() {
       {showApkModal && (
         <AndroidApkModal
           onClose={() =>
-            setShowApkModal(
-              false
-            )
+            setShowApkModal(false)
           }
         />
       )}
@@ -4168,21 +2078,12 @@ export default function App() {
 
       {showPrintView && (
         <PrintableView
-          patients={
-            safePatients
-          }
-          activePatient={
-            patientToPrint
-          }
+          patients={patients}
+          activePatient={patientToPrint}
 
           onClose={() => {
-            setShowPrintView(
-              false
-            );
-
-            setPatientToPrint(
-              null
-            );
+            setShowPrintView(false);
+            setPatientToPrint(null);
           }}
         />
       )}
@@ -4191,18 +2092,14 @@ export default function App() {
 
       {patientToDischarge && (
         <DischargePatientModal
-          patient={
-            patientToDischarge
-          }
+          patient={patientToDischarge}
 
           onConfirmDischarge={
             handleDischargePatient
           }
 
           onClose={() =>
-            setPatientToDischarge(
-              null
-            )
+            setPatientToDischarge(null)
           }
         />
       )}
@@ -4211,22 +2108,15 @@ export default function App() {
 
       {patientToReadmit && (
         <ReadmitPatientModal
-          patient={
-            patientToReadmit
-          }
-
-          availableBeds={
-            availableBeds
-          }
+          patient={patientToReadmit}
+          availableBeds={availableBeds}
 
           onReadmit={
             handleReadmitPatient
           }
 
           onClose={() =>
-            setPatientToReadmit(
-              null
-            )
+            setPatientToReadmit(null)
           }
         />
       )}
@@ -4235,17 +2125,11 @@ export default function App() {
 
       {showCloudAccountModal && (
         <CloudAccountModal
-          currentUser={
-            currentUser
-          }
-
+          currentUser={currentUser}
           cloudSyncStatus={
             cloudSyncStatus
           }
-
-          patients={
-            safePatients
-          }
+          patients={patients}
 
           onManualSync={
             handleManualSync
@@ -4256,9 +2140,7 @@ export default function App() {
           }
 
           onClose={() =>
-            setShowCloudAccountModal(
-              false
-            )
+            setShowCloudAccountModal(false)
           }
         />
       )}

@@ -1,795 +1,657 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect } from 'react';
 
-export type AppLanguage = 'en' | 'ar';
+export type Language = 'en' | 'ar';
 
-const STORAGE_KEY_LANGUAGE = 'cardiovault_language';
+export const STORAGE_KEY_LANG = 'icu_app_lang';
 
 export const translations = {
   en: {
-    app: {
-      name: 'CardioVault',
-      subtitle: 'ICU & CCU Clinical Notebook',
-    },
+    // App Brand & Nav
+    appName: 'CardioVault',
+    appSubtitle: 'ICU & CCU Clinical Notebook',
+    version: '1.1.0',
+    allSystems: 'All Units',
+    ccuMode: 'CCU Cardiology',
+    icuMode: 'ICU Critical Care',
+    activeBeds: 'Active Beds',
+    dischargedArchive: 'Discharged Archive',
+    patients: 'Patients',
+    beds: 'Beds',
+    archive: 'Archive',
+    settings: 'Settings',
+    calculators: 'Calculators',
+    cloudAccount: 'Cloud Account',
+    lockApp: 'Lock',
+    logout: 'Logout',
+    online: 'Online',
+    offline: 'Offline',
+    synced: 'Synced',
+    syncing: 'Syncing...',
+    syncError: 'Sync Error',
 
-    nav: {
-      home: 'Home',
-      patients: 'Patients',
-      beds: 'Beds',
-      archive: 'Archive',
-      settings: 'Settings',
-      all: 'All',
-      ccu: 'CCU',
-      icu: 'ICU',
-    },
+    // Census & Bed Management
+    bedCensusTitle: 'ICU / CCU Bed Census',
+    bedCensusSubtitle: 'Real-time bed occupancy, hemodynamics, patient acuity and bed allocation',
+    archiveTitle: 'Medical Records Archive',
+    archiveSubtitle: 'Permanent archive of discharged and transferred patient clinical files',
+    totalBeds: 'Total Beds',
+    occupiedBeds: 'Occupied',
+    availableBeds: 'Available',
+    criticalPatients: 'Critical',
+    stablePatients: 'Stable',
+    occupancyRate: 'Occupancy',
+    searchPatientOrBed: 'Search by patient name, MRN, diagnosis, bed...',
+    allStatus: 'All Status',
+    occupiedOnly: 'Occupied Only',
+    availableOnly: 'Available Only',
+    criticalOnly: 'Critical Only',
+    stableOnly: 'Stable Only',
+    admitPatient: 'Admit Patient',
+    configureBeds: 'Manage Beds',
+    reassignBed: 'Move Bed',
+    discharge: 'Discharge',
+    readmit: 'Re-admit',
+    viewFile: 'View File',
+    noActiveBeds: 'No matching beds found',
+    noArchivedPatients: 'No archived records found',
+    emptyBed: 'Available Bed',
+    clickToAdmit: 'Click to admit patient to this bed',
+    bedNumber: 'Bed',
+    department: 'Department',
+    status: 'Status',
+    primaryDiagnosis: 'Diagnosis',
+    attendingPhysician: 'Attending Physician',
+    admissionDate: 'Admission Date',
 
-    common: {
-      save: 'Save',
-      cancel: 'Cancel',
-      close: 'Close',
-      delete: 'Delete',
-      edit: 'Edit',
-      add: 'Add',
-      update: 'Update',
-      search: 'Search',
-      print: 'Print',
-      export: 'Export',
-      download: 'Download',
-      confirm: 'Confirm',
-      back: 'Back',
-      yes: 'Yes',
-      no: 'No',
-      loading: 'Loading...',
-      noData: 'No data available',
-      unknown: 'Unknown',
-      notAvailable: 'N/A',
-      active: 'Active',
-      inactive: 'Inactive',
-      online: 'Online',
-      offline: 'Offline',
-      enabled: 'Enabled',
-      disabled: 'Disabled',
-      language: 'Language',
-      english: 'English',
-      arabic: 'العربية',
-      light: 'Light',
-      dark: 'Dark',
-      system: 'System',
-      theme: 'Theme',
-      date: 'Date',
-      time: 'Time',
-      status: 'Status',
-      notes: 'Notes',
-      details: 'Details',
-    },
+    // Patient File Navigation & Tabs
+    patientFile: 'Patient Clinical File',
+    tabOverview: 'Overview',
+    tabHistory: 'History',
+    tabExamination: 'Examination',
+    tabVitalsIO: 'Vitals & I/O',
+    tabLabs: 'Labs',
+    tabABG: 'ABG',
+    tabECG: 'ECG',
+    tabEcho: 'Echo',
+    tabImaging: 'Imaging',
+    tabMedications: 'Medications',
+    tabInfusions: 'Infusions',
+    tabProcedures: 'Procedures',
+    tabProgressNotes: 'Progress Notes',
+    tabDischarge: 'Discharge',
 
-    dashboard: {
-      title: 'Clinical Dashboard',
-      overview: 'Unit Overview',
-      totalBeds: 'Total Beds',
-      occupiedBeds: 'Occupied',
-      availableBeds: 'Available',
-      critical: 'Critical',
-      stable: 'Stable',
-      guarded: 'Guarded',
-      deteriorating: 'Deteriorating',
-      postOp: 'Post-op',
-      recentPatients: 'Recent Patients',
-      noPatients: 'No patients found',
-      occupancy: 'Occupancy',
-    },
+    // Clinical History Fields
+    chiefComplaint: 'Chief Complaint',
+    hpi: 'History of Present Illness (HPI)',
+    pmh: 'Past Medical History (PMH)',
+    psh: 'Past Surgical History (PSH)',
+    drugHistory: 'Drug History',
+    drugAllergies: 'Drug Allergies',
+    familyHistory: 'Family History',
+    socialHistory: 'Social History',
+    saveHistory: 'Save History',
+    historySaved: 'Clinical history saved successfully',
+    clearField: 'Clear',
 
-    patients: {
-      title: 'Patients',
-      patient: 'Patient',
-      patientName: 'Patient Name',
-      age: 'Age',
-      gender: 'Gender',
-      mrn: 'MRN',
-      bed: 'Bed',
-      admissionDate: 'Admission Date',
-      diagnosis: 'Diagnosis',
-      primaryDiagnosis: 'Primary Diagnosis',
-      secondaryDiagnoses: 'Secondary Diagnoses',
-      chiefComplaint: 'Chief Complaint',
-      history: 'History',
-      historyOfPresentIllness: 'History of Present Illness',
-      pastMedicalHistory: 'Past Medical History',
-      pastSurgicalHistory: 'Past Surgical History',
-      drugHistory: 'Drug History',
-      allergies: 'Allergies',
-      familyHistory: 'Family History',
-      socialHistory: 'Social History',
-      examination: 'Examination',
-      examinationSummary: 'Examination Summary',
-      generalExamination: 'General Examination',
-      cardiovascularExamination: 'Cardiovascular Examination',
-      respiratoryExamination: 'Respiratory Examination',
-      abdominalExamination: 'Abdominal Examination',
-      cnsExamination: 'CNS Examination',
-      peripheralVascularExamination: 'Peripheral Vascular Examination',
-      otherExamination: 'Other Examination',
-      attendingPhysician: 'Attending Physician',
-      codeStatus: 'Code Status',
-      noPatients: 'No patients found',
-      searchPlaceholder: 'Search patients...',
-      admit: 'Admit Patient',
-      discharge: 'Discharge',
-      readmit: 'Readmit',
-      viewFile: 'View Patient File',
-      patientFile: 'Patient File',
-      printReport: 'Print / Export PDF',
-    },
+    // Clinical Examination Fields
+    generalExam: 'General Examination',
+    cvsExam: 'Cardiovascular Examination (CVS)',
+    rsExam: 'Respiratory Examination (RS)',
+    abdExam: 'Abdominal Examination (GIT)',
+    cnsExam: 'Neurological Examination (CNS)',
+    pvdExam: 'Peripheral Vascular Examination',
+    otherExam: 'Other Examination Findings',
+    saveExam: 'Save Examination',
+    examSaved: 'Examination findings saved successfully',
 
-    vitals: {
-      title: 'Vital Signs',
-      heartRate: 'HR',
-      bloodPressure: 'BP',
-      map: 'MAP',
-      respiratoryRate: 'RR',
-      oxygenSaturation: 'SpO2',
-      temperature: 'Temperature',
-      cvp: 'CVP',
-      rhythm: 'Rhythm',
-    },
+    // Labs
+    addLab: 'Add Laboratory Test',
+    editLab: 'Edit Lab Record',
+    deleteLab: 'Delete Lab',
+    testName: 'Test Name',
+    result: 'Result',
+    unit: 'Unit',
+    refRange: 'Reference Range',
+    flag: 'Flag',
+    normal: 'Normal',
+    high: 'High',
+    low: 'Low',
+    critical: 'Critical',
+    dateTime: 'Date & Time',
+    notes: 'Notes',
+    customTest: 'Custom Test',
+    selectPanel: 'Select Lab Panel',
+    saveLab: 'Save Laboratory Record',
+    deleteLabConfirm: 'Are you sure you want to delete this lab record?',
 
-    io: {
-      title: 'Input / Output',
-      intake: 'Intake',
-      output: 'Output',
-      iv: 'IV',
-      enteral: 'Enteral',
-      oral: 'Oral',
-      blood: 'Blood',
-      other: 'Other',
-      urine: 'Urine',
-      drain: 'Drain',
-      gi: 'GI',
-      stool: 'Stool',
-      totalIntake: 'Total Intake',
-      totalOutput: 'Total Output',
-      netBalance: 'Net Balance',
-      runningBalance: 'Running Balance',
-      dailyBalance: 'Daily Balance',
-    },
+    // ABG
+    addABG: 'Add ABG Record',
+    editABG: 'Edit ABG',
+    deleteABG: 'Delete ABG',
+    ph: 'pH',
+    paco2: 'PaCO₂ (mmHg)',
+    pao2: 'PaO₂ (mmHg)',
+    hco3: 'HCO₃⁻ (mmol/L)',
+    be: 'Base Excess (BE)',
+    lactate: 'Lactate (mmol/L)',
+    sao2: 'SaO₂ (%)',
+    fio2: 'FiO₂ (%)',
+    interpretation: 'Interpretation',
+    saveABG: 'Save ABG',
 
-    labs: {
-      title: 'Laboratory Results',
-      panel: 'Lab Panel',
-      result: 'Result',
-      unit: 'Unit',
-      referenceRange: 'Reference Range',
-      normal: 'Normal',
-      high: 'High',
-      low: 'Low',
-      critical: 'Critical',
-      cbc: 'CBC',
-      chemistry: 'Chemistry',
-      cardiac: 'Cardiac Markers',
-      coagulation: 'Coagulation',
-      inflammatory: 'Inflammatory Markers',
-    },
+    // ECG
+    addECG: 'Add ECG Record',
+    editECG: 'Edit ECG',
+    deleteECG: 'Delete ECG',
+    rhythm: 'Rhythm',
+    heartRate: 'Heart Rate (bpm)',
+    axis: 'Axis',
+    prInterval: 'PR Interval (ms)',
+    qrsDuration: 'QRS Duration (ms)',
+    qtInterval: 'QT (ms)',
+    qtcInterval: 'QTc (ms)',
+    stChanges: 'ST Segment Changes',
+    tChanges: 'T Wave Changes',
+    ecgAttachment: 'ECG Tracing Attachment',
+    uploadECGImage: 'Upload ECG Image',
+    saveECG: 'Save ECG Record',
 
-    abg: {
-      title: 'ABG',
-      ph: 'pH',
-      pco2: 'PaCO2',
-      po2: 'PaO2',
-      hco3: 'HCO3',
-      be: 'BE',
-      lactate: 'Lactate',
-      fio2: 'FiO2',
-      ratio: 'PaO2/FiO2',
-      interpretation: 'Interpretation',
-      ventilatorMode: 'Ventilator Mode',
-    },
+    // Echo
+    addEcho: 'Add Echocardiogram Study',
+    editEcho: 'Edit Echo Study',
+    deleteEcho: 'Delete Echo',
+    ef: 'Ejection Fraction (LVEF %)',
+    lvDimensions: 'LV Dimensions',
+    lvSystolic: 'LV Systolic Function',
+    rvAssessment: 'RV Assessment',
+    tapse: 'TAPSE (mm)',
+    laRa: 'LA / RA Dimensions',
+    rwma: 'Regional Wall Motion (RWMA)',
+    diastolicFunction: 'Diastolic Function',
+    valvularAssessment: 'Valvular Assessment',
+    pasp: 'Estimated PASP (mmHg)',
+    ivc: 'IVC Collapsibility',
+    pericardium: 'Pericardium / Effusion',
+    findings: 'Key Findings',
+    impression: 'Impression / Conclusion',
+    saveEcho: 'Save Echo Study',
 
-    cardiology: {
-      title: 'CCU / Cardiology',
-      ecg: 'ECG',
-      echo: 'Echo',
-      cath: 'Cath',
-      stent: 'Stent',
-      ecgSummary: 'ECG Summary',
-      stElevation: 'ST Elevation Leads',
-      arrhythmia: 'Arrhythmia',
-      ef: 'EF',
-      echoFindings: 'Echo Findings',
-      cathDate: 'Cath Date',
-      cathFindings: 'Cath Findings',
-      culpritLesion: 'Culprit Lesion',
-      stentType: 'Stent Type',
-      stentDetails: 'Stent Details',
-      antiplatelets: 'Antiplatelets',
-      anticoagulation: 'Anticoagulation',
-      timiFlow: 'TIMI Flow',
-    },
+    // Imaging
+    addImaging: 'Add Imaging Study',
+    editImaging: 'Edit Imaging',
+    deleteImaging: 'Delete Imaging',
+    imagingType: 'Imaging Modality',
+    cxr: 'Chest X-Ray (CXR)',
+    ct: 'Computed Tomography (CT)',
+    mri: 'Magnetic Resonance Imaging (MRI)',
+    ultrasound: 'Ultrasound / POCUS',
+    otherImaging: 'Other Imaging',
+    uploadImage: 'Upload Image / Document',
+    previewImage: 'Preview Image',
+    replaceImage: 'Replace Attachment',
+    deleteAttachment: 'Remove Attachment',
+    saveImaging: 'Save Imaging Study',
 
-    icu: {
-      title: 'ICU',
-      scores: 'ICU Scores',
-      ventilator: 'Ventilator',
-      gcs: 'GCS',
-      rass: 'RASS',
-      sofa: 'SOFA',
-      pupils: 'Pupils',
-      delirium: 'CAM-ICU',
-      mode: 'Mode',
-      peep: 'PEEP',
-      tidalVolume: 'Tidal Volume',
-      rate: 'Rate',
-      totalRate: 'Total Rate',
-      peakPressure: 'Ppeak',
-      plateauPressure: 'Pplat',
-      ettSize: 'ETT Size',
-      ettDepth: 'ETT Depth',
-    },
+    // Medications & Infusions
+    addMedication: 'Add Medication',
+    drugName: 'Drug Name',
+    dose: 'Dose',
+    route: 'Route',
+    frequency: 'Frequency',
+    startDate: 'Start Date',
+    stopDate: 'Stop Date',
+    activeMeds: 'Active Medications',
+    addInfusion: 'Add Infusion',
+    infusionDrug: 'Infusion Drug / Fluid',
+    concentration: 'Concentration',
+    rate: 'Rate',
+    infusionUnit: 'Rate Unit',
+    infusionStatus: 'Status',
+    running: 'Running',
+    titrating: 'Titrating',
+    held: 'Held',
+    stopped: 'Stopped',
 
-    treatment: {
-      medications: 'Medications',
-      infusions: 'Infusions',
-      procedures: 'Procedures',
-      consultations: 'Consultations',
-    },
+    // Input / Output
+    addIO: 'Add Fluid I/O Entry',
+    intakeOral: 'Oral Intake (mL)',
+    intakeIV: 'IV Fluids (mL)',
+    intakeOther: 'Other Intake (mL)',
+    totalIntake: 'Total Intake',
+    outputUrine: 'Urine Output (mL)',
+    outputDrains: 'Drains Output (mL)',
+    outputOther: 'Other Output (mL)',
+    totalOutput: 'Total Output',
+    runningBalance: 'Running Net Balance',
+    dailyBalance: '24h Fluid Balance',
 
-    documentation: {
-      progressNotes: 'Progress Notes',
-      dailyNotes: 'Daily Notes',
-      clinicalEvents: 'Clinical Events',
-      imaging: 'Imaging',
-      dischargePlan: 'Discharge Plan',
-      subjective: 'Subjective',
-      objective: 'Objective',
-      assessment: 'Assessment',
-      plan: 'Plan',
-      author: 'Author',
-      indication: 'Indication',
-      findings: 'Findings',
-      impression: 'Impression',
-    },
+    // Progress Notes
+    addNote: 'Add Progress Note',
+    noteAuthor: 'Author / Clinician',
+    clinicalAssessment: 'Clinical Assessment',
+    plan: 'Plan of Care',
+    freeTextNotes: 'Detailed Notes',
+    saveNote: 'Save Note',
 
-    settings: {
-      title: 'Settings',
-      language: 'Language',
-      languageDescription: 'Choose the application language',
-      theme: 'Appearance',
-      themeDescription: 'Choose light, dark, or follow the device',
-      bedConfiguration: 'Bed Configuration',
-      security: 'Security',
-      patientFields: 'Patient Fields',
-      cloudSync: 'Cloud Sync',
-      session: 'Session',
-      totalBeds: 'Total Beds',
-      saveBeds: 'Save Bed Configuration',
-      lock: 'Lock App',
-      logout: 'Logout',
-    },
+    // Common Actions
+    save: 'Save Changes',
+    edit: 'Edit',
+    delete: 'Delete',
+    cancel: 'Cancel',
+    close: 'Close',
+    confirm: 'Confirm',
+    clear: 'Clear',
+    add: 'Add',
+    search: 'Search...',
+    loading: 'Loading...',
+    print: 'Print Clinical Summary',
 
-    pdf: {
-      reportTitle: 'Patient Clinical Report',
-      generatedBy: 'Generated by CardioVault',
-      generatedAt: 'Generated At',
-      unit: 'Unit',
-      patientInformation: 'Patient Information',
-      clinicalHistory: 'Clinical History',
-      physicalExamination: 'Physical Examination',
-      vitalSigns: 'Vital Signs',
-      inputOutput: 'Input / Output',
-      laboratoryResults: 'Laboratory Results',
-      bloodGas: 'Arterial Blood Gas',
-      cardiology: 'Cardiology',
-      ecgStudies: 'ECG Studies',
-      echoStudies: 'Echocardiography',
-      imagingStudies: 'Imaging Studies',
-      medications: 'Medications',
-      infusions: 'Infusions',
-      procedures: 'Procedures',
-      progressNotes: 'Progress Notes',
-      discharge: 'Discharge / Transfer',
-      noInformation: 'No information available',
-    },
+    // Settings
+    settingsTitle: 'CardioVault Settings',
+    settingsSubtitle: 'Configure application theme, language, notifications, account, and security',
+    theme: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
+    language: 'Language',
+    languageEn: 'English',
+    languageAr: 'العربية',
+    notifications: 'Notifications',
+    enableNotifications: 'Enable Clinical Alerts',
+    notificationDesc: 'Receive alerts on critical vital alarms, infusion stops, and round handovers',
+    permissionAllowed: 'Permission Granted',
+    permissionDenied: 'Permission Blocked',
+    requestPermission: 'Request Permission',
+    account: 'Account & Synchronization',
+    contactUs: 'Contact Us',
+    about: 'About CardioVault',
+    aboutDesc: 'CardioVault is a state-of-the-art ICU & CCU clinical documentation and bedside decision support notebook designed for critical care physicians and cardiology teams.',
+    versionLabel: 'Application Version',
 
-    status: {
-      stable: 'Stable',
-      critical: 'Critical',
-      guarded: 'Guarded',
-      deteriorating: 'Deteriorating',
-      postOp: 'Post-op',
-      discharged: 'Discharged',
-      empty: 'Empty',
-    },
+    // Contact Us Modal
+    contactTitle: 'Contact Us & Feedback',
+    contactSubtitle: 'Get in touch with the CardioVault medical informatics team',
+    contactEmail: 'Email Support',
+    contactTelegram: 'Clinical Telegram Channel',
+    contactPhone: 'Medical Helpline',
+    subject: 'Subject',
+    message: 'Message',
+    sendEmail: 'Send Email',
+    sendFeedback: 'Submit Message',
+    feedbackSuccess: 'Thank you for your feedback! Our clinical support team will respond shortly.',
 
-    messages: {
-      saved: 'Saved successfully',
-      deleted: 'Deleted successfully',
-      saveFailed: 'Unable to save data',
-      loadFailed: 'Unable to load data',
-      invalidData:
-        'Some stored data was invalid and has been safely migrated.',
-      offline: 'You are currently offline',
-      online: 'Connection restored',
-      confirmDelete: 'Are you sure you want to delete this patient?',
-      noInternet:
-        'Internet connection is unavailable. Local data remains available.',
-    },
+    // Authentication
+    loginTitle: 'Clinical Access & Cloud Sync',
+    signInWithGoogle: 'Sign in with Google',
+    signInEmail: 'Sign In with Email',
+    createAccount: 'Create Clinical Account',
+    offlinePin: 'Offline Local PIN',
+    offlinePinDesc: 'Work offline or quick bedside access via encrypted local PIN',
+    loginSuccess: 'Logged in successfully',
+    email: 'Email',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    fullName: 'Dr. Full Name',
+    enterPin: 'Enter 6-digit PIN',
   },
-
   ar: {
-    app: {
-      name: 'CardioVault',
-      subtitle: 'دفتر الملاحظات السريرية للعناية المركزة والقلب',
-    },
+    // App Brand & Nav
+    appName: 'CardioVault',
+    appSubtitle: 'دفتر التوثيق السريري للعناية المركزة والقلبية',
+    version: '1.1.0',
+    allSystems: 'كافة الأقسام',
+    ccuMode: 'عناية القلب CCU',
+    icuMode: 'العناية المركزة ICU',
+    activeBeds: 'الأسرة النشطة',
+    dischargedArchive: 'أرشيف المرضى',
+    patients: 'المرضى',
+    beds: 'الأسرة',
+    archive: 'الأرشيف',
+    settings: 'الإعدادات',
+    calculators: 'الحاسبات السريرية',
+    cloudAccount: 'الحساب السحابي',
+    lockApp: 'قفل الشاشة',
+    logout: 'تسجيل الخروج',
+    online: 'متصل بالإنترنت',
+    offline: 'غير متصل (محلي)',
+    synced: 'تمت المزامنة',
+    syncing: 'جاري المزامنة...',
+    syncError: 'خطأ بالمزامنة',
 
-    nav: {
-      home: 'الرئيسية',
-      patients: 'المرضى',
-      beds: 'الأسِرّة',
-      archive: 'الأرشيف',
-      settings: 'الإعدادات',
-      all: 'الكل',
-      ccu: 'CCU',
-      icu: 'ICU',
-    },
+    // Census & Bed Management
+    bedCensusTitle: 'سجل أسرة العناية المركزة والقلبية',
+    bedCensusSubtitle: 'متابعة حية لشواغر الأسرة، الديناميكا الدموية، درجة خطورة المريض وتوزيع الحالات',
+    archiveTitle: 'أرشيف السجلات الطبية',
+    archiveSubtitle: 'سجل دائم للمرضى الذين تم تخريجهم أو تحويلهم خارج العناية',
+    totalBeds: 'إجمالي الأسرة',
+    occupiedBeds: 'مشغول',
+    availableBeds: 'شاغر',
+    criticalPatients: 'حالات حرجة',
+    stablePatients: 'حالات مستقرة',
+    occupancyRate: 'نسبة الإشغال',
+    searchPatientOrBed: 'البحث باسم المريض، الرقم الطبي، التشخيص، السرير...',
+    allStatus: 'جميع الحالات',
+    occupiedOnly: 'الأسرة المشغولة',
+    availableOnly: 'الأسرة الشاغرة',
+    criticalOnly: 'الحالات الحرجة فقط',
+    stableOnly: 'الحالات المستقرة فقط',
+    admitPatient: 'إدخال مريض',
+    configureBeds: 'إدارة وتعديل الأسرة',
+    reassignBed: 'نقل إلى سرير آخر',
+    discharge: 'تخريج المريض',
+    readmit: 'إعادة إدخال',
+    viewFile: 'فتح الملف السريري',
+    noActiveBeds: 'لم يتم العثور على أسرة مطابقة',
+    noArchivedPatients: 'لا يوجد مرضى في الأرشيف',
+    emptyBed: 'سرير شاغر',
+    clickToAdmit: 'اضغط لإدخال وتسكين مريض في هذا السرير',
+    bedNumber: 'السرير',
+    department: 'القسم',
+    status: 'الحالة',
+    primaryDiagnosis: 'التشخيص الرئيسي',
+    attendingPhysician: 'الطبيب المعالج',
+    admissionDate: 'تاريخ الدخول',
 
-    common: {
-      save: 'حفظ',
-      cancel: 'إلغاء',
-      close: 'إغلاق',
-      delete: 'حذف',
-      edit: 'تعديل',
-      add: 'إضافة',
-      update: 'تحديث',
-      search: 'بحث',
-      print: 'طباعة',
-      export: 'تصدير',
-      download: 'تنزيل',
-      confirm: 'تأكيد',
-      back: 'رجوع',
-      yes: 'نعم',
-      no: 'لا',
-      loading: 'جارٍ التحميل...',
-      noData: 'لا توجد بيانات',
-      unknown: 'غير معروف',
-      notAvailable: 'غير متاح',
-      active: 'نشط',
-      inactive: 'غير نشط',
-      online: 'متصل',
-      offline: 'غير متصل',
-      enabled: 'مفعّل',
-      disabled: 'غير مفعّل',
-      language: 'اللغة',
-      english: 'English',
-      arabic: 'العربية',
-      light: 'فاتح',
-      dark: 'داكن',
-      system: 'النظام',
-      theme: 'المظهر',
-      date: 'التاريخ',
-      time: 'الوقت',
-      status: 'الحالة',
-      notes: 'ملاحظات',
-      details: 'التفاصيل',
-    },
+    // Patient File Navigation & Tabs
+    patientFile: 'الملف السريري للمريض',
+    tabOverview: 'نظرة عامة',
+    tabHistory: 'القصة المرضية',
+    tabExamination: 'الفحص السريري',
+    tabVitalsIO: 'العلامات والصادر والوارد',
+    tabLabs: 'المختبر والتحاليل',
+    tabABG: 'غازات الدم ABG',
+    tabECG: 'تخطيط القلب ECG',
+    tabEcho: 'إيكو القلب Echo',
+    tabImaging: 'الأشعة والتصوير',
+    tabMedications: 'الأدوية والعلاجات',
+    tabInfusions: 'التسريب الوريدي',
+    tabProcedures: 'الإجراءات التداخلية',
+    tabProgressNotes: 'الملاحظات اليومية',
+    tabDischarge: 'خطة التخريج',
 
-    dashboard: {
-      title: 'لوحة التحكم السريرية',
-      overview: 'نظرة عامة على الوحدة',
-      totalBeds: 'إجمالي الأسِرّة',
-      occupiedBeds: 'مشغول',
-      availableBeds: 'متاح',
-      critical: 'حرج',
-      stable: 'مستقر',
-      guarded: 'تحت المراقبة',
-      deteriorating: 'متدهور',
-      postOp: 'ما بعد الجراحة',
-      recentPatients: 'أحدث المرضى',
-      noPatients: 'لا يوجد مرضى',
-      occupancy: 'الإشغال',
-    },
+    // Clinical History Fields
+    chiefComplaint: 'الشكوى الرئيسية',
+    hpi: 'قصة المرض الحالي (HPI)',
+    pmh: 'السوابق المرضية والطبية (PMH)',
+    psh: 'السوابق الجراحية (PSH)',
+    drugHistory: 'السوابق الدوائية',
+    drugAllergies: 'التحسس الدوائي والغذائي',
+    familyHistory: 'القصة العائلية',
+    socialHistory: 'القصة الاجتماعية والعادات',
+    saveHistory: 'حفظ القصة السريرية',
+    historySaved: 'تم حفظ القصة المرضية بنجاح',
+    clearField: 'مسح الحقل',
 
-    patients: {
-      title: 'المرضى',
-      patient: 'مريض',
-      patientName: 'اسم المريض',
-      age: 'العمر',
-      gender: 'النوع',
-      mrn: 'رقم الملف',
-      bed: 'السرير',
-      admissionDate: 'تاريخ الدخول',
-      diagnosis: 'التشخيص',
-      primaryDiagnosis: 'التشخيص الأساسي',
-      secondaryDiagnoses: 'التشخيصات الثانوية',
-      chiefComplaint: 'الشكوى الرئيسية',
-      history: 'التاريخ المرضي',
-      historyOfPresentIllness: 'تاريخ المرض الحالي',
-      pastMedicalHistory: 'التاريخ المرضي السابق',
-      pastSurgicalHistory: 'التاريخ الجراحي السابق',
-      drugHistory: 'التاريخ الدوائي',
-      allergies: 'الحساسية',
-      familyHistory: 'التاريخ العائلي',
-      socialHistory: 'التاريخ الاجتماعي',
-      examination: 'الفحص السريري',
-      examinationSummary: 'ملخص الفحص',
-      generalExamination: 'الفحص العام',
-      cardiovascularExamination: 'فحص القلب والأوعية',
-      respiratoryExamination: 'فحص الجهاز التنفسي',
-      abdominalExamination: 'فحص البطن',
-      cnsExamination: 'فحص الجهاز العصبي',
-      peripheralVascularExamination: 'فحص الأوعية الطرفية',
-      otherExamination: 'فحوصات أخرى',
-      attendingPhysician: 'الطبيب المسؤول',
-      codeStatus: 'حالة الإنعاش',
-      noPatients: 'لا يوجد مرضى',
-      searchPlaceholder: 'البحث عن مريض...',
-      admit: 'دخول مريض',
-      discharge: 'خروج',
-      readmit: 'إعادة دخول',
-      viewFile: 'فتح ملف المريض',
-      patientFile: 'ملف المريض',
-      printReport: 'طباعة / تصدير PDF',
-    },
+    // Clinical Examination Fields
+    generalExam: 'الفحص العام والحالة العامة',
+    cvsExam: 'فحص الجهاز القلبي الوعائي (CVS)',
+    rsExam: 'فحص الجهاز التنفسي والرئتين (RS)',
+    abdExam: 'فحص البطن والجهاز الهضمي (GIT)',
+    cnsExam: 'فحص الجهاز العصبي ودرجة الوعي (CNS)',
+    pvdExam: 'فحص الأوعية المحيطية والنبض',
+    otherExam: 'موجودات سريرية أخرى',
+    saveExam: 'حفظ الفحص السريري',
+    examSaved: 'تم حفظ نتائج الفحص السريري بنجاح',
 
-    vitals: {
-      title: 'العلامات الحيوية',
-      heartRate: 'HR',
-      bloodPressure: 'BP',
-      map: 'MAP',
-      respiratoryRate: 'RR',
-      oxygenSaturation: 'SpO2',
-      temperature: 'الحرارة',
-      cvp: 'CVP',
-      rhythm: 'النظم',
-    },
+    // Labs
+    addLab: 'إضافة تحليل مخبري',
+    editLab: 'تعديل السجل المخبري',
+    deleteLab: 'حذف التحليل',
+    testName: 'اسم التحليل',
+    result: 'النتيجة',
+    unit: 'الوحدة',
+    refRange: 'المجال المرجعي',
+    flag: 'المستوى',
+    normal: 'طبيعي',
+    high: 'مرتفع',
+    low: 'منخفض',
+    critical: 'حرج جداً',
+    dateTime: 'التاريخ والوقت',
+    notes: 'ملاحظات',
+    customTest: 'تحليل مخصص',
+    selectPanel: 'اختر باقة التحاليل',
+    saveLab: 'حفظ السجل المخبري',
+    deleteLabConfirm: 'هل أنت متأكد من رغبتك في حذف هذا التحليل المخبري؟',
 
-    io: {
-      title: 'السوائل الداخلة والخارجة',
-      intake: 'الداخل',
-      output: 'الخارج',
-      iv: 'وريدي',
-      enteral: 'تغذية معوية',
-      oral: 'فموي',
-      blood: 'دم',
-      other: 'أخرى',
-      urine: 'بول',
-      drain: 'درنقة',
-      gi: 'جهاز هضمي',
-      stool: 'براز',
-      totalIntake: 'إجمالي الداخل',
-      totalOutput: 'إجمالي الخارج',
-      netBalance: 'صافي التوازن',
-      runningBalance: 'التوازن التراكمي',
-      dailyBalance: 'التوازن اليومي',
-    },
+    // ABG
+    addABG: 'إضافة تحليل غازات دم ABG',
+    editABG: 'تعديل تحليل ABG',
+    deleteABG: 'حذف تحليل ABG',
+    ph: 'درجة الحموضة pH',
+    paco2: 'ضغط ثاني أكسيد الكربون PaCO₂',
+    pao2: 'ضغط الأكسجين الشرياني PaO₂',
+    hco3: 'البيكربونات HCO₃⁻',
+    be: 'الفائض القاعدي Base Excess',
+    lactate: 'حمض اللاكتات Lactate',
+    sao2: 'إشباع الأكسجين الشرياني SaO₂',
+    fio2: 'نسبة الأكسجين المستنشق FiO₂',
+    interpretation: 'تفسير وقراءة غازات الدم',
+    saveABG: 'حفظ تحليل ABG',
 
-    labs: {
-      title: 'نتائج التحاليل',
-      panel: 'مجموعة تحاليل',
-      result: 'النتيجة',
-      unit: 'الوحدة',
-      referenceRange: 'المعدل المرجعي',
-      normal: 'طبيعي',
-      high: 'مرتفع',
-      low: 'منخفض',
-      critical: 'حرج',
-      cbc: 'CBC',
-      chemistry: 'كيمياء الدم',
-      cardiac: 'مؤشرات القلب',
-      coagulation: 'التجلط',
-      inflammatory: 'مؤشرات الالتهاب',
-    },
+    // ECG
+    addECG: 'إضافة تخطيط قلب ECG',
+    editECG: 'تعديل تخطيط ECG',
+    deleteECG: 'حذف تخطيط ECG',
+    rhythm: 'النظم القلبي',
+    heartRate: 'معدل النبض (bpm)',
+    axis: 'المحور الكهربائي Axis',
+    prInterval: 'المسافة PR (ms)',
+    qrsDuration: 'عرض مركب QRS (ms)',
+    qtInterval: 'المسافة QT (ms)',
+    qtcInterval: 'المسافة المصححة QTc (ms)',
+    stChanges: 'تغيرات قطعة ST',
+    tChanges: 'تغيرات موجة T',
+    ecgAttachment: 'مرفق صورة تخطيط القلب',
+    uploadECGImage: 'رفع صورة التخطيط',
+    saveECG: 'حفظ سجل ECG',
 
-    abg: {
-      title: 'غازات الدم الشرياني',
-      ph: 'pH',
-      pco2: 'PaCO2',
-      po2: 'PaO2',
-      hco3: 'HCO3',
-      be: 'BE',
-      lactate: 'Lactate',
-      fio2: 'FiO2',
-      ratio: 'PaO2/FiO2',
-      interpretation: 'التفسير',
-      ventilatorMode: 'وضع جهاز التنفس',
-    },
+    // Echo
+    addEcho: 'إضافة فحص إيكو قلب Echo',
+    editEcho: 'تعديل فحص الإيكو',
+    deleteEcho: 'حذف فحص الإيكو',
+    ef: 'الكسر القذفي للبطين الأيسر (LVEF %)',
+    lvDimensions: 'أبعاد البطين الأيسر (LVEDD / LVESD)',
+    lvSystolic: 'الوظيفة الانقباضية للبطين الأيسر',
+    rvAssessment: 'تقييم البطين الأيمن',
+    tapse: 'قياس تابس TAPSE (mm)',
+    laRa: 'أبعاد الأذينتين (LA / RA)',
+    rwma: 'اضطراب حركة الجدر الموضعية (RWMA)',
+    diastolicFunction: 'الوظيفة الانبساطية',
+    valvularAssessment: 'تقييم الصمامات القلبية',
+    pasp: 'الضغط الرئوي التقديري (PASP mmHg)',
+    ivc: 'الوريد الأجوف السفلي وقابلية الانخماص IVC',
+    pericardium: 'التأمور وانصباب التأمور',
+    findings: 'أهم الموجودات',
+    impression: 'الخلاصة والتشخيص النهائي',
+    saveEcho: 'حفظ فحص الإيكو',
 
-    cardiology: {
-      title: 'العناية القلبية / القلب والأوعية',
-      ecg: 'ECG',
-      echo: 'Echo',
-      cath: 'قسطرة قلبية',
-      stent: 'دعامة',
-      ecgSummary: 'ملخص ECG',
-      stElevation: 'مشتقات ارتفاع ST',
-      arrhythmia: 'اضطراب النظم',
-      ef: 'EF',
-      echoFindings: 'نتائج Echo',
-      cathDate: 'تاريخ القسطرة',
-      cathFindings: 'نتائج القسطرة',
-      culpritLesion: 'الآفة المسؤولة',
-      stentType: 'نوع الدعامة',
-      stentDetails: 'تفاصيل الدعامة',
-      antiplatelets: 'مضادات الصفائح',
-      anticoagulation: 'مضادات التجلط',
-      timiFlow: 'تدفق TIMI',
-    },
+    // Imaging
+    addImaging: 'إضافة فحص أشعة / تصوير',
+    editImaging: 'تعديل فحص الأشعة',
+    deleteImaging: 'حذف فحص الأشعة',
+    imagingType: 'نوع التصوير الشعاعي',
+    cxr: 'أشعة الصدر البسيطة (CXR)',
+    ct: 'الأشعة المقطعية المحوسبة (CT)',
+    mri: 'الرنين المغناطيسي (MRI)',
+    ultrasound: 'الأمواج فوق الصوتية / السونار (US/POCUS)',
+    otherImaging: 'فحص شعاعي آخر',
+    uploadImage: 'رفع الصورة / التقرير',
+    previewImage: 'معاينة الصورة',
+    replaceImage: 'استبدال المرفق',
+    deleteAttachment: 'حذف المرفق',
+    saveImaging: 'حفظ فحص الأشعة',
 
-    icu: {
-      title: 'العناية المركزة',
-      scores: 'درجات تقييم الحالة',
-      ventilator: 'جهاز التنفس الصناعي',
-      gcs: 'GCS',
-      rass: 'RASS',
-      sofa: 'SOFA',
-      pupils: 'الحدقات',
-      delirium: 'CAM-ICU',
-      mode: 'الوضع',
-      peep: 'PEEP',
-      tidalVolume: 'الحجم الجاري',
-      rate: 'المعدل',
-      totalRate: 'المعدل الكلي',
-      peakPressure: 'Ppeak',
-      plateauPressure: 'Pplat',
-      ettSize: 'مقاس ETT',
-      ettDepth: 'عمق ETT',
-    },
+    // Medications & Infusions
+    addMedication: 'إضافة دواء جديد',
+    drugName: 'اسم الدواء التجاري / العلمي',
+    dose: 'الجرعة',
+    route: 'طريقة الإعطاء',
+    frequency: 'التكرار',
+    startDate: 'تاريخ البدء',
+    stopDate: 'تاريخ الإيقاف',
+    activeMeds: 'الأدوية الفعالة الحالية',
+    addInfusion: 'إضافة تسريب وريدي مستمر',
+    infusionDrug: 'مادة / سائل التسريب',
+    concentration: 'التركيز',
+    rate: 'معدل التسريب',
+    infusionUnit: 'وحدة التسريب',
+    infusionStatus: 'حالة التسريب',
+    running: 'جاري التسريب',
+    titrating: 'معايرة الجرعة',
+    held: 'موقوف مؤقتاً',
+    stopped: 'متوقف نهائياً',
 
-    treatment: {
-      medications: 'الأدوية',
-      infusions: 'المحاليل الوريدية / التسريبات',
-      procedures: 'الإجراءات',
-      consultations: 'الاستشارات',
-    },
+    // Input / Output
+    addIO: 'إضافة قيد صادر ووارد',
+    intakeOral: 'الوارد الفموي (mL)',
+    intakeIV: 'السوائل الوريدية (mL)',
+    intakeOther: 'واردات أخرى (mL)',
+    totalIntake: 'إجمالي الوارد',
+    outputUrine: 'الصادر البولي (mL)',
+    outputDrains: 'المفجرات والنزح (mL)',
+    outputOther: 'صادرات أخرى (mL)',
+    totalOutput: 'إجمالي الصادر',
+    runningBalance: 'الرصيد التراكمي للسوائل',
+    dailyBalance: 'رصيد سوائل 24 ساعة',
 
-    documentation: {
-      progressNotes: 'ملاحظات المتابعة',
-      dailyNotes: 'ملاحظات المتابعة اليومية',
-      clinicalEvents: 'الأحداث السريرية',
-      imaging: 'الأشعة والتصوير',
-      dischargePlan: 'خطة الخروج',
-      subjective: 'ذاتي',
-      objective: 'موضوعي',
-      assessment: 'التقييم',
-      plan: 'الخطة',
-      author: 'الطبيب',
-      indication: 'الداعي للفحص',
-      findings: 'النتائج',
-      impression: 'الانطباع',
-    },
+    // Progress Notes
+    addNote: 'إضافة ملاحظة سريرية',
+    noteAuthor: 'الطبيب / كاتب الملاحظة',
+    clinicalAssessment: 'التقييم السريري الشامل',
+    plan: 'الخطة العلاجية والدوائية',
+    freeTextNotes: 'الملاحظات التفصيلية',
+    saveNote: 'حفظ الملاحظة',
 
-    settings: {
-      title: 'الإعدادات',
-      language: 'اللغة',
-      languageDescription: 'اختر لغة التطبيق',
-      theme: 'المظهر',
-      themeDescription: 'اختر المظهر الفاتح أو الداكن أو مظهر الجهاز',
-      bedConfiguration: 'إعدادات الأسِرّة',
-      security: 'الأمان',
-      patientFields: 'حقول بيانات المريض',
-      cloudSync: 'المزامنة السحابية',
-      session: 'الجلسة',
-      totalBeds: 'إجمالي الأسِرّة',
-      saveBeds: 'حفظ إعدادات الأسِرّة',
-      lock: 'قفل التطبيق',
-      logout: 'تسجيل الخروج',
-    },
+    // Common Actions
+    save: 'حفظ التغييرات',
+    edit: 'تعديل',
+    delete: 'حذف',
+    cancel: 'إلغاء',
+    close: 'إغلاق',
+    confirm: 'تأكيد',
+    clear: 'مسح',
+    add: 'إضافة',
+    search: 'بحث...',
+    loading: 'جاري التحميل...',
+    print: 'طباعة الملخص السريري',
 
-    pdf: {
-      reportTitle: 'التقرير السريري للمريض',
-      generatedBy: 'تم إنشاء التقرير بواسطة CardioVault',
-      generatedAt: 'تاريخ ووقت الإنشاء',
-      unit: 'الوحدة',
-      patientInformation: 'بيانات المريض',
-      clinicalHistory: 'التاريخ المرضي',
-      physicalExamination: 'الفحص السريري',
-      vitalSigns: 'العلامات الحيوية',
-      inputOutput: 'السوائل الداخلة والخارجة',
-      laboratoryResults: 'نتائج التحاليل',
-      bloodGas: 'غازات الدم الشرياني',
-      cardiology: 'القلب والأوعية',
-      ecgStudies: 'دراسات ECG',
-      echoStudies: 'دراسات Echo',
-      imagingStudies: 'دراسات التصوير',
-      medications: 'الأدوية',
-      infusions: 'التسريبات',
-      procedures: 'الإجراءات',
-      progressNotes: 'ملاحظات المتابعة',
-      discharge: 'الخروج / النقل',
-      noInformation: 'لا توجد معلومات متاحة',
-    },
+    // Settings
+    settingsTitle: 'إعدادات CardioVault',
+    settingsSubtitle: 'تخصيص المظهر، لغة التطبيق، الإشعارات، الحساب والأمان السريري',
+    theme: 'المظهر والنمط',
+    themeLight: 'فاتح (Light)',
+    themeDark: 'داكن (Dark)',
+    themeSystem: 'تلقائي حسب النظام (System)',
+    language: 'لغة الواجهة',
+    languageEn: 'English (الإنجليزية)',
+    languageAr: 'العربية (Arabic)',
+    notifications: 'التنبيهات السريرية',
+    enableNotifications: 'تفعيل التنبيهات الفورية',
+    notificationDesc: 'استقبال تنبيهات العلامات الحيوية الحرجة، توقف التسريبات، ومواعيد المرور اليومي',
+    permissionAllowed: 'الإذن مفعل وممنوح',
+    permissionDenied: 'تم رفض الإذن في المتصفح',
+    requestPermission: 'طلب إذن الإشعارات',
+    account: 'الحساب والمزامنة السحابية',
+    contactUs: 'تواصل معنا',
+    about: 'عن تطبيق CardioVault',
+    aboutDesc: 'CardioVault هو مفكرة سريرية متقدمة ومنظومة توثيق رقمي لأطباء وفرق العناية المركزة والقلبية، مجهزة بحاسبات دقيقة وتوثيق فوري لخدمة المرضى.',
+    versionLabel: 'إصدار التطبيق',
 
-    status: {
-      stable: 'مستقر',
-      critical: 'حرج',
-      guarded: 'تحت المراقبة',
-      deteriorating: 'متدهور',
-      postOp: 'ما بعد الجراحة',
-      discharged: 'خرج',
-      empty: 'فارغ',
-    },
+    // Contact Us Modal
+    contactTitle: 'تواصل معنا والدعم الفني',
+    contactSubtitle: 'تواصل مع فريق تطوير المعلوماتية السريرية لتطبيق CardioVault',
+    contactEmail: 'البريد الإلكتروني للدعم',
+    contactTelegram: 'قناة الدعم والتحديثات (Telegram)',
+    contactPhone: 'خط الدعم الطبي',
+    subject: 'الموضوع',
+    message: 'نص الرسالة أو الاستفسار',
+    sendEmail: 'إرسال عبر البريد',
+    sendFeedback: 'إرسال الرسالة',
+    feedbackSuccess: 'شكراً لتواصلك! سيقوم فريق الدعم الطبي بالرد في أقرب وقت.',
 
-    messages: {
-      saved: 'تم الحفظ بنجاح',
-      deleted: 'تم الحذف بنجاح',
-      saveFailed: 'تعذر حفظ البيانات',
-      loadFailed: 'تعذر تحميل البيانات',
-      invalidData:
-        'تم العثور على بيانات قديمة أو غير مكتملة وتمت معالجتها بأمان.',
-      offline: 'أنت غير متصل بالإنترنت حاليًا',
-      online: 'تم استعادة الاتصال',
-      confirmDelete: 'هل أنت متأكد من حذف هذا المريض؟',
-      noInternet:
-        'لا يوجد اتصال بالإنترنت. بياناتك المحلية ما زالت متاحة.',
-    },
-  },
-} as const;
-
-type TranslationTree = typeof translations.en;
-
-let currentLanguage: AppLanguage = 'en';
-
-type LanguageListener = () => void;
-
-const languageListeners = new Set<LanguageListener>();
-
-function notifyLanguageListeners(): void {
-  languageListeners.forEach((listener) => {
-    try {
-      listener();
-    } catch {
-      // Ignore listener errors.
-    }
-  });
-}
-
-function subscribeToLanguage(listener: LanguageListener): () => void {
-  languageListeners.add(listener);
-
-  return () => {
-    languageListeners.delete(listener);
-  };
-}
-
-function getLanguageSnapshot(): AppLanguage {
-  return currentLanguage;
-}
-
-function detectDeviceLanguage(): AppLanguage {
-  if (typeof navigator === 'undefined') {
-    return 'en';
+    // Authentication
+    loginTitle: 'الدخول السريري والمزامنة السحابية',
+    signInWithGoogle: 'تسجيل الدخول السريع عبر Google',
+    signInEmail: 'تسجيل الدخول بالبريد الإلكتروني',
+    createAccount: 'إنشاء حساب طبيب جديد',
+    offlinePin: 'رمز PIN المحلي (بدون إنترنت)',
+    offlinePinDesc: 'العمل بدون إنترنت أو الدخول السريع عند سرير المريض برمز PIN المحلي',
+    loginSuccess: 'تم تسجيل الدخول بنجاح',
+    email: 'البريد الإلكتروني',
+    password: 'كلمة المرور',
+    confirmPassword: 'تأكيد كلمة المرور',
+    fullName: 'الاسم الكامل واللقب الطبي',
+    enterPin: 'أدخل رمز PIN المكون من 6 أرقام',
   }
+};
 
-  const language =
-    navigator.language ||
-    (Array.isArray(navigator.languages) ? navigator.languages[0] : '');
+export type TranslationKey = keyof typeof translations['en'];
 
-  return language?.toLowerCase().startsWith('ar') ? 'ar' : 'en';
-}
-
-export function getAppLanguage(): AppLanguage {
+export function getLanguage(): Language {
+  if (typeof window === 'undefined') return 'en';
   try {
-    const stored = localStorage.getItem(STORAGE_KEY_LANGUAGE);
-
-    if (stored === 'ar' || stored === 'en') {
-      currentLanguage = stored;
-      return stored;
-    }
-  } catch {
-    // Ignore storage errors.
-  }
-
-  currentLanguage = detectDeviceLanguage();
-  return currentLanguage;
+    const saved = localStorage.getItem(STORAGE_KEY_LANG);
+    if (saved === 'ar' || saved === 'en') return saved;
+    // Auto-detect browser language
+    const browserLang = navigator.language || (navigator as any).userLanguage || '';
+    if (browserLang.startsWith('ar')) return 'ar';
+  } catch {}
+  return 'en';
 }
 
-export function setAppLanguage(language: AppLanguage): void {
-  currentLanguage = language;
-
+export function setLanguage(lang: Language): void {
   try {
-    localStorage.setItem(STORAGE_KEY_LANGUAGE, language);
-  } catch {
-    // Ignore storage errors.
+    localStorage.setItem(STORAGE_KEY_LANG, lang);
+  } catch {}
+  applyLanguageToDom(lang);
+  window.dispatchEvent(new CustomEvent('cardiovault-lang-change', { detail: lang }));
+}
+
+export function applyLanguageToDom(lang: Language): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  if (lang === 'ar') {
+    document.documentElement.classList.add('rtl-mode');
+  } else {
+    document.documentElement.classList.remove('rtl-mode');
   }
-
-  applyLanguageToDom(language);
-  notifyLanguageListeners();
 }
 
-export function applyLanguageToDom(language: AppLanguage): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  const root = document.documentElement;
-
-  root.lang = language;
-  root.dir = language === 'ar' ? 'rtl' : 'ltr';
-
-  root.classList.toggle('rtl', language === 'ar');
-  root.classList.toggle('ltr', language === 'en');
-}
-
-export function initializeLanguage(): AppLanguage {
-  const language = getAppLanguage();
-
-  applyLanguageToDom(language);
-
-  return language;
-}
-
-export function getCurrentLanguage(): AppLanguage {
-  return currentLanguage;
-}
-
-/*
- * Compatibility alias.
- * main.tsx imports getLanguage, while the rest of the app
- * may use getAppLanguage / getCurrentLanguage.
- */
-export function getLanguage(): AppLanguage {
-  return getAppLanguage();
-}
-
-export function t<
-  T extends TranslationTree = TranslationTree
->(
-  path: string,
-  language: AppLanguage = currentLanguage
-): string {
-  const source = translations[language] ?? translations.en;
-
-  const value = path
-    .split('.')
-    .reduce<unknown>((current, key) => {
-      if (
-        current &&
-        typeof current === 'object' &&
-        key in current
-      ) {
-        return (current as Record<string, unknown>)[key];
-      }
-
-      return undefined;
-    }, source);
-
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  return path;
-}
-
-export function getDirection(
-  language: AppLanguage
-): 'rtl' | 'ltr' {
-  return language === 'ar' ? 'rtl' : 'ltr';
-}
-
-export function getLanguageName(language: AppLanguage): string {
-  return language === 'ar' ? 'العربية' : 'English';
+export function t(key: TranslationKey, lang?: Language): string {
+  const currentLang = lang || getLanguage();
+  const dict = translations[currentLang] || translations.en;
+  return (dict as any)[key] || (translations.en as any)[key] || key;
 }
 
 export function useI18n() {
-  const language = useSyncExternalStore(
-    subscribeToLanguage,
-    getLanguageSnapshot,
-    getLanguageSnapshot
-  );
+  const [lang, setLangState] = useState<Language>(() => getLanguage());
 
-  const translate = useCallback(
-    (path: string): string => t(path, language),
-    [language]
-  );
+  useEffect(() => {
+    applyLanguageToDom(lang);
 
-  const setLanguage = useCallback(
-    (nextLanguage: AppLanguage): void => {
-      setAppLanguage(nextLanguage);
-    },
-    []
-  );
+    const handleLangChange = (e: Event) => {
+      const customEvent = e as CustomEvent<Language>;
+      if (customEvent.detail) {
+        setLangState(customEvent.detail);
+      } else {
+        setLangState(getLanguage());
+      }
+    };
+
+    window.addEventListener('cardiovault-lang-change', handleLangChange);
+    return () => window.removeEventListener('cardiovault-lang-change', handleLangChange);
+  }, [lang]);
+
+  const changeLanguage = (newLang: Language) => {
+    setLangState(newLang);
+    setLanguage(newLang);
+  };
 
   return {
-    language,
-    t: translate,
-    direction: getDirection(language),
-    setLanguage,
+    lang,
+    isRtl: lang === 'ar',
+    t: (key: TranslationKey) => t(key, lang),
+    setLanguage: changeLanguage,
   };
 }
