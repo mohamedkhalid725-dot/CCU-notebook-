@@ -38,6 +38,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Show Android signing certificate
+        working-directory: android
+        run: ./gradlew signingReport
+
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug
