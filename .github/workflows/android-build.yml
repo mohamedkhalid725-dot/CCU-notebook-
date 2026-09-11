@@ -38,6 +38,19 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Create debug keystore
+        run: |
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -v \
+            -keystore ~/.config/.android/debug.keystore \
+            -storepass android \
+            -keypass android \
+            -alias AndroidDebugKey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Show Android signing certificate
         working-directory: android
         run: ./gradlew signingReport
