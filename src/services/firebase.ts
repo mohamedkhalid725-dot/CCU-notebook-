@@ -86,7 +86,7 @@ export async function registerWithEmail(
 export async function loginWithGoogle(): Promise<User> {
   // Android / iOS
   if (Capacitor.isNativePlatform()) {
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    const result = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
 
     const idToken = result.credential?.idToken;
 
