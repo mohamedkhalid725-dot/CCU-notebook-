@@ -1,12 +1,10 @@
 {
-  "projectId": "atlantean-replica-9dtd0",
-  "appId": "1:216805510125:web:547b1786ca81dc1234b5e4",
-  "apiKey": "AIzaSyCXiD-NLgI-anO7aFHuEYXCJc7Fp2yJY9E",
-  "authDomain": "atlantean-replica-9dtd0.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-icuccuclinicalno-20999f56-7fff-406e-ae68-70c015cd5887",
-  "storageBucket": "atlantean-replica-9dtd0.firebasestorage.app",
-  "messagingSenderId": "216805510125",
-  "measurementId": "",
-  "oAuthClientId": "216805510125-2939q6qr8o0enk8s4jn8g11kirj5ub2h.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "ccu-notebook",
+  "appId": "1:963615758407:web:1450d70d93670dc350b962",
+  "apiKey": "AIzaSyDo3vyGKW_Uf9qOWiiAe68euTaOA92xrmw",
+  "authDomain": "ccu-notebook.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "ccu-notebook.firebasestorage.app",
+  "messagingSenderId": "963615758407",
+  "measurementId": "G-5J0ELJ9082"
 }
