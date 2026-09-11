@@ -62,6 +62,8 @@ import {
   savePatientToCloud,
   deletePatientFromCloud,
   syncAllPatientsToCloud,
+  saveUserSettingsToCloud,
+  fetchUserSettingsFromCloud,
   logoutUser
 } from './services/firebase';
 
@@ -182,6 +184,7 @@ export default function App() {
 
         try {
           const cloudData = await fetchCloudPatients(user.uid);
+          const cloudSettings = await fetchUserSettingsFromCloud(user.uid);
 
           if (cloudData && cloudData.length > 0) {
             setPatients(cloudData);
@@ -194,6 +197,39 @@ export default function App() {
               user.uid,
               patients
             );
+          }
+
+          if (cloudSettings) {
+            if (typeof cloudSettings.totalBeds === 'number') {
+              const safeBeds = Math.max(
+                3,
+                Math.floor(cloudSettings.totalBeds)
+              );
+              setTotalBeds(safeBeds);
+              localStorage.setItem(
+                'icu_total_beds',
+                String(safeBeds)
+              );
+            }
+
+            if (
+              cloudSettings.specialtyMode === 'all' ||
+              cloudSettings.specialtyMode === 'ccu' ||
+              cloudSettings.specialtyMode === 'icu'
+            ) {
+              setSpecialtyMode(cloudSettings.specialtyMode);
+            }
+
+            if (cloudSettings.fieldConfig) {
+              setFieldConfig(cloudSettings.fieldConfig);
+              saveFieldConfig(cloudSettings.fieldConfig);
+            }
+          } else {
+            await saveUserSettingsToCloud(user.uid, {
+              totalBeds,
+              specialtyMode,
+              fieldConfig
+            });
           }
 
           setCloudSyncStatus('synced');
@@ -719,6 +755,14 @@ export default function App() {
       'icu_total_beds',
       String(safeCount)
     );
+
+    if (currentUser) {
+      saveUserSettingsToCloud(currentUser.uid, {
+        totalBeds: safeCount
+      }).catch((err) => {
+        console.error('Failed to sync bed settings:', err);
+      });
+    }
   };
 
   const handleUpdatePatientBed = useCallback(
@@ -743,6 +787,14 @@ export default function App() {
   ) => {
     setFieldConfig(newConfig);
     saveFieldConfig(newConfig);
+
+    if (currentUser) {
+      saveUserSettingsToCloud(currentUser.uid, {
+        fieldConfig: newConfig
+      }).catch((err) => {
+        console.error('Failed to sync field configuration:', err);
+      });
+    }
   };
 
   // =========================================================
@@ -1079,11 +1131,11 @@ export default function App() {
             Clinical Dashboard
           </p>
 
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
             CardioVault
           </h2>
 
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             ICU & CCU patient management
           </p>
         </div>
@@ -1098,7 +1150,7 @@ export default function App() {
             flex items-center justify-center gap-2
             bg-cyan-600
             hover:bg-cyan-500
-            text-white
+            text-slate-900 dark:text-white
             px-4 py-3
             rounded-xl
             font-semibold
@@ -1154,11 +1206,11 @@ export default function App() {
 
       <div className="grid lg:grid-cols-3 gap-4">
 
-        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
 
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
                 Current Patients
               </h3>
 
@@ -1181,7 +1233,7 @@ export default function App() {
             <div className="py-12 text-center">
               <Users className="w-10 h-10 text-slate-700 mx-auto" />
 
-              <p className="text-sm text-slate-400 mt-3">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
                 No active patients
               </p>
 
@@ -1210,16 +1262,16 @@ export default function App() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
 
-          <h3 className="font-semibold text-white">
+          <h3 className="font-semibold text-slate-900 dark:text-white">
             Bed Overview
           </h3>
 
           <div className="mt-4 space-y-3">
 
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-600 dark:text-slate-400">
                 Occupied
               </span>
 
@@ -1228,7 +1280,7 @@ export default function App() {
               </span>
             </div>
 
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-cyan-500 rounded-full"
                 style={{
@@ -1248,7 +1300,7 @@ export default function App() {
 
             <div className="grid grid-cols-2 gap-2 pt-2">
 
-              <div className="rounded-xl bg-slate-800/70 p-3">
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/70 p-3">
                 <p className="text-[10px] text-slate-500">
                   Stable
                 </p>
@@ -1258,7 +1310,7 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="rounded-xl bg-slate-800/70 p-3">
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/70 p-3">
                 <p className="text-[10px] text-slate-500">
                   Guarded
                 </p>
@@ -1282,8 +1334,8 @@ export default function App() {
               rounded-xl
               border border-slate-700
               text-xs
-              text-slate-300
-              hover:bg-slate-800
+              text-slate-700 dark:text-slate-300
+              hover:bg-slate-100 dark:bg-slate-800
             "
           >
             Open Bed Board
@@ -1291,12 +1343,12 @@ export default function App() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
 
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-4 h-4 text-cyan-400" />
 
-          <h3 className="font-semibold text-white">
+          <h3 className="font-semibold text-slate-900 dark:text-white">
             Quick Clinical Tools
           </h3>
         </div>
@@ -1307,10 +1359,10 @@ export default function App() {
             onClick={() =>
               setShowCalculators(true)
             }
-            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
           >
             <Activity className="w-4 h-4 text-amber-400" />
-            <p className="text-xs font-semibold text-white mt-2">
+            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
               Calculators
             </p>
           </button>
@@ -1319,10 +1371,10 @@ export default function App() {
             onClick={() =>
               setShowCustomizer(true)
             }
-            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
           >
             <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
-            <p className="text-xs font-semibold text-white mt-2">
+            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
               Customize
             </p>
           </button>
@@ -1331,10 +1383,10 @@ export default function App() {
             onClick={() =>
               setShowCloudAccountModal(true)
             }
-            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
           >
             <Cloud className="w-4 h-4 text-emerald-400" />
-            <p className="text-xs font-semibold text-white mt-2">
+            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
               Cloud Sync
             </p>
           </button>
@@ -1343,10 +1395,10 @@ export default function App() {
             onClick={() =>
               setShowSecurityModal(true)
             }
-            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-left"
+            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
           >
             <ShieldCheck className="w-4 h-4 text-violet-400" />
-            <p className="text-xs font-semibold text-white mt-2">
+            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
               Security
             </p>
           </button>

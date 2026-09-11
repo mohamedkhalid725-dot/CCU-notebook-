@@ -1,6 +1,8 @@
 import React from 'react';
 import { PatientRecord } from '../types';
 import { Printer, X, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface PrintableViewProps {
   patients: PatientRecord[];
@@ -15,8 +17,66 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
 }) => {
   const recordsToPrint = activePatient ? [activePatient] : patients;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const element = document.getElementById('printable-report');
+    if (!element) {
+      window.print();
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(
+        imgData,
+        'JPEG',
+        0,
+        position,
+        imgWidth,
+        imgHeight
+      );
+
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(
+          imgData,
+          'JPEG',
+          0,
+          position,
+          imgWidth,
+          imgHeight
+        );
+        heightLeft -= pageHeight;
+      }
+
+      const fileName = activePatient
+        ? `CardioVault_${activePatient.name.replace(/[^a-z0-9_-]/gi, '_')}_Report.pdf`
+        : `CardioVault_Census_Report.pdf`;
+
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      window.print();
+    }
   };
 
   return (
@@ -47,7 +107,7 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
       </div>
 
       {/* Printable Sheet (Styling optimized for paper and PDF export) */}
-      <div className="max-w-4xl mx-auto w-full my-6 p-8 bg-white text-slate-900 rounded-xl shadow-2xl print:m-0 print:p-4 print:shadow-none print:w-full print:max-w-none text-xs leading-normal">
+      <div id="printable-report" className="max-w-4xl mx-auto w-full my-6 p-8 bg-white text-slate-900 rounded-xl shadow-2xl print:m-0 print:p-4 print:shadow-none print:w-full print:max-w-none text-xs leading-normal">
         <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">

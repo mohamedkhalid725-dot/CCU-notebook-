@@ -442,7 +442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           MOBILE TOP HEADER
           ========================================================= */}
 
-      <header className="md:hidden sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
+      <header className="md:hidden sticky top-0 z-30 pt-[env(safe-area-inset-top)] bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
 
         <div className="px-4 py-3">
 
@@ -534,66 +534,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           </div>
 
-          {/* Mobile Specialty Switcher */}
-
-          <div className="flex items-center gap-1 mt-3 pt-3 border-t border-slate-800">
-
-            <button
-              onClick={() =>
-                onSetSpecialtyMode('all')
-              }
-              className={`
-                flex-1 py-1.5 rounded-lg
-                text-[10px] font-semibold
-                ${
-                  specialtyMode === 'all'
-                    ? 'bg-slate-800 text-cyan-300'
-                    : 'text-slate-400'
-                }
-              `}
-            >
-              All
-            </button>
-
-            <button
-              onClick={() =>
-                onSetSpecialtyMode('ccu')
-              }
-              className={`
-                flex-1 py-1.5 rounded-lg
-                text-[10px] font-semibold
-                flex items-center justify-center gap-1
-                ${
-                  specialtyMode === 'ccu'
-                    ? 'bg-rose-950 text-rose-300'
-                    : 'text-slate-400'
-                }
-              `}
-            >
-              <HeartPulse className="w-3 h-3" />
-              CCU
-            </button>
-
-            <button
-              onClick={() =>
-                onSetSpecialtyMode('icu')
-              }
-              className={`
-                flex-1 py-1.5 rounded-lg
-                text-[10px] font-semibold
-                flex items-center justify-center gap-1
-                ${
-                  specialtyMode === 'icu'
-                    ? 'bg-blue-950 text-blue-300'
-                    : 'text-slate-400'
-                }
-              `}
-            >
-              <Activity className="w-3 h-3" />
-              ICU
-            </button>
-
-          </div>
+    
 
         </div>
 
