@@ -33,3 +33,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(16, 185, 129, 0.5);
 }
+
+/* Keep every clinical-calculator item label visible on the dark modal. */
+#clinical-calculators label,
+#clinical-calculators label span {
+  color: #e2e8f0 !important;
+}
