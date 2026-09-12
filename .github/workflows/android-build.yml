@@ -37,21 +37,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Restore debug keystore
-        env:
-          ANDROID_DEBUG_KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
-        run: |
-          mkdir -p ~/.config/.android
-          echo "$ANDROID_DEBUG_KEYSTORE" | base64 --decode > ~/.config/.android/debug.keystore
-
-      - name: Verify debug keystore
-        run: |
-          ls -lh ~/.config/.android/debug.keystore
-          keytool -list -v \
-            -keystore ~/.config/.android/debug.keystore \
-            -storepass android \
-            -alias AndroidDebugKey
-
       - name: Show Android signing certificate
         working-directory: android
         run: ./gradlew signingReport
