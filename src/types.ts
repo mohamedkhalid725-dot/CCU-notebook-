@@ -28,9 +28,6 @@ export interface DischargeDetails {
 
 export type SpecialtyMode = 'all' | 'ccu' | 'icu';
 
-/**
- * Main application bottom-navigation tabs.
- */
 export type AppTab =
   | 'home'
   | 'patients'
@@ -159,31 +156,21 @@ export type AppTheme = 'light' | 'dark' | 'system';
 
 export interface LabResults {
   timestamp: string;
-
-  // CBC
   hb?: string;
   wbc?: string;
   platelets?: string;
-
-  // Chemistry
   na?: string;
   k?: string;
   cl?: string;
   urea?: string;
   creatinine?: string;
   glucose?: string;
-
-  // Cardiac / CCU
   troponin?: string;
   ckmb?: string;
   bnp?: string;
-
-  // Coagulation
   pt?: string;
   inr?: string;
   aptt?: string;
-
-  // Inflammatory
   crp?: string;
   pct?: string;
   lactate?: string;
@@ -208,19 +195,15 @@ export interface CCUCardiology {
   ecgSummary: string;
   stElevationLeads?: string;
   arrhythmia?: string;
-
   echoEF: string;
   echoFindings: string;
-
   cathDate?: string;
   cathFindings?: string;
   culpritLesion?: string;
   stentType?: string;
   stentDetails?: string;
-
   antiplatelets: string;
   anticoagulation: string;
-
   timiFlowPost?: string;
 }
 
@@ -229,33 +212,21 @@ export interface ICUScores {
   gcsEye: number;
   gcsVerbal: number;
   gcsMotor: number;
-
   rass: number;
-
   sofaScore: number;
-
   pupils?: string;
-
-  deliriumCamICU?:
-    | 'positive'
-    | 'negative'
-    | 'unassessable';
+  deliriumCamICU?: 'positive' | 'negative' | 'unassessable';
 }
 
 export interface VentilatorSettings {
   mode: string;
-
   fio2: number | string;
   peep: number | string;
-
   tv: number | string;
   rate: number | string;
-
   totalRate?: number | string;
-
   pPeak?: number | string;
   pPlat?: number | string;
-
   etTubeSize?: string;
   etTubeDepth?: string;
 }
@@ -264,34 +235,27 @@ export interface VentilatorRecord {
   id: string;
   timestamp: string;
   recordedBy?: string;
-  // Mode & Airway
   mode: string;
   airwayType?: 'ETT' | 'Tracheostomy' | 'NIV Mask' | 'High-Flow Nasal Cannula (HFNC)' | 'T-Piece';
   etTubeSize?: string;
   etTubeDepth?: string;
-  // Oxygenation
   fio2: number | string;
   peep: number | string;
   spo2Target?: string;
-  // Volume / Pressure
   tidalVolume?: number | string;
   inspiratoryPressure?: number | string;
   pressureSupport?: number | string;
   peakPressure?: number | string;
   plateauPressure?: number | string;
   drivingPressure?: number | string;
-  // Respiratory Rate
   setRate?: number | string;
   actualRate?: number | string;
-  // Timing & Flow
   ieRatio?: string;
   inspiratoryTime?: number | string;
   inspiratoryFlow?: number | string;
-  // Additional Parameters
   triggerType?: 'Flow' | 'Pressure';
   sensitivity?: string;
   riseTime?: string;
-  // Monitoring & Mechanics
   minuteVentilation?: number | string;
   exhaledTidalVolume?: number | string;
   compliance?: number | string;
@@ -309,13 +273,7 @@ export interface Medication {
   stopDate?: string;
   status?: 'active' | 'held' | 'discontinued';
   notes?: string;
-
-  category?:
-    | 'antibiotic'
-    | 'cardiac'
-    | 'sedation'
-    | 'gi'
-    | 'other';
+  category?: 'antibiotic' | 'cardiac' | 'sedation' | 'gi' | 'other';
 }
 
 export interface Infusion {
@@ -350,25 +308,15 @@ export interface InfusionDrug {
 
 export interface ProgressNote {
   id: string;
-
   timestamp: string;
   author: string;
-
   title?: string;
-
   subjective?: string;
   objective?: string;
-
   assessment: string;
   plan: string;
   content?: string;
-
-  tag?:
-    | 'Round'
-    | 'Event'
-    | 'Procedure'
-    | 'Consult'
-    | 'Handover';
+  tag?: 'Round' | 'Event' | 'Procedure' | 'Consult' | 'Handover';
 }
 
 export interface DailyRoundNote {
@@ -381,16 +329,7 @@ export interface DailyRoundNote {
   objectiveLabs?: string;
   assessment: string;
   planGeneral?: string;
-  planBySystem?: {
-    cvs?: string;
-    rs?: string;
-    cns?: string;
-    renal?: string;
-    gi?: string;
-    id?: string;
-    hematology?: string;
-    prophylaxis?: string;
-  };
+  planBySystem?: { cvs?: string; rs?: string; cns?: string; renal?: string; gi?: string; id?: string; hematology?: string; prophylaxis?: string };
   todoList?: Array<{ id: string; text: string; done: boolean }>;
   author?: string;
   title?: string;
@@ -416,7 +355,6 @@ export interface Procedure {
   procedureName?: string;
   date?: string;
   timestamp?: string;
-
   site?: string;
   performer?: string;
   operator?: string;
@@ -433,7 +371,6 @@ export interface ProcedureRecord {
   procedureName: string;
   date?: string;
   timestamp: string;
-
   site?: string;
   performer?: string;
   operator?: string;
@@ -442,6 +379,14 @@ export interface ProcedureRecord {
   complications?: string;
   postProcedurePlan?: string;
   notes?: string;
+}
+
+export interface ClinicalCalculatorRecord {
+  id: string;
+  calculator: string;
+  score: number;
+  interpretation: string;
+  timestamp: string;
 }
 
 export type FluidBalanceRecord = IOEntry;
@@ -465,23 +410,16 @@ export interface DischargePlan {
 
 export interface PatientRecord {
   id: string;
-
-  // Basic patient information
   bedNumber: number | string;
   bedName?: string;
   previousBedNumber?: number | string;
   name: string;
   age: number | string;
-
   gender: 'Male' | 'Female' | 'Other';
-
   mrn: string;
-
   admissionDate: string;
-
   status: BedStatus;
   isDischarged?: boolean;
-
   primaryDiagnosis: string;
   diagnosis?: string;
   secondaryDiagnoses: string[];
@@ -493,8 +431,6 @@ export interface PatientRecord {
   allergies?: string;
   familyHistory?: string;
   socialHistory?: string;
-
-  // Physical Examination
   examinationSummary: string;
   generalExamination?: string;
   cardiovascularExamination?: string;
@@ -503,47 +439,33 @@ export interface PatientRecord {
   cnsExamination?: string;
   peripheralVascularExamination?: string;
   otherExamination?: string;
-
   codeStatus?: string;
   attendingPhysician?: string;
-
-  // Clinical tracking
   vitals: VitalSignEntry[];
   ioRecords: IOEntry[];
   fluidBalanceRecords?: IOEntry[];
   labs: LabResults[];
   labPanels?: LabPanelRecord[];
   abgRecords: ABGEntry[];
-
-  // Diagnostic Studies (Multiple records)
   ecgRecords?: ECGRecord[];
   echoStudies?: EchoStudy[];
   imagingStudies?: ImagingStudy[];
-
-  // Specialty data
   ccuData: CCUCardiology;
   icuVentilator: VentilatorSettings;
   ventilationRecords?: VentilatorRecord[];
   icuScores: ICUScores;
-
-  // Therapies & Interventions
   medications: Medication[];
   infusions: Infusion[];
   procedures: Procedure[];
-
-  // Documentation
+  clinicalCalculations?: ClinicalCalculatorRecord[];
   progressNotes: ProgressNote[];
   dailyNotes?: ProgressNote[];
   clinicalEvents?: ClinicalEvent[];
   consultations?: string;
   imagingSummary?: string;
-
-  // Disposition
   dischargeTransferPlan?: string;
   dischargeDetails?: DischargeDetails;
   dischargePlan?: DischargePlan;
-
-  // Metadata
   lastUpdated?: string;
   lastSyncedAt?: string;
 }
