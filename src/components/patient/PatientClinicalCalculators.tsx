@@ -40,6 +40,7 @@ export const PatientClinicalCalculators: React.FC<Props> = ({ patient, onUpdateP
     stroke: false,
     vascular: false,
     abnormalRenal: false,
+    abnormalLiver: false,
     bleeding: false,
     labileINR: false,
     drugsAlcohol: false,
@@ -162,7 +163,7 @@ export const PatientClinicalCalculators: React.FC<Props> = ({ patient, onUpdateP
 
         {calculator === 'chadsvasc' && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Toggle label="Congestive heart failure / LV dysfunction" field="chf" /><Toggle label="Hypertension" field="hypertension" /><Toggle label="Diabetes mellitus" field="diabetes" /><Toggle label="Prior stroke / TIA / thromboembolism" field="stroke" /><Toggle label="Vascular disease (MI/PAD/aortic plaque)" field="vascular" /><div className="text-xs text-slate-500">Age and sex are taken from the patient file: {patient.age} / {patient.gender}.</div></div>}
 
-        {calculator === 'hasbled' && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Toggle label="Abnormal renal function" field="abnormalRenal" /><Toggle label="Abnormal liver function" field="abnormalLiver" /><Toggle label="Prior stroke" field="stroke" /><Toggle label="Prior major bleeding / predisposition" field="bleeding" /><Toggle label="Labile INR" field="labileINR" /><Toggle label="Drugs / alcohol predisposing to bleeding" field="drugsAlcohol" /><div className="text-xs text-slate-500">Age >65 is counted automatically when applicable.</div></div>}
+        {calculator === 'hasbled' && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Toggle label="Abnormal renal function" field="abnormalRenal" /><Toggle label="Abnormal liver function" field="abnormalLiver" /><Toggle label="Prior stroke" field="stroke" /><Toggle label="Prior major bleeding / predisposition" field="bleeding" /><Toggle label="Labile INR" field="labileINR" /><Toggle label="Drugs / alcohol predisposing to bleeding" field="drugsAlcohol" /><div className="text-xs text-slate-500">Age &gt;65 is counted automatically when applicable.</div></div>}
 
         <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
           <div><div className="text-xs text-slate-500">{result.label}</div><div className="text-2xl font-black text-slate-900 dark:text-white">{result.score}</div><div className="text-xs font-semibold text-emerald-600">{result.interpretation}</div></div>
