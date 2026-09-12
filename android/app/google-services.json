@@ -54,6 +54,14 @@
           }
         },
         {
+          "client_id": "963615758407-o5qdl4skh86te5p1cotmlcnhpglef8nv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ccunotebook.app",
+            "certificate_hash": "672d141b148345e1feaafa1ce3fe998a04f589a3"
+          }
+        },
+        {
           "client_id": "963615758407-4mqf4obq64h2ucpb7cdm8mc56mmj6qmg.apps.googleusercontent.com",
           "client_type": 3
         }
