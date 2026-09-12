@@ -163,9 +163,42 @@ export default function App() {
 
     try {
       const loaded = await loadPatients(pin);
+
+      // If the user is logged in, restore patients from Cloud first.
+      if (currentUser) {
+        try {
+          const cloudData = await fetchCloudPatients(
+            currentUser.uid
+          );
+
+          if (cloudData.length > 0) {
+            setPatients(cloudData);
+
+            // Save the restored Cloud data locally
+            // using the current PIN.
+            await savePatients(
+              cloudData,
+              pin
+            );
+
+            setCloudSyncStatus('synced');
+            return;
+          }
+        } catch (cloudErr) {
+          console.error(
+            'Failed to restore patients from cloud:',
+            cloudErr
+          );
+        }
+      }
+
+      // If there is no Cloud data, use local data.
       setPatients(loaded);
     } catch (err) {
-      console.error('Failed to load patient records', err);
+      console.error(
+        'Failed to load patient records',
+        err
+      );
     }
   };
 
