@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Printer, X, Download, Share2, Loader2, Check, AlertCircle, HeartPulse, FileText, UserRound, AlertTriangle, Stethoscope, Activity, Bed, Syringe, Wind, ClipboardList, Calculator, FlaskConical, ScanLine, CheckSquare, Flag, Waves } from 'lucide-react';
+import { Printer, X, Download, Share2, Loader2, Check, AlertCircle, HeartPulse, FileText, UserRound, AlertTriangle, Stethoscope, Activity, Bed, Syringe, ClipboardList, Calculator, FlaskConical, CheckSquare, Flag, Waves } from 'lucide-react';
 import { PatientRecord } from '../types';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -162,7 +162,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
           const latestVital = patient.vitals?.[patient.vitals.length - 1];
           const latestAbg = patient.abgRecords?.[patient.abgRecords.length - 1];
           const latestLab = patient.labs?.[patient.labs.length - 1];
-          const latestVent = patient.ventilationRecords?.[patient.ventilationRecords.length - 1];
           const latestEcg = patient.ecgRecords?.[patient.ecgRecords.length - 1];
           const latestEcho = patient.echoStudies?.[patient.echoStudies.length - 1];
           const latestImaging = patient.imagingStudies?.[patient.imagingStudies.length - 1];
@@ -173,11 +172,31 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
           const admission = safe(patient.admissionDate);
           const physician = safe(patient.attendingPhysician, 'Dr. Consultant');
           const allergies = safe(patient.allergies, 'No known drug allergies (NKDA)');
-          const labEntries = latestLab ? [
+
+          // The patient file can store labs in either the legacy labs array or the newer labPanels/items structure.
+          // Prefer the most recently recorded panel when present, then merge any legacy structured values without duplicates.
+          const latestLabPanel = patient.labPanels?.length
+            ? [...patient.labPanels].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp))).at(-1)
+            : undefined;
+          const panelEntries = latestLabPanel?.items?.map(item => ({
+            name: item.name,
+            value: item.result,
+            unit: item.unit || '',
+            timestamp: latestLabPanel.timestamp,
+            status: item.status
+          })) || [];
+          const legacyEntries = latestLab ? [
             ['Hb', latestLab.hb, 'g/dL'], ['WBC', latestLab.wbc, '10³/µL'], ['Platelets', latestLab.platelets, '10³/µL'],
             ['Creatinine', latestLab.creatinine, 'mg/dL'], ['Na⁺', latestLab.na, 'mmol/L'], ['K⁺', latestLab.k, 'mmol/L'],
             ['Troponin I', latestLab.troponin, 'ng/mL'], ['INR', latestLab.inr, '']
-          ].filter(([, value]) => value !== undefined && value !== null && value !== '') : [];
+          ].filter(([, value]) => value !== undefined && value !== null && value !== '')
+            .map(([name, value, unit]) => ({ name: String(name), value: String(value), unit: String(unit), timestamp: latestLab.timestamp })) : [];
+          const panelNames = new Set(panelEntries.map(entry => entry.name.trim().toLowerCase()));
+          const labEntries = [
+            ...panelEntries,
+            ...legacyEntries.filter(entry => !panelNames.has(entry.name.trim().toLowerCase()))
+          ];
+
           return (
             <div key={patient.id} className={`${index > 0 ? 'pt-5 mt-5 border-t-2 border-slate-300' : ''} px-6 pb-6`}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-0 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden cv-break">
@@ -201,10 +220,7 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
                 <Card><SectionHeader icon={<Bed className="w-5 h-5" />} title="Admission Information" /><div className="p-3 space-y-1.5"><LabelValue label="Admission Date & Time" value={admission} /><LabelValue label="Attending Physician" value={physician} /><LabelValue label="Source of Admission" value="Emergency Department" /><LabelValue label="Reason for Admission" value={patient.chiefComplaint || patient.primaryDiagnosis} /></div></Card>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 cv-break">
-                <div className="md:col-span-2"><Card><SectionHeader icon={<Syringe className="w-5 h-5" />} title="Procedures & Interventions" />{procedures.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50 text-slate-700"><th className="border border-slate-200 px-2 py-2 text-left">Date / Time</th><th className="border border-slate-200 px-2 py-2 text-left">Procedure</th><th className="border border-slate-200 px-2 py-2 text-left">Indication</th><th className="border border-slate-200 px-2 py-2 text-left">Performed by</th><th className="border border-slate-200 px-2 py-2 text-left">Outcome / Notes</th></tr></thead><tbody>{[...procedures].sort((a,b) => String(a.timestamp || a.date || '').localeCompare(String(b.timestamp || b.date || ''))).map(proc => <tr key={proc.id}><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.timestamp || proc.date)}</td><td className="border border-slate-200 px-2 py-2 align-top font-semibold">{safe(proc.procedureName || proc.name)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.indication)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.operator || proc.performer)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.details || proc.notes)}{proc.complications ? ` Complications: ${proc.complications}` : ''}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No procedures documented.</div>}</Card></div>
-                <Card><SectionHeader icon={<Wind className="w-5 h-5" />} title="Respiratory & Ventilator Status" /><div className="p-3 space-y-1.5"><LabelValue label="Mode" value={latestVent?.mode || patient.icuVentilator?.mode || 'Room Air / NC'} /><LabelValue label="FiO₂" value={latestVent?.fio2 ?? patient.icuVentilator?.fio2 ?? 21} /><LabelValue label="PEEP" value={latestVent?.peep ?? patient.icuVentilator?.peep ?? 0} /><LabelValue label="SpO₂" value={latestVital?.spo2} /><LabelValue label="Airway" value={latestVent?.airwayType || 'Spontaneous'} /><LabelValue label="Notes" value={latestVent ? latestVent.notes : 'Not intubated.'} /></div></Card>
-              </div>
+              <div className="mt-3 cv-break"><Card><SectionHeader icon={<Syringe className="w-5 h-5" />} title="Procedures & Interventions" />{procedures.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50 text-slate-700"><th className="border border-slate-200 px-2 py-2 text-left">Date / Time</th><th className="border border-slate-200 px-2 py-2 text-left">Procedure</th><th className="border border-slate-200 px-2 py-2 text-left">Indication</th><th className="border border-slate-200 px-2 py-2 text-left">Performed by</th><th className="border border-slate-200 px-2 py-2 text-left">Outcome / Notes</th></tr></thead><tbody>{[...procedures].sort((a,b) => String(a.timestamp || a.date || '').localeCompare(String(b.timestamp || b.date || ''))).map(proc => <tr key={proc.id}><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.timestamp || proc.date)}</td><td className="border border-slate-200 px-2 py-2 align-top font-semibold">{safe(proc.procedureName || proc.name)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.indication)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.operator || proc.performer)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.details || proc.notes)}{proc.complications ? ` Complications: ${proc.complications}` : ''}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No procedures documented.</div>}</Card></div>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3 cv-break">
                 <div className="md:col-span-3"><Card><SectionHeader icon={<ClipboardList className="w-5 h-5" />} title="Latest Progress Notes" />{notes.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Date / Time</th><th className="border border-slate-200 px-2 py-2 text-left">Author</th><th className="border border-slate-200 px-2 py-2 text-left">Note</th></tr></thead><tbody>{notes.slice(-5).reverse().map(note => <tr key={note.id}><td className="border border-slate-200 px-2 py-2 align-top whitespace-nowrap">{note.timestamp}</td><td className="border border-slate-200 px-2 py-2 align-top whitespace-nowrap">{note.author}</td><td className="border border-slate-200 px-2 py-2 align-top"><b>A:</b> {safe(note.assessment)}<br /><b>P:</b> {safe(note.plan)}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No progress notes documented.</div>}</Card></div>
@@ -212,7 +228,7 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3 cv-break">
-                <div className="md:col-span-2"><Card><SectionHeader icon={<FlaskConical className="w-5 h-5" />} title="Laboratory Results" subtitle="(Latest)" />{labEntries.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Test</th><th className="border border-slate-200 px-2 py-2 text-left">Result</th><th className="border border-slate-200 px-2 py-2 text-left">Unit</th><th className="border border-slate-200 px-2 py-2 text-left">Date</th></tr></thead><tbody>{labEntries.map(([name,value,unit]) => <tr key={name}><td className="border border-slate-200 px-2 py-1.5">{name}</td><td className="border border-slate-200 px-2 py-1.5 font-semibold">{safe(value)}</td><td className="border border-slate-200 px-2 py-1.5">{unit}</td><td className="border border-slate-200 px-2 py-1.5">{latestLab?.timestamp ? new Date(latestLab.timestamp).toLocaleDateString('en-GB') : '—'}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No laboratory results documented.</div>}</Card></div>
+                <div className="md:col-span-2"><Card><SectionHeader icon={<FlaskConical className="w-5 h-5" />} title="Laboratory Results" subtitle={labEntries.length ? '(Latest)' : ''} />{labEntries.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Test</th><th className="border border-slate-200 px-2 py-2 text-left">Result</th><th className="border border-slate-200 px-2 py-2 text-left">Unit</th><th className="border border-slate-200 px-2 py-2 text-left">Date</th></tr></thead><tbody>{labEntries.map((entry, index) => <tr key={`${entry.name}-${index}`}><td className="border border-slate-200 px-2 py-1.5">{entry.name}</td><td className="border border-slate-200 px-2 py-1.5 font-semibold">{safe(entry.value)}</td><td className="border border-slate-200 px-2 py-1.5">{entry.unit}</td><td className="border border-slate-200 px-2 py-1.5">{entry.timestamp ? new Date(entry.timestamp).toLocaleDateString('en-GB') : '—'}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No laboratory results documented.</div>}</Card></div>
                 <div className="md:col-span-2"><Card><SectionHeader icon={<Waves className="w-5 h-5" />} title="Imaging & Cardiac Studies" /><div className="p-3 space-y-3">{latestEcg && <div><div className="font-black text-[12px]">▪ 12-Lead ECG</div><div className="pl-3 text-[11px]">{safe(latestEcg.interpretation || latestEcg.rhythm)}{latestEcg.notes ? ` — ${latestEcg.notes}` : ''}</div></div>}{latestEcho && <div><div className="font-black text-[12px]">▪ Echocardiography</div><div className="pl-3 text-[11px]">EF {safe(latestEcho.ef)}, {safe(latestEcho.impression)}{latestEcho.rwma ? ` RWMA: ${latestEcho.rwma}` : ''}</div></div>}{latestImaging && <div><div className="font-black text-[12px]">▪ {latestImaging.type}</div><div className="pl-3 text-[11px]">{safe(latestImaging.impression || latestImaging.findings)}</div></div>}{!latestEcg && !latestEcho && !latestImaging && <div className="text-slate-500">No imaging or cardiac studies documented.</div>}{latestAbg && <div><div className="font-black text-[12px]">▪ Latest ABG</div><div className="pl-3 text-[11px]">pH {latestAbg.ph} • PaCO₂ {latestAbg.pco2} • HCO₃ {latestAbg.hco3} • Lactate {latestAbg.lactate} • FiO₂ {latestAbg.fio2}</div></div>}</div></Card></div>
                 <div className="md:col-span-1"><Card><SectionHeader icon={<CheckSquare className="w-5 h-5" />} title="Current Plan" /><div className="p-3 text-[11px] space-y-2">{patient.dischargeTransferPlan ? patient.dischargeTransferPlan.split(/\n|;/).filter(Boolean).map((item,i) => <div key={i}><b>{i + 1}.</b> {item.trim()}</div>) : <><div><b>1.</b> Continue monitoring and targeted medical management.</div><div><b>2.</b> Review latest investigations and clinical response.</div><div><b>3.</b> Continue appropriate medications and supportive care.</div></>}</div></Card></div>
               </div>
