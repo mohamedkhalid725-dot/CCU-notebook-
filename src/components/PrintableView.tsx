@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { Printer, X, Download, Share2, Loader2, Check, AlertCircle, HeartPulse, FileText, UserRound, AlertTriangle, Stethoscope, Activity, Bed, Syringe, Wind, ClipboardList, Calculator, FlaskConical, ScanLine, CheckSquare, Flag, Waves } from 'lucide-react';
 import { PatientRecord } from '../types';
-import { Printer, X, Download, Share2, Loader2, Check, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { Capacitor } from '@capacitor/core';
@@ -8,6 +8,35 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 
 interface PrintableViewProps { patients: PatientRecord[]; activePatient?: PatientRecord | null; onClose: () => void; }
 const safe = (value: unknown, fallback = '—') => value === undefined || value === null || value === '' ? fallback : String(value);
+const generatedAt = () => new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const statusLabel = (status: string) => status ? status.replace(/-/g, ' ').toUpperCase() : '—';
+
+const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string }> = ({ icon, title, subtitle }) => (
+  <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-50 to-slate-50 border-b border-slate-200 rounded-t-xl">
+    <span className="text-emerald-700">{icon}</span>
+    <span className="text-[13px] font-extrabold text-emerald-800">{title}</span>
+    {subtitle && <span className="text-[10px] font-medium text-slate-500">{subtitle}</span>}
+  </div>
+);
+
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <section className={`rounded-xl border border-slate-200 bg-white overflow-hidden ${className}`}>{children}</section>
+);
+
+const LabelValue: React.FC<{ label: string; value: unknown; className?: string }> = ({ label, value, className = '' }) => (
+  <div className={className}>
+    <div className="text-[10px] font-bold text-slate-600">{label}:</div>
+    <div className="text-[11px] text-slate-700 leading-snug">{safe(value)}</div>
+  </div>
+);
+
+const SnapshotBox: React.FC<{ label: string; value: unknown; unit?: string }> = ({ label, value, unit }) => (
+  <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-center min-h-[57px] flex flex-col justify-center">
+    <div className="text-[10px] font-bold text-slate-600">{label}</div>
+    <div className="text-[15px] font-black text-slate-800 leading-tight">{safe(value)}</div>
+    {unit && <div className="text-[9px] text-slate-500">{unit}</div>}
+  </div>
+);
 
 export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePatient, onClose }) => {
   const recordsToPrint = activePatient ? [activePatient] : patients;
@@ -18,38 +47,88 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
   const generatePdfBlob = async (): Promise<{ pdf: jsPDF; blob: Blob; fileName: string }> => {
     const element = document.getElementById('printable-report');
     if (!element) throw new Error('Report element not found');
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, onclone: (clonedDoc) => { const report = clonedDoc.getElementById('printable-report'); if (report) { report.style.width = '800px'; report.style.maxWidth = '800px'; report.style.margin = '0 auto'; report.style.boxShadow = 'none'; } } });
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      onclone: (clonedDoc) => {
+        const report = clonedDoc.getElementById('printable-report');
+        if (report) {
+          report.style.width = '960px';
+          report.style.maxWidth = '960px';
+          report.style.margin = '0 auto';
+          report.style.boxShadow = 'none';
+          report.style.borderRadius = '0';
+        }
+      }
+    });
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgData = canvas.toDataURL('image/jpeg', 0.96);
     let heightLeft = imgHeight;
     let position = 0;
     pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
-    while (heightLeft > 0) { position = heightLeft - imgHeight; pdf.addPage(); pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight); heightLeft -= pageHeight; }
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
     const fileName = activePatient ? `CardioVault_${activePatient.name.replace(/[^a-z0-9_-]/gi, '_')}_Report.pdf` : 'CardioVault_Census_Report.pdf';
     return { pdf, blob: pdf.output('blob'), fileName };
   };
 
-  const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => { const result = String(reader.result || ''); const commaIndex = result.indexOf(','); resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result); }; reader.onerror = reject; reader.readAsDataURL(blob); });
+  const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = String(reader.result || '');
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
   const handleDownloadPdf = async () => {
     if (isGenerating) return;
     setIsGenerating(true); setErrorMessage(null);
-    try { const { pdf, blob, fileName } = await generatePdfBlob(); if (Capacitor.isNativePlatform()) { const base64Data = await blobToBase64(blob); await Filesystem.writeFile({ path: `CardioVault/${fileName}`, data: base64Data, directory: Directory.Documents, recursive: true }); alert(`PDF saved successfully in Documents/CardioVault/\n${fileName}`); } else { pdf.save(fileName); } }
-    catch (error) { console.error('PDF export failed:', error); setErrorMessage('Direct PDF export encountered an issue. Launching print dialog...'); setTimeout(() => window.print(), 300); }
-    finally { setIsGenerating(false); }
+    try {
+      const { pdf, blob, fileName } = await generatePdfBlob();
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = await blobToBase64(blob);
+        await Filesystem.writeFile({ path: `CardioVault/${fileName}`, data: base64Data, directory: Directory.Documents, recursive: true });
+        alert(`PDF saved successfully in Documents/CardioVault/\n${fileName}`);
+      } else {
+        pdf.save(fileName);
+      }
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      setErrorMessage('Direct PDF export encountered an issue. Launching print dialog...');
+      setTimeout(() => window.print(), 300);
+    } finally { setIsGenerating(false); }
   };
 
   const handleSharePdf = async () => {
     if (isGenerating) return;
     setIsGenerating(true); setErrorMessage(null);
-    try { const { pdf, blob, fileName } = await generatePdfBlob(); const file = new File([blob], fileName, { type: 'application/pdf' }); if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: fileName, text: `CardioVault clinical file: ${activePatient ? activePatient.name : 'Census'}` }); setShareSuccess(true); setTimeout(() => setShareSuccess(false), 3000); } else { pdf.save(fileName); } }
-    catch (err: any) { if (err?.name !== 'AbortError') { setErrorMessage('Unable to share PDF via system sheet. Downloading file instead...'); try { const { pdf, fileName } = await generatePdfBlob(); pdf.save(fileName); } catch { /* ignore */ } } }
-    finally { setIsGenerating(false); }
+    try {
+      const { pdf, blob, fileName } = await generatePdfBlob();
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: fileName, text: `CardioVault clinical file: ${activePatient ? activePatient.name : 'Census'}` });
+        setShareSuccess(true); setTimeout(() => setShareSuccess(false), 3000);
+      } else { pdf.save(fileName); }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        setErrorMessage('Unable to share PDF via system sheet. Downloading file instead...');
+        try { const { pdf, fileName } = await generatePdfBlob(); pdf.save(fileName); } catch { /* ignore */ }
+      }
+    } finally { setIsGenerating(false); }
   };
 
   return (
@@ -58,43 +137,98 @@ export const PrintableView: React.FC<PrintableViewProps> = ({ patients, activePa
         <div className="flex items-center gap-2 min-w-0"><div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center"><Printer className="w-4 h-4" /></div><span className="font-bold text-xs sm:text-sm truncate">{activePatient ? `CardioVault Clinical File: ${activePatient.name}` : `Census Handover (${recordsToPrint.length} Patients)`}</span></div>
         <div className="flex items-center gap-2"><button onClick={handleSharePdf} disabled={isGenerating} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs disabled:opacity-60">{shareSuccess ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}<span className="hidden sm:inline">Share</span></button><button onClick={handleDownloadPdf} disabled={isGenerating} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-semibold text-xs disabled:opacity-60">{isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Generating PDF...</span></> : <><Download className="w-4 h-4" /><span>Export PDF</span></>}</button><button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs"><Printer className="w-4 h-4" />Print</button><button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="w-5 h-5" /></button></div>
       </div>
-      {errorMessage && <div className="print:hidden mx-auto max-w-4xl w-full px-4 pt-3"><div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-center gap-2"><AlertCircle className="w-4 h-4" />{errorMessage}</div></div>}
+      {errorMessage && <div className="print:hidden mx-auto max-w-5xl w-full px-4 pt-3"><div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 text-xs flex items-center gap-2"><AlertCircle className="w-4 h-4" />{errorMessage}</div></div>}
 
-      <div id="printable-report" className="max-w-4xl mx-auto w-full my-6 p-8 bg-white text-slate-900 rounded-xl shadow-2xl print:m-0 print:p-4 print:shadow-none print:w-full print:max-w-none text-xs leading-normal">
-        <div className="border-b-2 border-slate-900 pb-3 mb-5 flex items-center justify-between"><div><h1 className="text-xl font-bold uppercase tracking-tight">CardioVault</h1><p className="text-sm font-semibold text-slate-600">ICU / CCU Clinical Patient Report</p><p className="text-[10px] text-slate-500">Confidential Medical Document • Generated: {new Date().toLocaleString()}</p></div><span className="px-2.5 py-1 rounded bg-slate-100 border border-slate-300 font-mono font-bold text-xs">CONFIDENTIAL</span></div>
+      <div id="printable-report" className="mx-auto w-[960px] max-w-[calc(100vw-32px)] my-6 bg-white text-slate-900 shadow-2xl print:m-0 print:w-full print:max-w-none text-[11px] leading-normal" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        <style>{`@media print { #printable-report { box-shadow:none !important; } .cv-break { break-inside:avoid; page-break-inside:avoid; } }`}</style>
+        <div className="px-6 pt-5 pb-3">
+          <div className="flex items-start justify-between border-b-[3px] border-slate-800 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-700 to-teal-500 flex items-center justify-center shadow-sm"><HeartPulse className="w-12 h-12 text-white" strokeWidth={2.2} /></div>
+              <div>
+                <div className="text-[34px] leading-none font-black tracking-tight"><span className="text-slate-900">Cardio</span><span className="text-emerald-700">Vault</span></div>
+                <div className="text-[19px] font-extrabold text-slate-800 mt-1">ICU / CCU Clinical Patient Report</div>
+                <div className="text-[12px] text-slate-500">Organize Care. Improve Outcomes.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 pt-1">
+              <FileText className="w-8 h-8 text-slate-700" strokeWidth={1.8} />
+              <div className="text-right"><div className="text-[18px] font-black text-red-600">CONFIDENTIAL</div><div className="text-[13px] font-semibold text-slate-700">Medical Document</div><div className="text-[10px] text-slate-500">Generated: {generatedAt()}</div><div className="text-[11px] text-slate-500 mt-2">Page 1 of {Math.max(1, Math.ceil(recordsToPrint.length / 1))}</div></div>
+            </div>
+          </div>
+        </div>
+
         {recordsToPrint.map((patient, index) => {
           const latestVital = patient.vitals?.[patient.vitals.length - 1];
           const latestAbg = patient.abgRecords?.[patient.abgRecords.length - 1];
           const latestLab = patient.labs?.[patient.labs.length - 1];
+          const latestVent = patient.ventilationRecords?.[patient.ventilationRecords.length - 1];
+          const latestEcg = patient.ecgRecords?.[patient.ecgRecords.length - 1];
+          const latestEcho = patient.echoStudies?.[patient.echoStudies.length - 1];
+          const latestImaging = patient.imagingStudies?.[patient.imagingStudies.length - 1];
           const procedures = patient.procedures || [];
           const calculations = patient.clinicalCalculations || [];
-          const latestVent = patient.ventilationRecords?.[patient.ventilationRecords.length - 1];
+          const notes = patient.progressNotes || [];
+          const status = patient.isDischarged ? (patient.dischargeDetails?.disposition || 'Discharged') : statusLabel(patient.status);
+          const admission = safe(patient.admissionDate);
+          const physician = safe(patient.attendingPhysician, 'Dr. Consultant');
+          const allergies = safe(patient.allergies, 'No known drug allergies (NKDA)');
+          const labEntries = latestLab ? [
+            ['Hb', latestLab.hb, 'g/dL'], ['WBC', latestLab.wbc, '10³/µL'], ['Platelets', latestLab.platelets, '10³/µL'],
+            ['Creatinine', latestLab.creatinine, 'mg/dL'], ['Na⁺', latestLab.na, 'mmol/L'], ['K⁺', latestLab.k, 'mmol/L'],
+            ['Troponin I', latestLab.troponin, 'ng/mL'], ['INR', latestLab.inr, '']
+          ].filter(([, value]) => value !== undefined && value !== null && value !== '') : [];
           return (
-            <div key={patient.id} className={`space-y-4 ${index > 0 ? 'mt-8 pt-8 border-t-2 border-slate-300 print:break-before-page' : ''}`}>
-              <section className="bg-slate-100 p-3 rounded-lg border border-slate-300 flex items-center justify-between"><div><div className="text-lg font-black">{patient.isDischarged ? `Ex-Bed ${patient.previousBedNumber || patient.bedNumber}` : `Bed ${patient.bedNumber}`} — {patient.name}</div><div className="text-slate-600">{patient.age}yo {patient.gender} • MRN: {patient.mrn}</div></div><div className="text-right"><div className="font-bold uppercase text-[11px] px-2 py-0.5 rounded bg-slate-200 border border-slate-400">{patient.isDischarged ? (patient.dischargeDetails?.disposition || 'Discharged') : patient.status}</div><div className="font-bold text-[10px] mt-1">{safe(patient.codeStatus)}</div></div></section>
+            <div key={patient.id} className={`${index > 0 ? 'pt-5 mt-5 border-t-2 border-slate-300' : ''} px-6 pb-6`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-0 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden cv-break">
+                <div className="md:col-span-1 px-4 py-4 border-b md:border-b-0 md:border-r border-slate-200 flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center"><UserRound className="w-10 h-10 text-emerald-700" strokeWidth={1.8} /></div>
+                  <div className="min-w-0"><div className="text-[27px] leading-none font-black text-slate-900">{patient.name}</div><div className="text-[15px] text-slate-700 mt-1">{patient.age} years, {patient.gender}</div><div className="text-[13px] text-slate-700 mt-1"><b>MRN:</b> {patient.mrn} &nbsp;&nbsp; <b>Bed:</b> {patient.isDischarged ? (patient.previousBedNumber || patient.bedNumber) : patient.bedNumber}</div><div className="text-[12px] text-slate-700"><b>Admission:</b> {admission}</div></div>
+                </div>
+                <div className="px-4 py-4 flex items-center gap-3 border-b md:border-b-0 md:border-r border-slate-200">
+                  <div className="flex-1 space-y-2"><div className="flex items-center gap-2"><span className="font-bold text-slate-600">Status:</span><span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-extrabold text-[12px]">{status}</span></div><div className="flex items-center gap-2"><span className="font-bold text-slate-600">Code Status:</span><span className="px-3 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-[12px]">{safe(patient.codeStatus, 'Full Code')}</span></div><div className="text-[12px] text-slate-700"><b>Attending Physician:</b> {physician}</div><div className="text-[12px] text-slate-700"><b>Service:</b> Cardiology / CCU</div></div>
+                </div>
+                <div className="px-4 py-4 flex items-center"><div className="w-full rounded-xl border border-red-300 bg-red-50 px-4 py-3"><div className="flex items-center gap-2 text-red-700 font-black text-[14px]"><AlertTriangle className="w-5 h-5" />Allergies</div><div className="text-[12px] text-red-700 mt-1">{allergies}</div></div></div>
+              </div>
 
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Brief Clinical History</h2><div className="grid grid-cols-2 gap-3"><div><b>Chief complaint / presenting symptoms:</b><p>{safe(patient.chiefComplaint)}</p></div><div><b>Admission:</b><p>{safe(patient.admissionDate)}</p></div><div><b>Relevant medical history:</b><p>{safe(patient.pastMedicalHistory)}</p></div><div><b>Cardiac history:</b><p>{safe(patient.ccuData?.echoFindings || patient.ccuData?.ecgSummary)}</p></div><div><b>Relevant medications:</b><p>{patient.medications?.length ? patient.medications.map(m => `${m.name} ${m.dose} (${m.frequency})`).join('; ') : 'None documented'}</p></div><div><b>Important risk factors:</b><p>{safe(patient.socialHistory || patient.secondaryDiagnoses?.join(', '))}</p></div></div></section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 cv-break">
+                <Card><SectionHeader icon={<Stethoscope className="w-5 h-5" />} title="Primary Diagnosis" /><div className="p-4"><div className="text-[19px] font-black text-slate-900">{safe(patient.primaryDiagnosis)}</div><div className="mt-4 text-[11px] font-bold text-slate-600">Secondary Diagnoses / Comorbidities</div><div className="text-[12px] text-slate-700 mt-1">{patient.secondaryDiagnoses?.length ? patient.secondaryDiagnoses.join(', ') : 'None listed'}</div></div></Card>
+                <Card><SectionHeader icon={<FileText className="w-5 h-5" />} title="Brief Clinical History" /><div className="p-3 grid grid-cols-[160px_1fr] gap-x-3 gap-y-1.5"><LabelValue label="Chief Complaint" value={patient.chiefComplaint} className="contents" /><LabelValue label="History of Present Illness" value={patient.historyOfPresentIllness} className="contents" /><LabelValue label="Past Medical History" value={patient.pastMedicalHistory} className="contents" /><LabelValue label="Cardiac History" value={patient.ccuData?.echoFindings || patient.ccuData?.ecgSummary} className="contents" /><LabelValue label="Medications on Admission" value={patient.medications?.length ? patient.medications.map(m => `${m.name} ${m.dose} ${m.route || ''} ${m.frequency}`).join('; ') : 'None documented'} className="contents" /><LabelValue label="Risk Factors" value={patient.socialHistory || patient.secondaryDiagnoses?.join(', ')} className="contents" /></div></Card>
+              </div>
 
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Primary Diagnosis & Comorbidities</h2><p className="text-sm font-bold">{safe(patient.primaryDiagnosis)}</p><p>{patient.secondaryDiagnoses?.length ? patient.secondaryDiagnoses.join(', ') : 'None documented'}</p></section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 cv-break">
+                <Card><SectionHeader icon={<Activity className="w-5 h-5" />} title="Clinical Snapshot" subtitle="(Latest Available)" /><div className="p-3 grid grid-cols-7 gap-2"><SnapshotBox label="BP" value={latestVital ? `${latestVital.bpSystolic}/${latestVital.bpDiastolic}` : undefined} unit="mmHg" /><SnapshotBox label="HR" value={latestVital?.hr} unit="bpm" /><SnapshotBox label="SpO₂" value={latestVital?.spo2} unit="%" /><SnapshotBox label="RR" value={latestVital?.rr} unit="/min" /><SnapshotBox label="Echo EF" value={patient.ccuData?.echoEF} unit="%" /><SnapshotBox label="GCS" value={patient.icuScores?.gcsTotal} unit="/15" /><SnapshotBox label="SOFA" value={patient.icuScores?.sofaScore} /></div></Card>
+                <Card><SectionHeader icon={<Bed className="w-5 h-5" />} title="Admission Information" /><div className="p-3 space-y-1.5"><LabelValue label="Admission Date & Time" value={admission} /><LabelValue label="Attending Physician" value={physician} /><LabelValue label="Source of Admission" value="Emergency Department" /><LabelValue label="Reason for Admission" value={patient.chiefComplaint || patient.primaryDiagnosis} /></div></Card>
+              </div>
 
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Clinical Snapshot</h2><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono"><div className="p-2 rounded bg-slate-100 border"><span className="text-[9px] block">BP / HR</span><b>{latestVital ? `${latestVital.bpSystolic}/${latestVital.bpDiastolic} / ${latestVital.hr}` : '—'}</b></div><div className="p-2 rounded bg-slate-100 border"><span className="text-[9px] block">SpO₂ / RR</span><b>{latestVital ? `${latestVital.spo2}% / ${latestVital.rr}` : '—'}</b></div><div className="p-2 rounded bg-slate-100 border"><span className="text-[9px] block">GCS / SOFA</span><b>{patient.icuScores?.gcsTotal ?? '—'} / {patient.icuScores?.sofaScore ?? '—'}</b></div><div className="p-2 rounded bg-slate-100 border"><span className="text-[9px] block">EF / RASS</span><b>{safe(patient.ccuData?.echoEF)} / {patient.icuScores?.rass ?? '—'}</b></div></div></section>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 cv-break">
+                <div className="md:col-span-2"><Card><SectionHeader icon={<Syringe className="w-5 h-5" />} title="Procedures & Interventions" />{procedures.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50 text-slate-700"><th className="border border-slate-200 px-2 py-2 text-left">Date / Time</th><th className="border border-slate-200 px-2 py-2 text-left">Procedure</th><th className="border border-slate-200 px-2 py-2 text-left">Indication</th><th className="border border-slate-200 px-2 py-2 text-left">Performed by</th><th className="border border-slate-200 px-2 py-2 text-left">Outcome / Notes</th></tr></thead><tbody>{[...procedures].sort((a,b) => String(a.timestamp || a.date || '').localeCompare(String(b.timestamp || b.date || ''))).map(proc => <tr key={proc.id}><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.timestamp || proc.date)}</td><td className="border border-slate-200 px-2 py-2 align-top font-semibold">{safe(proc.procedureName || proc.name)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.indication)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.operator || proc.performer)}</td><td className="border border-slate-200 px-2 py-2 align-top">{safe(proc.details || proc.notes)}{proc.complications ? ` Complications: ${proc.complications}` : ''}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No procedures documented.</div>}</Card></div>
+                <Card><SectionHeader icon={<Wind className="w-5 h-5" />} title="Respiratory & Ventilator Status" /><div className="p-3 space-y-1.5"><LabelValue label="Mode" value={latestVent?.mode || patient.icuVentilator?.mode || 'Room Air / NC'} /><LabelValue label="FiO₂" value={latestVent?.fio2 ?? patient.icuVentilator?.fio2 ?? 21} /><LabelValue label="PEEP" value={latestVent?.peep ?? patient.icuVentilator?.peep ?? 0} /><LabelValue label="SpO₂" value={latestVital?.spo2} /><LabelValue label="Airway" value={latestVent?.airwayType || 'Spontaneous'} /><LabelValue label="Notes" value={latestVent ? latestVent.notes : 'Not intubated.'} /></div></Card>
+              </div>
 
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Respiratory / Ventilator Status</h2>{latestVent ? <p><b>Mode:</b> {latestVent.mode} • <b>FiO₂:</b> {latestVent.fio2}% • <b>PEEP:</b> {latestVent.peep} • <b>Rate:</b> {safe(latestVent.actualRate || latestVent.setRate)} • <b>Airway:</b> {safe(latestVent.airwayType)}</p> : <p><b>Mode:</b> {safe(patient.icuVentilator?.mode)} • <b>FiO₂:</b> {safe(patient.icuVentilator?.fio2)} • <b>PEEP:</b> {safe(patient.icuVentilator?.peep)}</p>}{latestAbg && <p className="mt-1 font-mono"><b>Latest ABG:</b> pH {latestAbg.ph} • PaCO₂ {latestAbg.pco2} • HCO₃ {latestAbg.hco3} • Lactate {latestAbg.lactate} • FiO₂ {latestAbg.fio2}</p>}</section>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3 cv-break">
+                <div className="md:col-span-3"><Card><SectionHeader icon={<ClipboardList className="w-5 h-5" />} title="Latest Progress Notes" />{notes.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Date / Time</th><th className="border border-slate-200 px-2 py-2 text-left">Author</th><th className="border border-slate-200 px-2 py-2 text-left">Note</th></tr></thead><tbody>{notes.slice(-5).reverse().map(note => <tr key={note.id}><td className="border border-slate-200 px-2 py-2 align-top whitespace-nowrap">{note.timestamp}</td><td className="border border-slate-200 px-2 py-2 align-top whitespace-nowrap">{note.author}</td><td className="border border-slate-200 px-2 py-2 align-top"><b>A:</b> {safe(note.assessment)}<br /><b>P:</b> {safe(note.plan)}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No progress notes documented.</div>}</Card></div>
+                <div className="md:col-span-2"><Card><SectionHeader icon={<Calculator className="w-5 h-5" />} title="Clinical Calculators" />{calculations.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Calculator</th><th className="border border-slate-200 px-2 py-2 text-left">Result</th><th className="border border-slate-200 px-2 py-2 text-left">Interpretation</th></tr></thead><tbody>{calculations.slice(-8).reverse().map(calc => <tr key={calc.id}><td className="border border-slate-200 px-2 py-2">{calc.calculator}</td><td className="border border-slate-200 px-2 py-2 font-bold">{calc.score}</td><td className="border border-slate-200 px-2 py-2">{calc.interpretation}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No clinical calculations performed.</div>}</Card></div>
+              </div>
 
-              {procedures.length > 0 && <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Procedures & Interventions</h2><div className="space-y-2">{[...procedures].sort((a,b) => String(b.timestamp || b.date || '').localeCompare(String(a.timestamp || a.date || ''))).map(proc => <div key={proc.id} className="p-2 rounded bg-slate-50 border border-slate-200"><div className="font-bold">{safe(proc.timestamp || proc.date)} — {safe(proc.procedureName || proc.name)}</div><div><b>Indication:</b> {safe(proc.indication)} • <b>Performed by:</b> {safe(proc.operator || proc.performer)}</div>{proc.details && <div><b>Outcome / Notes:</b> {proc.details}</div>}{proc.complications && <div><b>Complications:</b> {proc.complications}</div>}{proc.postProcedurePlan && <div><b>Post-procedure plan:</b> {proc.postProcedurePlan}</div>}</div>)}</div></section>}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3 cv-break">
+                <div className="md:col-span-2"><Card><SectionHeader icon={<FlaskConical className="w-5 h-5" />} title="Laboratory Results" subtitle="(Latest)" />{labEntries.length ? <div className="p-3"><table className="w-full border-collapse text-[10px]"><thead><tr className="bg-slate-50"><th className="border border-slate-200 px-2 py-2 text-left">Test</th><th className="border border-slate-200 px-2 py-2 text-left">Result</th><th className="border border-slate-200 px-2 py-2 text-left">Unit</th><th className="border border-slate-200 px-2 py-2 text-left">Date</th></tr></thead><tbody>{labEntries.map(([name,value,unit]) => <tr key={name}><td className="border border-slate-200 px-2 py-1.5">{name}</td><td className="border border-slate-200 px-2 py-1.5 font-semibold">{safe(value)}</td><td className="border border-slate-200 px-2 py-1.5">{unit}</td><td className="border border-slate-200 px-2 py-1.5">{latestLab?.timestamp ? new Date(latestLab.timestamp).toLocaleDateString('en-GB') : '—'}</td></tr>)}</tbody></table></div> : <div className="p-4 text-slate-500">No laboratory results documented.</div>}</Card></div>
+                <div className="md:col-span-2"><Card><SectionHeader icon={<Waves className="w-5 h-5" />} title="Imaging & Cardiac Studies" /><div className="p-3 space-y-3">{latestEcg && <div><div className="font-black text-[12px]">▪ 12-Lead ECG</div><div className="pl-3 text-[11px]">{safe(latestEcg.interpretation || latestEcg.rhythm)}{latestEcg.notes ? ` — ${latestEcg.notes}` : ''}</div></div>}{latestEcho && <div><div className="font-black text-[12px]">▪ Echocardiography</div><div className="pl-3 text-[11px]">EF {safe(latestEcho.ef)}, {safe(latestEcho.impression)}{latestEcho.rwma ? ` RWMA: ${latestEcho.rwma}` : ''}</div></div>}{latestImaging && <div><div className="font-black text-[12px]">▪ {latestImaging.type}</div><div className="pl-3 text-[11px]">{safe(latestImaging.impression || latestImaging.findings)}</div></div>}{!latestEcg && !latestEcho && !latestImaging && <div className="text-slate-500">No imaging or cardiac studies documented.</div>}{latestAbg && <div><div className="font-black text-[12px]">▪ Latest ABG</div><div className="pl-3 text-[11px]">pH {latestAbg.ph} • PaCO₂ {latestAbg.pco2} • HCO₃ {latestAbg.hco3} • Lactate {latestAbg.lactate} • FiO₂ {latestAbg.fio2}</div></div>}</div></Card></div>
+                <div className="md:col-span-1"><Card><SectionHeader icon={<CheckSquare className="w-5 h-5" />} title="Current Plan" /><div className="p-3 text-[11px] space-y-2">{patient.dischargeTransferPlan ? patient.dischargeTransferPlan.split(/\n|;/).filter(Boolean).map((item,i) => <div key={i}><b>{i + 1}.</b> {item.trim()}</div>) : <><div><b>1.</b> Continue monitoring and targeted medical management.</div><div><b>2.</b> Review latest investigations and clinical response.</div><div><b>3.</b> Continue appropriate medications and supportive care.</div></>}</div></Card></div>
+              </div>
 
-              {patient.progressNotes?.length > 0 && <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Progress Notes / Clinical Course</h2><div className="space-y-2">{patient.progressNotes.slice(-5).reverse().map(note => <div key={note.id} className="p-2 rounded bg-slate-50 border"><div className="font-bold font-mono">{note.timestamp} • {note.author}</div>{note.assessment && <p><b>Assessment:</b> {note.assessment}</p>}{note.plan && <p><b>Plan:</b> {note.plan}</p>}</div>)}</div></section>}
-
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Labs & Investigations</h2>{latestLab ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{Object.entries(latestLab).filter(([key]) => key !== 'timestamp').map(([key,value]) => value ? <div key={key} className="p-2 bg-slate-50 border rounded"><span className="text-[9px] uppercase block text-slate-500">{key}</span><b>{String(value)}</b></div> : null)}</div> : <p>No laboratory panel documented.</p>}{patient.ecgRecords?.length ? <p className="mt-2"><b>ECG:</b> {safe(patient.ecgRecords[patient.ecgRecords.length - 1].interpretation)}</p> : null}{patient.echoStudies?.length ? <p className="mt-1"><b>Echo:</b> EF {safe(patient.echoStudies[patient.echoStudies.length - 1].ef)} • {safe(patient.echoStudies[patient.echoStudies.length - 1].impression)}</p> : null}</section>
-
-              {calculations.length > 0 && <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Clinical Calculators</h2><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{calculations.map(calc => <div key={calc.id} className="p-2 rounded bg-slate-50 border"><div className="font-bold">{calc.calculator}: {calc.score}</div><div>{calc.interpretation}</div><div className="text-[9px] text-slate-500">Calculated: {new Date(calc.timestamp).toLocaleString()}</div></div>)}</div></section>}
-
-              <section><h2 className="text-xs font-black uppercase tracking-wide border-b border-slate-300 pb-1 mb-2">Current Plan / Disposition / Handover</h2><p><b>Attending:</b> {safe(patient.attendingPhysician)}</p><p><b>Current plan:</b> {safe(patient.dischargeTransferPlan || patient.dischargePlan?.hospitalCourse)}</p>{patient.dischargePlan && <p><b>Disposition:</b> {safe(patient.dischargePlan.destination || patient.dischargePlan.conditionAtDischarge)}</p>}{patient.dischargeDetails && <p><b>Discharge:</b> {safe(patient.dischargeDetails.disposition)} • {safe(patient.dischargeDetails.conditionAtDischarge)}</p>}</section>
-
-              <div className="pt-3 border-t border-slate-300 flex justify-between text-[9px] text-slate-500"><span>CARDIOVAULT • Confidential Medical Document</span><span>Generated {new Date().toLocaleString()}</span></div>
+              <Card className="mt-3 bg-amber-50 border-amber-200"><div className="flex items-center gap-2 px-3 py-2 border-b border-amber-200"><Flag className="w-5 h-5 text-amber-700" /><span className="text-[13px] font-extrabold text-amber-800">Disposition / Transfer Goal</span></div><div className="px-4 py-3 text-[12px]">{safe(patient.dischargeTransferPlan || patient.dischargePlan?.destination || (patient.isDischarged ? patient.dischargeDetails?.disposition : 'Pending clinical stabilization and observation.'))}</div></Card>
             </div>
           );
         })}
+
+        <div className="px-6 pb-4 pt-2">
+          <div className="border-t border-slate-200 pt-3 flex items-end justify-between text-[11px] text-slate-500">
+            <div><div className="font-black text-slate-800 text-[14px]">CardioVault <span className="font-normal text-slate-500">ICU / CCU Clinical Notebook</span></div><div>Confidential Medical Document</div></div>
+            <div className="text-right"><div>Generated on {generatedAt()}</div><div>Page 1 of {Math.max(1, recordsToPrint.length)}</div></div>
+            <div className="flex items-center gap-2 text-slate-700"><span>Better Data.</span><HeartPulse className="w-9 h-9 text-emerald-700" /><span>Better Decisions.</span></div>
+          </div>
+        </div>
       </div>
     </div>
   );
