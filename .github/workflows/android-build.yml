@@ -46,10 +46,11 @@ jobs:
 
       - name: Verify debug keystore
         run: |
+          ls -lh ~/.config/.android/debug.keystore
           keytool -list -v \
             -keystore ~/.config/.android/debug.keystore \
             -storepass android \
-            -alias AndroidDebugKey | grep "SHA1:"
+            -alias AndroidDebugKey
 
       - name: Show Android signing certificate
         working-directory: android
