@@ -3,6 +3,8 @@ import { PatientRecord } from '../types';
 import { Printer, X, Download, Share2, Loader2, Check, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 
 interface PrintableViewProps {
   patients: PatientRecord[];
@@ -72,13 +74,36 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
     return { pdf, blob, fileName };
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = String(reader.result || '');
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
   const handleDownloadPdf = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
     setErrorMessage(null);
     try {
-      const { pdf, fileName } = await generatePdfBlob();
-      pdf.save(fileName);
+      const { pdf, blob, fileName } = await generatePdfBlob();
+
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = await blobToBase64(blob);
+        await Filesystem.writeFile({
+          path: `CardioVault/${fileName}`,
+          data: base64Data,
+          directory: Directory.Documents,
+          recursive: true
+        });
+        alert(`PDF saved successfully in Documents/CardioVault/\n${fileName}`);
+      } else {
+        pdf.save(fileName);
+      }
     } catch (error: any) {
       console.error('PDF export failed:', error);
       setErrorMessage('Direct PDF export encountered an issue. Launching print dialog...');
@@ -107,7 +132,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
         setShareSuccess(true);
         setTimeout(() => setShareSuccess(false), 3000);
       } else {
-        // Fallback to direct download if sharing files is not supported
         const { pdf } = await generatePdfBlob();
         pdf.save(fileName);
       }
@@ -133,7 +157,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-md overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      {/* Top action bar (hidden during print) */}
       <div className="sticky top-0 z-10 print:hidden flex items-center justify-between px-4 sm:px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-sm">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -144,7 +167,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Share Button (Android / Web Share API) */}
           <button
             onClick={handleSharePdf}
             disabled={isGenerating}
@@ -159,7 +181,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
             <span className="hidden sm:inline">Share</span>
           </button>
 
-          {/* Export PDF Button */}
           <button
             onClick={handleDownloadPdf}
             disabled={isGenerating}
@@ -179,7 +200,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
             )}
           </button>
 
-          {/* Print Button */}
           <button
             onClick={handlePrint}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition"
@@ -207,7 +227,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
         </div>
       )}
 
-      {/* Printable Sheet (Styling optimized for paper and PDF export) */}
       <div id="printable-report" className="max-w-4xl mx-auto w-full my-6 p-8 bg-white text-slate-900 rounded-xl shadow-2xl print:m-0 print:p-4 print:shadow-none print:w-full print:max-w-none text-xs leading-normal">
         <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between">
           <div>
@@ -235,11 +254,10 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
               key={patient.id}
               className={`space-y-4 ${index > 0 ? 'mt-8 pt-8 border-t-2 border-slate-300 print:break-before-page' : ''}`}
             >
-              {/* Header Box */}
               <div className="bg-slate-100 p-3 rounded-lg border border-slate-300 flex items-center justify-between">
                 <div>
                   <span className="text-lg font-black text-slate-900">
-                    {patient.isDischarged 
+                    {patient.isDischarged
                       ? `Ex-Bed ${patient.previousBedNumber || patient.bedNumber} — ${patient.name}`
                       : `Bed ${patient.bedNumber} — ${patient.name}`}
                   </span>
@@ -259,7 +277,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               </div>
 
-              {/* Discharge / Transfer Summary */}
               {patient.isDischarged && patient.dischargeDetails && (
                 <div className="border border-amber-300 rounded p-2.5 bg-amber-50">
                   <div className="flex items-center justify-between mb-1">
@@ -284,7 +301,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               )}
 
-              {/* Diagnosis & HPI */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <strong className="block text-slate-700 font-bold uppercase text-[10px]">Primary Diagnosis:</strong>
@@ -302,14 +318,12 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               </div>
 
-              {/* Chief Complaint & HPI */}
               <div className="border border-slate-200 rounded p-2.5 bg-slate-50">
                 <strong className="block text-slate-800 font-semibold mb-0.5">Clinical Presentation:</strong>
                 <p className="text-slate-700">{patient.chiefComplaint}</p>
                 <p className="text-slate-600 mt-1">{patient.historyOfPresentIllness}</p>
               </div>
 
-              {/* Latest Vitals & Labs Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
                 <div className="p-2 rounded bg-slate-100 border border-slate-200">
                   <span className="text-[10px] text-slate-500 block font-sans">BP & HR</span>
@@ -337,7 +351,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               </div>
 
-              {/* CCU / ICU Specialty Data */}
               {(patient.ccuData?.cathFindings || patient.ccuData?.antiplatelets || patient.icuVentilator?.mode) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-slate-200 p-2.5 rounded">
                   {patient.ccuData?.cathFindings && (
@@ -376,7 +389,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               )}
 
-              {/* Active Infusions & Medications */}
               {(patient.medications.length > 0 || patient.infusions.length > 0) && (
                 <div>
                   <strong className="block text-slate-800 font-semibold mb-1">Medications & Infusions:</strong>
@@ -395,7 +407,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               )}
 
-              {/* Latest Progress Notes */}
               {patient.progressNotes.length > 0 && (
                 <div className="border-t border-slate-200 pt-2">
                   <strong className="block text-slate-800 font-semibold mb-1">Latest Progress Notes:</strong>
@@ -411,7 +422,6 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                 </div>
               )}
 
-              {/* Plan & Step-down */}
               {patient.dischargeTransferPlan && (
                 <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-900 font-medium">
                   <strong>Transfer / Discharge Goal:</strong> {patient.dischargeTransferPlan}
