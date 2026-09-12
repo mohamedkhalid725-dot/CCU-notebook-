@@ -45,10 +45,13 @@ interface CensusViewProps {
   onAdmitToBed: (bedNum: number | string) => void;
   onDischargePatient: (patient: PatientRecord) => void;
   onReadmitPatient: (patient: PatientRecord) => void;
-  onDeletePatient?: (patient: PatientRecord) => void;
+  onDeletePatient?: (patient: PatientRecord | string) => void;
   onChangeTotalBeds: (newTotal: number) => void;
   onUpdatePatientBed?: (patientId: string, newBedNumber: string | number) => void;
+  initialCategory?: 'active' | 'discharged' | 'archive';
 }
+
+export type BedsCategory = 'active' | 'discharged' | 'archive';
 
 export const CensusView: React.FC<CensusViewProps> = ({
   patients,
@@ -60,9 +63,10 @@ export const CensusView: React.FC<CensusViewProps> = ({
   onReadmitPatient,
   onDeletePatient,
   onChangeTotalBeds,
-  onUpdatePatientBed
+  onUpdatePatientBed,
+  initialCategory = 'active'
 }) => {
-  const [currentView, setCurrentView] = useState<'census' | 'archive'>('census');
+  const [currentView, setCurrentView] = useState<BedsCategory>(initialCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [archiveFilter, setArchiveFilter] = useState<string>('all');
@@ -141,11 +145,15 @@ export const CensusView: React.FC<CensusViewProps> = ({
   });
 
   // Filter for Medical Records / Discharged Archive
-  const filteredArchive = dischargedPatients.filter(patient => {
+  const wardCount = dischargedPatients.filter(p => p.dischargeDetails?.disposition === 'Transferred to Ward' || p.dischargePlan?.transferDestination === 'Ward').length;
+  const homeCount = dischargedPatients.filter(p => p.dischargeDetails?.disposition === 'Discharged Home').length;
+  const stepdownCount = dischargedPatients.filter(p => p.dischargeDetails?.disposition === 'Transferred to Step-Down Unit' || p.dischargePlan?.transferDestination === 'Step-Down').length;
+
+  const filteredDischarged = dischargedPatients.filter(patient => {
     if (archiveFilter !== 'all') {
-      if (archiveFilter === 'ward' && patient.dischargeDetails?.disposition !== 'Transferred to Ward') return false;
+      if (archiveFilter === 'ward' && patient.dischargeDetails?.disposition !== 'Transferred to Ward' && patient.dischargePlan?.transferDestination !== 'Ward') return false;
       if (archiveFilter === 'home' && patient.dischargeDetails?.disposition !== 'Discharged Home') return false;
-      if (archiveFilter === 'stepdown' && patient.dischargeDetails?.disposition !== 'Transferred to Step-Down Unit') return false;
+      if (archiveFilter === 'stepdown' && patient.dischargeDetails?.disposition !== 'Transferred to Step-Down Unit' && patient.dischargePlan?.transferDestination !== 'Step-Down') return false;
     }
 
     if (!searchQuery.trim()) return true;
@@ -156,6 +164,19 @@ export const CensusView: React.FC<CensusViewProps> = ({
       (patient.mrn || '').toLowerCase().includes(q) ||
       (patient.dischargeDetails?.disposition || '').toLowerCase().includes(q) ||
       (patient.dischargePlan?.dischargeDiagnosis || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredArchive = dischargedPatients.filter(patient => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      patient.name.toLowerCase().includes(q) ||
+      (patient.diagnosis || '').toLowerCase().includes(q) ||
+      (patient.mrn || '').toLowerCase().includes(q) ||
+      (patient.dischargeDetails?.disposition || '').toLowerCase().includes(q) ||
+      (patient.dischargePlan?.dischargeDiagnosis || '').toLowerCase().includes(q) ||
+      (patient.attendingPhysician || '').toLowerCase().includes(q)
     );
   });
 
@@ -211,12 +232,19 @@ export const CensusView: React.FC<CensusViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            {currentView === 'census' ? (
+            {currentView === 'active' && (
               <>
                 <Bed className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 <span>ICU / CCU Bed Census</span>
               </>
-            ) : (
+            )}
+            {currentView === 'discharged' && (
+              <>
+                <LogOut className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+                <span>Discharged Patients Registry</span>
+              </>
+            )}
+            {currentView === 'archive' && (
               <>
                 <FolderArchive className="w-6 h-6 text-amber-500" />
                 <span>Medical Records Archive</span>
@@ -224,19 +252,19 @@ export const CensusView: React.FC<CensusViewProps> = ({
             )}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {currentView === 'census'
-              ? 'Real-time bed occupancy, hemodynamics, patient acuity and bed allocation'
-              : 'Permanent archive of discharged and transferred patient clinical files'}
+            {currentView === 'active' && 'Real-time bed occupancy, hemodynamics, patient acuity and bed allocation'}
+            {currentView === 'discharged' && 'Patients discharged, stepped down or transferred from ICU/CCU'}
+            {currentView === 'archive' && 'Permanent historical clinical records, case files, and treatment summaries'}
           </p>
         </div>
 
         {/* View Switcher & Bed Management Action */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-full">
             <button
-              onClick={() => setCurrentView('census')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                currentView === 'census'
+              onClick={() => setCurrentView('active')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                currentView === 'active'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
@@ -244,22 +272,39 @@ export const CensusView: React.FC<CensusViewProps> = ({
               <Bed className="w-4 h-4" />
               <span>Active Beds</span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                currentView === 'census' ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                currentView === 'active' ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}>
                 {occupiedCount}/{beds.length}
               </span>
             </button>
 
             <button
+              onClick={() => setCurrentView('discharged')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
+                currentView === 'discharged'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Discharged</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                currentView === 'discharged' ? 'bg-cyan-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}>
+                {dischargedPatients.length}
+              </span>
+            </button>
+
+            <button
               onClick={() => setCurrentView('archive')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
                 currentView === 'archive'
                   ? 'bg-amber-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <FolderArchive className="w-4 h-4" />
-              <span>Discharged Archive</span>
+              <span>Archive</span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
                 currentView === 'archive' ? 'bg-amber-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}>
@@ -268,21 +313,19 @@ export const CensusView: React.FC<CensusViewProps> = ({
             </button>
           </div>
 
-          {currentView === 'census' && (
-            <button
-              onClick={() => setIsBedModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 text-xs font-semibold shadow-sm transition"
-              title="Add, rename or remove beds"
-            >
-              <Settings className="w-4 h-4 text-emerald-500" />
-              <span>Manage Beds</span>
-            </button>
-          )}
+          <button
+            onClick={() => setIsBedModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 text-xs font-semibold shadow-sm transition"
+            title="Add, rename or remove beds"
+          >
+            <Settings className="w-4 h-4 text-emerald-500" />
+            <span>Manage Beds</span>
+          </button>
         </div>
       </div>
 
-      {/* CENSUS VIEW */}
-      {currentView === 'census' && (
+      {/* ACTIVE BEDS VIEW */}
+      {currentView === 'active' && (
         <div className="space-y-4">
           {/* Occupancy Metric Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -548,9 +591,61 @@ export const CensusView: React.FC<CensusViewProps> = ({
         </div>
       )}
 
-      {/* MEDICAL RECORDS ARCHIVE */}
-      {currentView === 'archive' && (
+      {/* DISCHARGED PATIENTS VIEW */}
+      {currentView === 'discharged' && (
         <div className="space-y-4">
+          {/* Discharged Summary Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Total Discharged
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-cyan-600 dark:text-cyan-400">
+                  {dischargedPatients.length}
+                </span>
+                <span className="text-[10px] text-slate-400">patients</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Transferred to Ward
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-slate-900 dark:text-white">
+                  {wardCount}
+                </span>
+                <span className="text-[10px] text-slate-400">floor transfer</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Discharged Home
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {homeCount}
+                </span>
+                <span className="text-[10px] text-slate-400">recovered</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                Step-Down / HDU
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                  {stepdownCount}
+                </span>
+                <span className="text-[10px] text-slate-400">step-down</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -559,21 +654,65 @@ export const CensusView: React.FC<CensusViewProps> = ({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search discharged patient, MRN, diagnosis..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-sm"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 transition shadow-sm"
               />
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <button
+                onClick={() => setArchiveFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  archiveFilter === 'all'
+                    ? 'bg-slate-800 dark:bg-slate-700 text-white'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                All ({dischargedPatients.length})
+              </button>
+              <button
+                onClick={() => setArchiveFilter('ward')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  archiveFilter === 'ward'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Ward ({wardCount})
+              </button>
+              <button
+                onClick={() => setArchiveFilter('home')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  archiveFilter === 'home'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Home ({homeCount})
+              </button>
+              <button
+                onClick={() => setArchiveFilter('stepdown')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  archiveFilter === 'stepdown'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Step-Down ({stepdownCount})
+              </button>
             </div>
           </div>
 
-          {filteredArchive.length > 0 ? (
+          {/* Discharged List */}
+          {filteredDischarged.length > 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredArchive.map(patient => (
+              {filteredDischarged.map(patient => (
                 <div
                   key={patient.id}
                   onClick={() => onSelectPatient(patient)}
                   className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                         {patient.name}
                       </h4>
@@ -583,10 +722,25 @@ export const CensusView: React.FC<CensusViewProps> = ({
                       {patient.mrn && (
                         <span className="text-xs font-mono text-slate-400">MRN: {patient.mrn}</span>
                       )}
+                      {patient.bedNumber && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                          Former Bed #{patient.bedNumber}
+                        </span>
+                      )}
+                      {patient.dischargeDetails?.disposition && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 font-medium border border-cyan-200 dark:border-cyan-800/50">
+                          {patient.dischargeDetails.disposition}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
                       {patient.dischargePlan?.dischargeDiagnosis || patient.diagnosis || 'Cardiology Admission'}
                     </p>
+                    {patient.dischargeDetails?.dischargeDate && (
+                      <p className="text-[11px] text-slate-400">
+                        Discharged: {new Date(patient.dischargeDetails.dischargeDate).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-center">
@@ -616,8 +770,100 @@ export const CensusView: React.FC<CensusViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
-              No archived patients match the search criteria.
+            <div className="p-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+              <LogOut className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No Discharged Patients</p>
+              <p className="text-xs text-slate-400">
+                {searchQuery ? 'No discharged patients match your search query.' : 'When patients are discharged from active beds, they will appear here.'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MEDICAL RECORDS ARCHIVE */}
+      {currentView === 'archive' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search archived record, MRN, physician, diagnosis..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 transition shadow-sm"
+              />
+            </div>
+          </div>
+
+          {filteredArchive.length > 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredArchive.map(patient => (
+                <div
+                  key={patient.id}
+                  onClick={() => onSelectPatient(patient)}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition"
+                >
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {patient.name}
+                      </h4>
+                      <span className="text-xs text-slate-400">
+                        ({patient.gender}, {patient.age || '—'}y)
+                      </span>
+                      {patient.mrn && (
+                        <span className="text-xs font-mono text-slate-400">MRN: {patient.mrn}</span>
+                      )}
+                      <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800/50">
+                        Archived File
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {patient.dischargePlan?.dischargeDiagnosis || patient.diagnosis || 'Cardiology Admission'}
+                    </p>
+                    {patient.admissionDate && (
+                      <p className="text-[11px] text-slate-400">
+                        Admitted: {new Date(patient.admissionDate).toLocaleDateString()}
+                        {patient.dischargeDetails?.dischargeDate && ` • Discharged: ${new Date(patient.dischargeDetails.dischargeDate).toLocaleDateString()}`}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        onReadmitPatient(patient);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition"
+                    >
+                      Readmit
+                    </button>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setPatientToDelete(patient);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 text-xs font-semibold transition flex items-center gap-1"
+                      title="Permanently Delete Patient Record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                    <ChevronRight size={16} className="text-slate-400" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+              <FolderArchive className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No Archived Records</p>
+              <p className="text-xs text-slate-400">
+                No archived patient records found matching the search criteria.
+              </p>
             </div>
           )}
         </div>

@@ -1,37 +1,121 @@
 {
-  "version": "1.0",
-  "collections": [
-    {
-      "path": "users/{userId}/patients",
-      "description": "Clinical patient records belonging exclusively to the authenticated physician",
-      "documentSchema": {
-        "id": "string",
-        "bedNumber": "number or string",
-        "name": "string",
-        "age": "number",
-        "gender": "string",
-        "mrn": "string",
-        "admissionDate": "string",
-        "status": "string",
-        "primaryDiagnosis": "string",
-        "isDischarged": "boolean",
-        "dischargeDetails": "object",
-        "vitals": "array",
-        "labs": "array",
-        "abgRecords": "array",
-        "progressNotes": "array",
-        "lastUpdated": "string"
-      }
+  "entities": {
+    "Patient": {
+      "title": "Patient",
+      "description": "Comprehensive clinical patient record in ICU/CCU",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique patient identifier",
+          "maxLength": 128
+        },
+        "bedNumber": {
+          "type": "number",
+          "description": "Assigned bed number"
+        },
+        "name": {
+          "type": "string",
+          "description": "Patient full name",
+          "maxLength": 200
+        },
+        "age": {
+          "type": "number",
+          "description": "Patient age in years"
+        },
+        "gender": {
+          "type": "string",
+          "description": "Patient gender",
+          "enum": ["male", "female", "other"]
+        },
+        "mrn": {
+          "type": "string",
+          "description": "Medical Record Number",
+          "maxLength": 100
+        },
+        "admissionDate": {
+          "type": "string",
+          "description": "Admission ISO date"
+        },
+        "status": {
+          "type": "string",
+          "description": "Clinical acuity status",
+          "enum": ["stable", "critical", "improving", "deteriorating"]
+        },
+        "primaryDiagnosis": {
+          "type": "string",
+          "description": "Primary clinical diagnosis",
+          "maxLength": 500
+        },
+        "isDischarged": {
+          "type": "boolean",
+          "description": "Discharge status"
+        },
+        "dischargeDetails": {
+          "type": "object",
+          "description": "Discharge metadata and summaries"
+        },
+        "vitals": {
+          "type": "array",
+          "description": "Logged vital sign recordings"
+        },
+        "labs": {
+          "type": "array",
+          "description": "Laboratory test results"
+        },
+        "abgRecords": {
+          "type": "array",
+          "description": "Arterial Blood Gas recordings"
+        },
+        "progressNotes": {
+          "type": "array",
+          "description": "Clinical progress and daily round notes"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Timestamp of last modification"
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "description": "Timestamp of cloud synchronization"
+        }
+      },
+      "required": ["id", "name", "admissionDate"]
     },
-    {
-      "path": "users/{userId}/settings",
+    "UserSettings": {
+      "title": "UserSettings",
       "description": "User clinical settings, field toggles, and total beds preferences",
-      "documentSchema": {
-        "totalBeds": "number",
-        "specialtyMode": "string",
-        "fieldConfig": "object",
-        "updatedAt": "string"
+      "type": "object",
+      "properties": {
+        "totalBeds": {
+          "type": "number",
+          "description": "Configured total number of beds"
+        },
+        "specialtyMode": {
+          "type": "string",
+          "description": "Active specialty filter",
+          "enum": ["all", "ccu", "icu"]
+        },
+        "fieldConfig": {
+          "type": "object",
+          "description": "Visibility toggles for clinical sections"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of last update"
+        }
       }
     }
-  ]
+  },
+  "firestore": {
+    "/users/{userId}/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Clinical patient records belonging exclusively to the authenticated physician"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "UserSettings",
+      "description": "User clinical settings, field toggles, and total beds preferences"
+    }
+  }
 }
+

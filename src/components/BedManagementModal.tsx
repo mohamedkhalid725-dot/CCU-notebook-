@@ -54,6 +54,10 @@ export const BedManagementModal: React.FC<BedManagementModalProps> = ({
   const [movingPatient, setMovingPatient] = useState<PatientRecord | null>(null);
   const [targetBedNumber, setTargetBedNumber] = useState<string>('');
 
+  // In-modal alerts and confirmation (replaces iframe-blocked alert/confirm)
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [bedToRemove, setBedToRemove] = useState<BedDefinition | null>(null);
+
   if (!isOpen) return null;
 
   const activePatients = patients.filter((p) => !p.isDischarged);
@@ -119,20 +123,26 @@ export const BedManagementModal: React.FC<BedManagementModalProps> = ({
   };
 
   const handleRemoveBed = (bed: BedDefinition) => {
+    setActionNotice(null);
     const occupant = activePatients.find(
       (p) => String(p.bedNumber).trim().toLowerCase() === bed.name.trim().toLowerCase()
     );
     if (occupant) {
-      alert(`Cannot delete ${bed.name}: currently occupied by ${occupant.name}. Please reassign or discharge patient first.`);
+      setActionNotice(`Cannot delete ${bed.name}: currently occupied by ${occupant.name}. Please reassign or discharge patient first.`);
       return;
     }
     if (beds.length <= 1) {
-      alert('At least one bed must be maintained.');
+      setActionNotice('At least one bed must be maintained.');
       return;
     }
-    if (confirm(`Are you sure you want to remove ${bed.name}?`)) {
-      onSaveBeds(beds.filter((b) => b.id !== bed.id));
-    }
+    setBedToRemove(bed);
+  };
+
+  const confirmRemoveBed = () => {
+    if (!bedToRemove) return;
+    onSaveBeds(beds.filter((b) => b.id !== bedToRemove.id));
+    setBedToRemove(null);
+    setActionNotice(null);
   };
 
   const handleExecuteMovePatient = () => {
@@ -143,8 +153,8 @@ export const BedManagementModal: React.FC<BedManagementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 pt-[max(env(safe-area-inset-top),1rem)] pb-[max(env(safe-area-inset-bottom),1rem)] overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -167,6 +177,46 @@ export const BedManagementModal: React.FC<BedManagementModalProps> = ({
             <X size={18} />
           </button>
         </div>
+
+        {/* Notice Banner if any */}
+        {actionNotice && (
+          <div className="px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>{actionNotice}</span>
+            </div>
+            <button
+              onClick={() => setActionNotice(null)}
+              className="text-amber-600 dark:text-amber-400 hover:text-amber-800 text-xs font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Remove Confirmation Prompt */}
+        {bedToRemove && (
+          <div className="px-4 py-3 bg-rose-500/10 border-b border-rose-500/20 text-rose-800 dark:text-rose-200 text-xs flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>Remove <strong>{bedToRemove.name}</strong> from ICU/CCU bed roster?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBedToRemove(null)}
+                className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemoveBed}
+                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs"
+              >
+                Confirm Remove
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-xs shrink-0">

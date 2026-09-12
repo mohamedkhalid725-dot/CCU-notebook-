@@ -109,26 +109,26 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 p-4 select-none">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-4 pt-[max(env(safe-area-inset-top),1rem)] pb-[max(env(safe-area-inset-bottom),1rem)] select-none overflow-y-auto transition-colors">
       {/* Background glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(6,182,212,0.12),transparent_70%)] pointer-events-none" />
 
-      <div className="w-full max-w-sm flex flex-col items-center z-10">
+      <div className="w-full max-w-sm flex flex-col items-center z-10 my-auto">
         {/* Shield & App Brand */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl shadow-cyan-950/40 mb-4 flex items-center justify-center">
-          <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-            <Lock className="w-8 h-8 text-cyan-400 animate-pulse" />
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl shadow-cyan-950/20 mb-4 flex items-center justify-center">
+          <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center">
+            <Lock className="w-8 h-8 text-cyan-600 dark:text-cyan-400 animate-pulse" />
           </div>
         </div>
 
-        <h1 className="text-xl font-bold text-white tracking-tight text-center">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight text-center">
           {isSettingUp
             ? setupStep === 'enter'
               ? 'Create Secure PIN'
               : 'Confirm Your PIN'
             : 'ICU & CCU Personal Notebook'}
         </h1>
-        <p className="text-xs text-slate-400 mt-1 text-center max-w-xs">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center max-w-xs">
           {isSettingUp
             ? 'All medical records will be locally encrypted on this device with AES-GCM 256-bit.'
             : 'Confidential Patient Data — Enter PIN to decrypt session'}
@@ -143,8 +143,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({
                 key={i}
                 className={`w-3.5 h-3.5 rounded-full border transition-all duration-200 ${
                   filled
-                    ? 'bg-cyan-400 border-cyan-300 scale-110 shadow-sm shadow-cyan-400'
-                    : 'bg-slate-900 border-slate-700'
+                    ? 'bg-cyan-500 border-cyan-400 scale-110 shadow-sm shadow-cyan-400'
+                    : 'bg-slate-200 dark:bg-slate-900 border-slate-300 dark:border-slate-700'
                 }`}
               />
             );
@@ -153,7 +153,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
         {/* Error Message */}
         {errorMsg && (
-          <div className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-950/50 border border-rose-800/40 px-3 py-1.5 rounded-lg mb-4 animate-shake">
+          <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/40 px-3 py-1.5 rounded-lg mb-4 animate-shake">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -163,7 +163,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         {isSettingUp && pin.length >= 4 && (
           <button
             onClick={handleSetupProceed}
-            className="w-full mb-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm shadow-lg shadow-cyan-950/50 transition active:scale-98 flex items-center justify-center gap-2"
+            className="w-full mb-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm shadow-lg shadow-cyan-950/20 transition active:scale-98 flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
             {setupStep === 'enter' ? 'Continue' : 'Set PIN & Encrypt'}
@@ -176,7 +176,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <button
               key={num}
               onClick={() => handleDigit(num)}
-              className="h-14 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-xl font-semibold text-white transition active:scale-95 shadow-sm active:bg-cyan-950/40 flex items-center justify-center"
+              className="h-14 rounded-2xl bg-white dark:bg-slate-900/90 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 text-xl font-semibold text-slate-900 dark:text-white transition active:scale-95 shadow-sm active:bg-cyan-50 dark:active:bg-cyan-950/40 flex items-center justify-center"
             >
               {num}
             </button>
@@ -186,16 +186,16 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           {!isSettingUp && securitySettings.biometricEnabled ? (
             <button
               onClick={handleBiometricAuth}
-              className="h-14 rounded-2xl bg-slate-900/50 hover:bg-slate-800 border border-slate-800 text-cyan-400 flex flex-col items-center justify-center transition active:scale-95"
+              className="h-14 rounded-2xl bg-white dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-cyan-600 dark:text-cyan-400 flex flex-col items-center justify-center transition active:scale-95 shadow-sm"
               title="Biometric Unlock"
             >
               <Fingerprint className="w-6 h-6" />
-              <span className="text-[10px] text-cyan-400 font-medium mt-0.5">Biometric</span>
+              <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-0.5">Biometric</span>
             </button>
           ) : (
             <button
               onClick={handleClear}
-              className="h-14 rounded-2xl bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/80 text-xs text-slate-400 transition active:scale-95 flex items-center justify-center"
+              className="h-14 rounded-2xl bg-white dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 transition active:scale-95 flex items-center justify-center shadow-sm"
             >
               Clear
             </button>
@@ -203,14 +203,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({
 
           <button
             onClick={() => handleDigit('0')}
-            className="h-14 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-xl font-semibold text-white transition active:scale-95 shadow-sm flex items-center justify-center"
+            className="h-14 rounded-2xl bg-white dark:bg-slate-900/90 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xl font-semibold text-slate-900 dark:text-white transition active:scale-95 shadow-sm flex items-center justify-center"
           >
             0
           </button>
 
           <button
             onClick={handleBackspace}
-            className="h-14 rounded-2xl bg-slate-900/40 hover:bg-slate-800 border border-slate-800 text-slate-300 transition active:scale-95 flex items-center justify-center"
+            className="h-14 rounded-2xl bg-white dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition active:scale-95 flex items-center justify-center shadow-sm"
             title="Delete"
           >
             <Delete className="w-5 h-5" />
@@ -218,11 +218,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         </div>
 
         {/* Local-First Privacy Guarantee Banner */}
-        <div className="mt-4 p-3 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2 max-w-xs text-left">
-          <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="mt-4 p-3 rounded-xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2 max-w-xs text-left shadow-sm">
+          <Shield className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
           <div>
-            <span className="text-slate-200 font-semibold">100% Local-First & Offline</span>
-            <p className="text-[10px] text-slate-400 mt-0.5 leading-normal">
+            <span className="text-slate-900 dark:text-slate-200 font-semibold">100% Local-First & Offline</span>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
               Zero cloud transmission. Protected by client-side Web Crypto AES-GCM.
             </p>
           </div>

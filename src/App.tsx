@@ -15,7 +15,11 @@ import {
   getFieldConfig,
   saveFieldConfig,
   loadPatients,
-  savePatients
+  savePatients,
+  getAppTheme,
+  setAppTheme,
+  applyThemeToDom,
+  AppTheme
 } from './services/storage';
 
 import { LockScreen } from './components/LockScreen';
@@ -57,7 +61,10 @@ import {
   RefreshCw,
   LogOut,
   SlidersHorizontal,
-  Trash2
+  Trash2,
+  Sun,
+  Moon,
+  Laptop
 } from 'lucide-react';
 
 import {
@@ -121,6 +128,26 @@ export default function App() {
 
   const [patientSearch, setPatientSearch] =
     useState<string>('');
+
+  const [currentTheme, setCurrentTheme] =
+    useState<AppTheme>(() => getAppTheme());
+
+  const handleSelectTheme = (theme: AppTheme) => {
+    setCurrentTheme(theme);
+    setAppTheme(theme);
+  };
+
+  useEffect(() => {
+    applyThemeToDom(currentTheme);
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = () => {
+      if (getAppTheme() === 'system') {
+        applyThemeToDom('system');
+      }
+    };
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, [currentTheme]);
 
   // =========================================================
   // Modals
@@ -189,18 +216,19 @@ export default function App() {
             return;
           }
         } catch (cloudErr) {
-          console.error(
-            'Failed to restore patients from cloud:',
+          console.warn(
+            'Cloud patients restore unavailable, continuing with local encrypted data:',
             cloudErr
           );
+          setCloudSyncStatus('error');
         }
       }
 
       // If there is no Cloud data, use local data.
       setPatients(loaded);
     } catch (err) {
-      console.error(
-        'Failed to load patient records',
+      console.warn(
+        'Notice loading patient records:',
         err
       );
     }
@@ -219,6 +247,16 @@ export default function App() {
         setIsUnlocked(true);
         setCloudSyncStatus('syncing');
 
+        // Always ensure local data is loaded first as baseline
+        try {
+          const localData = await loadPatients(activePin || '0000');
+          if (localData && localData.length > 0) {
+            setPatients(localData);
+          }
+        } catch {
+          // Local storage empty or needs PIN
+        }
+
         try {
           const cloudData = await fetchCloudPatients(user.uid);
           const cloudSettings = await fetchUserSettingsFromCloud(user.uid);
@@ -230,10 +268,14 @@ export default function App() {
               await savePatients(cloudData, activePin);
             }
           } else if (patients.length > 0) {
-            await syncAllPatientsToCloud(
-              user.uid,
-              patients
-            );
+            try {
+              await syncAllPatientsToCloud(
+                user.uid,
+                patients
+              );
+            } catch (syncErr) {
+              console.warn('Initial cloud sync postponed:', syncErr);
+            }
           }
 
           if (cloudSettings) {
@@ -262,17 +304,21 @@ export default function App() {
               saveFieldConfig(cloudSettings.fieldConfig);
             }
           } else {
-            await saveUserSettingsToCloud(user.uid, {
-              totalBeds,
-              specialtyMode,
-              fieldConfig
-            });
+            try {
+              await saveUserSettingsToCloud(user.uid, {
+                totalBeds,
+                specialtyMode,
+                fieldConfig
+              });
+            } catch (settingsErr) {
+              console.warn('Initial settings sync postponed:', settingsErr);
+            }
           }
 
           setCloudSyncStatus('synced');
         } catch (err) {
-          console.error(
-            'Failed to sync cloud patients:',
+          console.warn(
+            'Cloud patients synchronization notice (using local offline storage):',
             err
           );
 
@@ -473,7 +519,7 @@ export default function App() {
 
           setCloudSyncStatus('synced');
         } catch (e) {
-          console.error('Cloud save failed:', e);
+          console.warn('Cloud save notice:', e);
           setCloudSyncStatus('error');
         }
       }
@@ -512,7 +558,7 @@ export default function App() {
 
           setCloudSyncStatus('synced');
         } catch (e) {
-          console.error('Cloud delete failed:', e);
+          console.warn('Cloud delete notice:', e);
           setCloudSyncStatus('error');
         }
       }
@@ -559,8 +605,8 @@ export default function App() {
 
           setCloudSyncStatus('synced');
         } catch (e) {
-          console.error(
-            'Cloud admit save failed:',
+          console.warn(
+            'Cloud admit save notice:',
             e
           );
 
@@ -668,8 +714,8 @@ export default function App() {
 
           setCloudSyncStatus('synced');
         } catch (e) {
-          console.error(
-            'Cloud discharge save failed:',
+          console.warn(
+            'Cloud discharge save notice:',
             e
           );
 
@@ -794,8 +840,8 @@ export default function App() {
 
           setCloudSyncStatus('synced');
         } catch (e) {
-          console.error(
-            'Cloud readmit save failed:',
+          console.warn(
+            'Cloud readmit save notice:',
             e
           );
 
@@ -823,7 +869,7 @@ export default function App() {
 
       setCloudSyncStatus('synced');
     } catch (err) {
-      console.error('Manual sync failed:', err);
+      console.warn('Manual cloud sync notice:', err);
       setCloudSyncStatus('error');
     }
   };
@@ -837,19 +883,21 @@ export default function App() {
       const cloudData =
         await fetchCloudPatients(currentUser.uid);
 
-      setPatients(cloudData);
+      if (cloudData && cloudData.length > 0) {
+        setPatients(cloudData);
 
-      if (activePin) {
-        await savePatients(
-          cloudData,
-          activePin
-        );
+        if (activePin) {
+          await savePatients(
+            cloudData,
+            activePin
+          );
+        }
       }
 
       setCloudSyncStatus('synced');
     } catch (err) {
-      console.error(
-        'Pull cloud data failed:',
+      console.warn(
+        'Pull cloud data notice (preserving existing records):',
         err
       );
 
@@ -1124,30 +1172,31 @@ export default function App() {
       className="
         w-full text-left
         rounded-2xl
-        border border-slate-800
-        bg-slate-900/80
+        border border-slate-200 dark:border-slate-800
+        bg-white dark:bg-slate-900/80
         p-4
-        hover:bg-slate-800/80
+        hover:bg-slate-50 dark:hover:bg-slate-800/80
+        shadow-sm
         transition
       "
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {title}
           </p>
 
-          <p className="text-2xl font-bold text-white mt-1">
+          <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
             {value}
           </p>
 
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1">
             {subtitle}
           </p>
         </div>
 
-        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-cyan-400" />
+        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
         </div>
       </div>
     </button>
@@ -1161,81 +1210,105 @@ export default function App() {
     archived?: boolean;
     key?: React.Key;
   }) => (
-    <button
-      onClick={() =>
-        setSelectedPatientId(patient.id)
-      }
-      className="
-        w-full
-        text-left
-        p-4
-        rounded-2xl
-        border border-slate-800
-        bg-slate-900/80
-        hover:bg-slate-800
-        transition
-      "
-    >
-      <div className="flex items-center gap-3">
-        <div className="
-          w-11 h-11
-          rounded-xl
-          bg-slate-800
-          flex items-center justify-center
-          shrink-0
-        ">
-          <HeartPulse className="w-5 h-5 text-cyan-400" />
-        </div>
+    <div className="relative flex items-center">
+      <button
+        onClick={() =>
+          setSelectedPatientId(patient.id)
+        }
+        className="
+          w-full
+          text-left
+          p-4
+          rounded-2xl
+          border border-slate-200 dark:border-slate-800
+          bg-white dark:bg-slate-900/80
+          hover:bg-slate-50 dark:hover:bg-slate-800
+          shadow-sm
+          transition
+        "
+      >
+        <div className="flex items-center gap-3">
+          <div className="
+            w-11 h-11
+            rounded-xl
+            bg-slate-100 dark:bg-slate-800
+            flex items-center justify-center
+            shrink-0
+          ">
+            <HeartPulse className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+          </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-white truncate">
-              {patient.name || 'Unnamed Patient'}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-slate-900 dark:text-white truncate">
+                {patient.name || 'Unnamed Patient'}
+              </p>
+
+              {!archived && (
+                <span className={`
+                  text-[9px]
+                  px-2 py-0.5
+                  rounded-full
+                  ${
+                    patient.status === 'critical' ||
+                    patient.status === 'deteriorating'
+                      ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                      : patient.status === 'stable'
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                  }
+                `}>
+                  {patient.status}
+                </span>
+              )}
+
+              {archived && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
+                  Archived
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+              {patient.primaryDiagnosis || patient.diagnosis || 'No diagnosis recorded'}
             </p>
 
-            {!archived && (
-              <span className={`
-                text-[9px]
-                px-2 py-0.5
-                rounded-full
-                ${
-                  patient.status === 'critical' ||
-                  patient.status === 'deteriorating'
-                    ? 'bg-rose-950 text-rose-300'
-                    : patient.status === 'stable'
-                      ? 'bg-emerald-950 text-emerald-300'
-                      : 'bg-amber-950 text-amber-300'
-                }
-              `}>
-                {patient.status}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500">
+              <span>
+                ID: {patient.mrn || '—'}
               </span>
-            )}
+
+              <span>
+                {patient.age || '—'} yrs
+              </span>
+
+              {patient.bedNumber !== '' && (
+                <span>
+                  Bed {patient.bedNumber}
+                </span>
+              )}
+            </div>
           </div>
 
-          <p className="text-xs text-slate-400 mt-1 truncate">
-            {patient.primaryDiagnosis || 'No diagnosis recorded'}
-          </p>
-
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500">
-            <span>
-              ID: {patient.mrn || '—'}
-            </span>
-
-            <span>
-              {patient.age || '—'} yrs
-            </span>
-
-            {patient.bedNumber !== '' && (
-              <span>
-                Bed {patient.bedNumber}
-              </span>
+          <div className="flex items-center gap-1">
+            {archived && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeletePatient(patient.id);
+                }}
+                className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition"
+                title="Delete from Archive"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
+            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
         </div>
-
-        <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-      </div>
-    </button>
+      </button>
+    </div>
   );
 
   // =========================================================
@@ -1536,17 +1609,17 @@ export default function App() {
     <div className="space-y-5">
 
       <div>
-        <h2 className="text-2xl font-bold text-white">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Patients
         </h2>
 
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
           Active ICU / CCU patient records
         </p>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 
         <input
           value={patientSearch}
@@ -1556,28 +1629,29 @@ export default function App() {
           placeholder="Search by name, ID, diagnosis or bed..."
           className="
             w-full
-            bg-slate-900
-            border border-slate-800
+            bg-white dark:bg-slate-900
+            border border-slate-200 dark:border-slate-800
             rounded-xl
             pl-10 pr-4 py-3
             text-sm
-            text-white
+            text-slate-900 dark:text-white
             outline-none
             focus:border-cyan-600
+            shadow-sm
           "
         />
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        <span className="px-3 py-1.5 rounded-full bg-cyan-950 text-cyan-300 text-xs whitespace-nowrap">
+        <span className="px-3 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-950/80 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-semibold whitespace-nowrap">
           Active: {activePatients.length}
         </span>
 
-        <span className="px-3 py-1.5 rounded-full bg-rose-950 text-rose-300 text-xs whitespace-nowrap">
+        <span className="px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold whitespace-nowrap">
           Critical: {criticalCount}
         </span>
 
-        <span className="px-3 py-1.5 rounded-full bg-emerald-950 text-emerald-300 text-xs whitespace-nowrap">
+        <span className="px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold whitespace-nowrap">
           Stable: {stableCount}
         </span>
       </div>
@@ -1585,10 +1659,10 @@ export default function App() {
       {filteredPatients.filter(
         (p) => !p.isDischarged
       ).length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
-          <Users className="w-12 h-12 text-slate-700 mx-auto" />
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm">
+          <Users className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
 
-          <p className="text-sm text-slate-400 mt-3">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
             No matching active patients
           </p>
         </div>
@@ -1620,7 +1694,7 @@ export default function App() {
       onAdmitToBed={(bedNum) => setAdmitBedNumber(Number(bedNum) || 1)}
       onDischargePatient={(pt) => setPatientToDischarge(pt)}
       onReadmitPatient={(pt) => setPatientToReadmit(pt)}
-      onDeletePatient={(pt) => handleDeletePatient(pt.id)}
+      onDeletePatient={(pt) => handleDeletePatient(typeof pt === 'string' ? pt : pt.id)}
       onChangeTotalBeds={handleChangeTotalBeds}
       onUpdatePatientBed={handleUpdatePatientBed}
     />
@@ -1634,17 +1708,17 @@ export default function App() {
     <div className="space-y-5">
 
       <div>
-        <h2 className="text-2xl font-bold text-white">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Archive
         </h2>
 
-        <p className="text-sm text-slate-400 mt-1">
-          Discharged patients and completed cases
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          Discharged patients and completed clinical records
         </p>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 
         <input
           value={patientSearch}
@@ -1654,14 +1728,15 @@ export default function App() {
           placeholder="Search archived patients..."
           className="
             w-full
-            bg-slate-900
-            border border-slate-800
+            bg-white dark:bg-slate-900
+            border border-slate-200 dark:border-slate-800
             rounded-xl
             pl-10 pr-4 py-3
             text-sm
-            text-white
+            text-slate-900 dark:text-white
             outline-none
             focus:border-cyan-600
+            shadow-sm
           "
         />
       </div>
@@ -1669,10 +1744,10 @@ export default function App() {
       {filteredPatients.filter(
         (p) => p.isDischarged
       ).length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 py-16 text-center">
-          <Archive className="w-12 h-12 text-slate-700 mx-auto" />
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm">
+          <Archive className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
 
-          <p className="text-sm text-slate-400 mt-3">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
             Archive is empty
           </p>
         </div>
@@ -1700,24 +1775,80 @@ export default function App() {
     <div className="space-y-5">
 
       <div>
-        <h2 className="text-2xl font-bold text-white">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Settings
         </h2>
 
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
           CardioVault configuration
         </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-
+        {/* Appearance & Theme Selector */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <BedDouble className="w-5 h-5 text-cyan-400" />
+            <Sun className="w-5 h-5 text-amber-500" />
 
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                Appearance & Theme
+              </h3>
+
+              <p className="text-[11px] text-slate-500">
+                Choose Light, Dark, or System preference
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => handleSelectTheme('light')}
+              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
+                currentTheme === 'light'
+                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Sun className="w-5 h-5 text-amber-500" />
+              <span className="text-xs">Light</span>
+            </button>
+
+            <button
+              onClick={() => handleSelectTheme('dark')}
+              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
+                currentTheme === 'dark'
+                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Moon className="w-5 h-5 text-indigo-400" />
+              <span className="text-xs">Dark</span>
+            </button>
+
+            <button
+              onClick={() => handleSelectTheme('system')}
+              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
+                currentTheme === 'system'
+                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
+                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Laptop className="w-5 h-5 text-cyan-500" />
+              <span className="text-xs">System</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bed Configuration */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
+
+          <div className="flex items-center gap-3 mb-4">
+            <BedDouble className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white">
                 Bed Configuration
               </h3>
 
@@ -1727,7 +1858,7 @@ export default function App() {
             </div>
           </div>
 
-          <label className="text-xs text-slate-400">
+          <label className="text-xs text-slate-500 dark:text-slate-400">
             Total Beds
           </label>
 
@@ -1744,34 +1875,35 @@ export default function App() {
               }
               className="
                 flex-1
-                bg-slate-950
-                border border-slate-700
+                bg-slate-50 dark:bg-slate-950
+                border border-slate-300 dark:border-slate-700
                 rounded-xl
                 px-3 py-3
-                text-white
+                text-slate-900 dark:text-white
                 outline-none
                 focus:border-cyan-600
               "
             />
 
-            <div className="px-4 rounded-xl bg-slate-800 flex items-center text-xs text-slate-400">
+            <div className="px-4 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center text-xs text-slate-600 dark:text-slate-400">
               beds
             </div>
 
           </div>
 
-          <p className="text-[10px] text-slate-600 mt-2">
+          <p className="text-[10px] text-slate-400 mt-2">
             Minimum 3 beds.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+        {/* Security */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
 
           <div className="flex items-center gap-3 mb-4">
-            <ShieldCheck className="w-5 h-5 text-violet-400" />
+            <ShieldCheck className="w-5 h-5 text-violet-500 dark:text-violet-400" />
 
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
                 Security
               </h3>
 
@@ -1790,11 +1922,12 @@ export default function App() {
               flex items-center justify-between
               p-3
               rounded-xl
-              bg-slate-800
-              hover:bg-slate-700
+              bg-slate-100 dark:bg-slate-800
+              hover:bg-slate-200 dark:hover:bg-slate-700
+              transition
             "
           >
-            <span className="text-sm text-slate-200">
+            <span className="text-sm text-slate-800 dark:text-slate-200">
               Security Settings
             </span>
 
@@ -1802,13 +1935,14 @@ export default function App() {
           </button>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+        {/* Patient Fields */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
 
           <div className="flex items-center gap-3 mb-4">
-            <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
+            <SlidersHorizontal className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
 
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
                 Patient Fields
               </h3>
 
@@ -1827,11 +1961,12 @@ export default function App() {
               flex items-center justify-between
               p-3
               rounded-xl
-              bg-slate-800
-              hover:bg-slate-700
+              bg-slate-100 dark:bg-slate-800
+              hover:bg-slate-200 dark:hover:bg-slate-700
+              transition
             "
           >
-            <span className="text-sm text-slate-200">
+            <span className="text-sm text-slate-800 dark:text-slate-200">
               Customize Fields
             </span>
 
@@ -1839,13 +1974,14 @@ export default function App() {
           </button>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+        {/* Cloud Sync */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
 
           <div className="flex items-center gap-3 mb-4">
-            <Cloud className="w-5 h-5 text-emerald-400" />
+            <Cloud className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
 
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="font-semibold text-slate-900 dark:text-white">
                 Cloud Sync
               </h3>
 
@@ -1860,12 +1996,12 @@ export default function App() {
             {cloudSyncStatus === 'syncing' ? (
               <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
             ) : cloudSyncStatus === 'synced' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             ) : (
               <Clock3 className="w-4 h-4 text-slate-500" />
             )}
 
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-600 dark:text-slate-400">
               {cloudSyncStatus === 'syncing'
                 ? 'Syncing...'
                 : cloudSyncStatus === 'synced'
@@ -1884,10 +2020,11 @@ export default function App() {
               w-full
               p-3
               rounded-xl
-              bg-slate-800
-              hover:bg-slate-700
+              bg-slate-100 dark:bg-slate-800
+              hover:bg-slate-200 dark:hover:bg-slate-700
               text-sm
-              text-slate-200
+              text-slate-800 dark:text-slate-200
+              transition
             "
           >
             Cloud Account
@@ -1896,13 +2033,13 @@ export default function App() {
 
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
 
         <div className="flex items-center gap-3">
-          <LogOut className="w-5 h-5 text-rose-400" />
+          <LogOut className="w-5 h-5 text-rose-500 dark:text-rose-400" />
 
           <div className="flex-1">
-            <h3 className="font-semibold text-white">
+            <h3 className="font-semibold text-slate-900 dark:text-white">
               Session
             </h3>
 
@@ -1916,10 +2053,11 @@ export default function App() {
             className="
               px-3 py-2
               rounded-xl
-              bg-slate-800
-              hover:bg-slate-700
+              bg-slate-100 dark:bg-slate-800
+              hover:bg-slate-200 dark:hover:bg-slate-700
               text-xs
-              text-slate-300
+              text-slate-800 dark:text-slate-300
+              transition
             "
           >
             Lock
@@ -1931,10 +2069,11 @@ export default function App() {
               className="
                 px-3 py-2
                 rounded-xl
-                bg-rose-950
-                hover:bg-rose-900
+                bg-rose-100 dark:bg-rose-950
+                hover:bg-rose-200 dark:hover:bg-rose-900
                 text-xs
-                text-rose-300
+                text-rose-700 dark:text-rose-300
+                transition
               "
             >
               Logout
@@ -1943,9 +2082,9 @@ export default function App() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4">
         <div className="flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-slate-500" />
+          <Wrench className="w-4 h-4 text-slate-400" />
 
           <p className="text-xs text-slate-500">
             CardioVault • ICU & CCU Clinical Notebook
@@ -2061,13 +2200,14 @@ export default function App() {
   return (
     <div className="
       min-h-screen
-      bg-slate-950
-      text-slate-100
+      bg-slate-50 dark:bg-slate-950
+      text-slate-900 dark:text-slate-100
       flex flex-col
       selection:bg-cyan-500/30
       selection:text-cyan-200
-      pt-[env(safe-area-inset-top)]
-      pb-[env(safe-area-inset-bottom)]
+      pt-[max(env(safe-area-inset-top),0.5rem)]
+      pb-[max(env(safe-area-inset-bottom),0.5rem)]
+      transition-colors duration-200
     ">
 
       <Navbar
@@ -2082,6 +2222,9 @@ export default function App() {
 
         currentUser={currentUser}
         cloudSyncStatus={cloudSyncStatus}
+
+        theme={currentTheme}
+        onSetTheme={handleSelectTheme}
 
         onOpenCloudAccount={() =>
           setShowCloudAccountModal(true)

@@ -224,12 +224,28 @@ export const CloudAccountModal: React.FC<CloudAccountModalProps> = ({
                   </div>
                   <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                     <span className="text-slate-400 block mb-0.5">حالة المزامنة:</span>
-                    <strong className="text-cyan-300 text-sm">
-                      {cloudSyncStatus === 'syncing' ? 'جاري المزامنة...' : 'محدثة تلقائياً'}
+                    <strong className={`text-sm ${cloudSyncStatus === 'error' ? 'text-amber-400' : 'text-cyan-300'}`}>
+                      {cloudSyncStatus === 'syncing'
+                        ? 'جاري المزامنة...'
+                        : cloudSyncStatus === 'error'
+                          ? 'محفوظ محلياً (السحابة مقيدة)'
+                          : 'محدثة تلقائياً'}
                     </strong>
                   </div>
                 </div>
               </div>
+
+              {cloudSyncStatus === 'error' && (
+                <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-800/60 text-amber-200 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-amber-300 font-bold">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>تنبيه المزامنة السحابية / التخزين المحلي الآمن</span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                    قواعد السحابة في مشروع Firebase مقيدة حالياً، لكن جميع سجلات المرضى وملاحظات الأسرة مشفرة ومحفوظة بالكامل محلياً على هذا الجهاز وتعمل بدون أي انقطاع.
+                  </p>
+                </div>
+              )}
 
               {/* Cloud sync actions */}
               <div className="grid grid-cols-2 gap-3">

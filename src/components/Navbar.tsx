@@ -183,7 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           DESKTOP / TABLET TOP HEADER
           ========================================================= */}
 
-      <header className="hidden md:block sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
+      <header className="hidden md:block sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
 
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-3">
 
@@ -193,12 +193,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => onTabChange('home')}
-              className="flex items-center gap-3 text-left min-w-0"
+              className="flex items-center gap-3 text-left min-w-0 group"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
 
-                <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-                  <HeartPulse className="w-5 h-5 text-cyan-400" />
+                <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[10px] flex items-center justify-center">
+                  <HeartPulse className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
 
               </div>
@@ -207,20 +207,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <div className="flex items-center gap-2">
 
-                  <h1 className="text-sm lg:text-base font-bold text-white tracking-tight truncate">
+                  <h1 className="text-sm lg:text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
                     CardioVault
                   </h1>
 
-                  <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                  <span className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">
 
                     {currentUser ? (
                       <>
-                        <Cloud className="w-3 h-3 text-emerald-400" />
+                        <Cloud className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         <span>Cloud Synced</span>
                       </>
                     ) : (
                       <>
-                        <ShieldCheck className="w-3 h-3 text-cyan-400" />
+                        <ShieldCheck className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
                         <span>Local-First</span>
                       </>
                     )}
@@ -229,31 +229,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 </div>
 
-                <p className="text-[11px] text-slate-400 flex items-center gap-2">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
 
                   <span>
                     Beds:{' '}
-                    <strong className="text-slate-200">
+                    <strong className="text-slate-800 dark:text-slate-200">
                       {occupiedCount}/{totalBeds}
                     </strong>
                   </span>
 
-                  <span className="text-slate-600">
+                  <span className="text-slate-300 dark:text-slate-600">
                     •
                   </span>
 
-                  <span className="text-rose-400">
+                  <span className="text-rose-600 dark:text-rose-400">
                     Critical:{' '}
                     <strong>
                       {criticalCount}
                     </strong>
                   </span>
 
-                  <span className="text-slate-600">
+                  <span className="text-slate-300 dark:text-slate-600">
                     •
                   </span>
 
-                  <span className="text-emerald-400">
+                  <span className="text-emerald-600 dark:text-emerald-400">
                     Stable:{' '}
                     <strong>
                       {stableCount}
@@ -268,7 +268,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Desktop Navigation */}
 
-            <nav className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800">
+            <nav className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950/70 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
 
               {tabs.map(tab => {
                 const Icon = tab.icon;
@@ -289,7 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ${
                         active
                           ? 'bg-cyan-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800'
                       }
                     `}
                   >
@@ -320,8 +320,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   p-2 rounded-lg border transition
                   ${
                     currentUser
-                      ? 'bg-cyan-950/80 hover:bg-cyan-900 border-cyan-700/70 text-cyan-200'
-                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                      ? 'bg-cyan-50 hover:bg-cyan-100 dark:bg-cyan-950/80 dark:hover:bg-cyan-900 border-cyan-200 dark:border-cyan-700/70 text-cyan-700 dark:text-cyan-200'
+                      : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                   }
                 `}
                 title={
@@ -335,9 +335,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     w-4 h-4
                     ${
                       cloudSyncStatus === 'syncing'
-                        ? 'animate-bounce text-cyan-400'
+                        ? 'animate-bounce text-cyan-500 dark:text-cyan-400'
                         : currentUser
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-500 dark:text-emerald-400'
                           : 'text-slate-400'
                     }
                   `}
@@ -346,23 +346,23 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={onOpenCalculators}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition"
+                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700/80 transition"
                 title="Clinical Calculators"
               >
-                <Calculator className="w-4 h-4 text-amber-400" />
+                <Calculator className="w-4 h-4 text-amber-500 dark:text-amber-400" />
               </button>
 
               <button
                 onClick={handleToggleTheme}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition"
+                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition"
                 title={`Theme: ${theme.toUpperCase()} (Click to toggle)`}
               >
                 {theme === 'dark' ? (
                   <Moon className="w-4 h-4 text-cyan-400" />
                 ) : theme === 'light' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
+                  <Sun className="w-4 h-4 text-amber-500" />
                 ) : (
-                  <Laptop className="w-4 h-4 text-emerald-400" />
+                  <Laptop className="w-4 h-4 text-emerald-500" />
                 )}
               </button>
 
@@ -370,7 +370,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() =>
                   onTabChange('settings')
                 }
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition"
+                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/80 transition"
                 title="Settings"
               >
                 <MoreHorizontal className="w-4 h-4" />
@@ -382,9 +382,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Specialty Switcher */}
 
-          <div className="flex items-center justify-center mt-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-center mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
 
-            <div className="flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
 
               <button
                 onClick={() =>
@@ -395,8 +395,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   font-medium transition
                   ${
                     specialtyMode === 'all'
-                      ? 'bg-slate-800 text-cyan-300 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-white dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }
                 `}
               >
@@ -413,12 +413,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   gap-1.5 transition
                   ${
                     specialtyMode === 'ccu'
-                      ? 'bg-rose-950/80 text-rose-300 border border-rose-800/40'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }
                 `}
               >
-                <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
+                <HeartPulse className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                 CCU Cardiology
               </button>
 
@@ -432,12 +432,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   gap-1.5 transition
                   ${
                     specialtyMode === 'icu'
-                      ? 'bg-blue-950/80 text-blue-300 border border-blue-800/40'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }
                 `}
               >
-                <Activity className="w-3.5 h-3.5 text-blue-400" />
+                <Activity className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                 ICU Critical Care
               </button>
 
@@ -453,9 +453,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           MOBILE TOP HEADER
           ========================================================= */}
 
-      <header className="md:hidden sticky top-0 z-30 pt-[env(safe-area-inset-top)] bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
+      <header className="md:hidden sticky top-0 z-30 pt-[max(env(safe-area-inset-top),0.5rem)] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
 
-        <div className="px-4 py-3">
+        <div className="px-4 py-2.5">
 
           <div className="flex items-center justify-between gap-3">
 
@@ -466,29 +466,29 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2.5 min-w-0"
             >
 
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 flex items-center justify-center shrink-0 shadow-sm">
 
-                <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-                  <HeartPulse className="w-5 h-5 text-cyan-400" />
+                <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[10px] flex items-center justify-center">
+                  <HeartPulse className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
 
               </div>
 
               <div className="text-left min-w-0">
 
-                <h1 className="text-sm font-bold text-white truncate">
+                <h1 className="text-sm font-bold text-slate-900 dark:text-white truncate">
                   CardioVault
                 </h1>
 
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
 
                   {occupiedCount}/{totalBeds} beds
 
-                  <span className="mx-1 text-slate-600">
+                  <span className="mx-1 text-slate-300 dark:text-slate-600">
                     •
                   </span>
 
-                  <span className="text-rose-400">
+                  <span className="text-rose-600 dark:text-rose-400 font-medium">
                     {criticalCount} critical
                   </span>
 
@@ -502,7 +502,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={onOpenNewPatientModal}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white transition active:scale-95"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white transition active:scale-95 shadow-sm"
                 title="Admit Patient"
               >
                 <Plus className="w-5 h-5" />
@@ -510,7 +510,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={onOpenCloudAccount}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                 title="Cloud Account"
               >
                 <Cloud
@@ -518,9 +518,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     w-4 h-4
                     ${
                       cloudSyncStatus === 'syncing'
-                        ? 'animate-bounce text-cyan-400'
+                        ? 'animate-bounce text-cyan-500 dark:text-cyan-400'
                         : currentUser
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-500 dark:text-emerald-400'
                           : 'text-slate-400'
                     }
                   `}
@@ -529,15 +529,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={handleToggleTheme}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 text-slate-300"
-                title="Toggle Theme"
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition"
+                title={`Theme: ${theme.toUpperCase()}`}
               >
                 {theme === 'dark' ? (
                   <Moon className="w-4 h-4 text-cyan-400" />
                 ) : theme === 'light' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
+                  <Sun className="w-4 h-4 text-amber-500" />
                 ) : (
-                  <Laptop className="w-4 h-4 text-emerald-400" />
+                  <Laptop className="w-4 h-4 text-emerald-500" />
                 )}
               </button>
 
@@ -545,95 +545,99 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           </div>
 
-    
-
         </div>
 
       </header>
 
       {/* =========================================================
-          MOBILE BOTTOM NAVIGATION
+          MOBILE BOTTOM NAVIGATION (NON-OVERLAPPING)
           ========================================================= */}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900/98 backdrop-blur-xl border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.35)] transition-colors">
 
-        <div className="relative max-w-lg mx-auto px-2 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-lg mx-auto px-1 pb-[env(safe-area-inset-bottom)]">
 
-          {/* Floating Add Patient */}
+          <div className="flex items-center justify-between h-[64px]">
 
-          <button
-            onClick={onOpenNewPatientModal}
-            className="
-              absolute
-              left-1/2
-              -translate-x-1/2
-              -top-7
-              w-14
-              h-14
-              rounded-full
-              bg-cyan-600
-              hover:bg-cyan-500
-              text-white
-              shadow-lg
-              shadow-cyan-950/40
-              border-4
-              border-slate-950
-              flex
-              items-center
-              justify-center
-              transition
-              active:scale-90
-            "
-            title="Add Patient"
-          >
-            <Plus className="w-6 h-6" />
-          </button>
+            {/* 1. Home */}
+            <button
+              onClick={() => onTabChange('home')}
+              className={`flex-1 flex flex-col items-center justify-center py-1 gap-1 rounded-xl transition min-w-0 ${
+                activeTab === 'home'
+                  ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Home className={`w-5 h-5 shrink-0 ${activeTab === 'home' ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-[10px] font-medium tracking-tight truncate">Home</span>
+            </button>
 
-          <div className="grid grid-cols-5 h-[68px]">
+            {/* 2. Patients */}
+            <button
+              onClick={() => onTabChange('patients')}
+              className={`flex-1 flex flex-col items-center justify-center py-1 gap-1 rounded-xl transition min-w-0 ${
+                activeTab === 'patients'
+                  ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Users className={`w-5 h-5 shrink-0 ${activeTab === 'patients' ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-[10px] font-medium tracking-tight truncate">Patients</span>
+            </button>
 
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              const active =
-                activeTab === tab.id;
+            {/* 3. Central Add Patient (+) Button (Dedicated non-overlapping slot) */}
+            <div className="flex-1 flex flex-col items-center justify-center min-w-0">
+              <button
+                onClick={onOpenNewPatientModal}
+                className="w-11 h-11 -mt-3.5 rounded-full bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white shadow-lg shadow-cyan-600/30 border-2 border-white dark:border-slate-900 flex items-center justify-center transition"
+                title="Admit Patient"
+                aria-label="Admit Patient"
+              >
+                <Plus className="w-6 h-6 stroke-[2.5]" />
+              </button>
+              <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 mt-0.5 tracking-tight">
+                Admit
+              </span>
+            </div>
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() =>
-                    onTabChange(tab.id)
-                  }
-                  className={`
-                    flex flex-col
-                    items-center
-                    justify-center
-                    gap-1
-                    rounded-xl
-                    transition
-                    ${
-                      active
-                        ? 'text-cyan-400'
-                        : 'text-slate-500 hover:text-slate-300'
-                    }
-                  `}
-                >
-                  <Icon
-                    className={`
-                      w-5 h-5
-                      ${
-                        active
-                          ? 'stroke-[2.5]'
-                          : ''
-                      }
-                    `}
-                  />
+            {/* 4. Beds (Completely unblocked, unobstructed) */}
+            <button
+              onClick={() => onTabChange('beds')}
+              className={`flex-1 flex flex-col items-center justify-center py-1 gap-1 rounded-xl transition min-w-0 ${
+                activeTab === 'beds'
+                  ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <BedDouble className={`w-5 h-5 shrink-0 ${activeTab === 'beds' ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-[10px] font-medium tracking-tight truncate">Beds</span>
+            </button>
 
-                  <span className="text-[9px] font-semibold">
-                    {tab.label}
-                  </span>
+            {/* 5. Archive */}
+            <button
+              onClick={() => onTabChange('archive')}
+              className={`flex-1 flex flex-col items-center justify-center py-1 gap-1 rounded-xl transition min-w-0 ${
+                activeTab === 'archive'
+                  ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Archive className={`w-5 h-5 shrink-0 ${activeTab === 'archive' ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-[10px] font-medium tracking-tight truncate">Archive</span>
+            </button>
 
-                </button>
-              );
-            })}
+            {/* 6. Settings */}
+            <button
+              onClick={() => onTabChange('settings')}
+              className={`flex-1 flex flex-col items-center justify-center py-1 gap-1 rounded-xl transition min-w-0 ${
+                activeTab === 'settings'
+                  ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Settings className={`w-5 h-5 shrink-0 ${activeTab === 'settings' ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-[10px] font-medium tracking-tight truncate">Settings</span>
+            </button>
 
           </div>
 
