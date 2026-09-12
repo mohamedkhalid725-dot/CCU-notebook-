@@ -34,6 +34,9 @@ import { CloudAccountModal } from './components/CloudAccountModal';
 import { LoginScreen } from './components/LoginScreen';
 
 import { User } from 'firebase/auth';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { motion, AnimatePresence } from 'motion/react';
 
 import {
   HeartPulse,
@@ -53,7 +56,8 @@ import {
   Cloud,
   RefreshCw,
   LogOut,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Trash2
 } from 'lucide-react';
 
 import {
@@ -281,6 +285,89 @@ export default function App() {
 
     return () => unsubscribe();
   }, [activePin]);
+
+  // =========================================================
+  // Android Native Hardware Back Button Handling
+  // =========================================================
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let listenerHandle: any = null;
+
+    const setupListener = async () => {
+      listenerHandle = await CapacitorApp.addListener('backButton', () => {
+        if (showPrintView) {
+          setShowPrintView(false);
+          setPatientToPrint(null);
+          return;
+        }
+        if (patientToDischarge) {
+          setPatientToDischarge(null);
+          return;
+        }
+        if (patientToReadmit) {
+          setPatientToReadmit(null);
+          return;
+        }
+        if (admitBedNumber !== null) {
+          setAdmitBedNumber(null);
+          return;
+        }
+        if (selectedPatientId !== null) {
+          setSelectedPatientId(null);
+          return;
+        }
+        if (showCalculators) {
+          setShowCalculators(false);
+          return;
+        }
+        if (showCustomizer) {
+          setShowCustomizer(false);
+          return;
+        }
+        if (showSecurityModal) {
+          setShowSecurityModal(false);
+          return;
+        }
+        if (showApkModal) {
+          setShowApkModal(false);
+          return;
+        }
+        if (showCloudAccountModal) {
+          setShowCloudAccountModal(false);
+          return;
+        }
+        if (activeTab !== 'home') {
+          setActiveTab('home');
+          return;
+        }
+
+        // At root screen with no overlays open -> exit app cleanly
+        CapacitorApp.exitApp();
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
+    };
+  }, [
+    showPrintView,
+    patientToDischarge,
+    patientToReadmit,
+    admitBedNumber,
+    selectedPatientId,
+    showCalculators,
+    showCustomizer,
+    showSecurityModal,
+    showApkModal,
+    showCloudAccountModal,
+    activeTab
+  ]);
 
   // =========================================================
   // Lock
@@ -1533,6 +1620,7 @@ export default function App() {
       onAdmitToBed={(bedNum) => setAdmitBedNumber(Number(bedNum) || 1)}
       onDischargePatient={(pt) => setPatientToDischarge(pt)}
       onReadmitPatient={(pt) => setPatientToReadmit(pt)}
+      onDeletePatient={(pt) => handleDeletePatient(pt.id)}
       onChangeTotalBeds={handleChangeTotalBeds}
       onUpdatePatientBed={handleUpdatePatientBed}
     />
@@ -1873,23 +1961,23 @@ export default function App() {
   // =========================================================
 
   const renderActivePage = () => {
-    switch (activeTab) {
-      case 'patients':
-        return <PatientsPage />;
-
-      case 'beds':
-        return <BedsPage />;
-
-      case 'archive':
-        return <ArchivePage />;
-
-      case 'settings':
-        return <SettingsPage />;
-
-      case 'home':
-      default:
-        return <HomePage />;
-    }
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -5 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          {activeTab === 'patients' && <PatientsPage />}
+          {activeTab === 'beds' && <BedsPage />}
+          {activeTab === 'archive' && <ArchivePage />}
+          {activeTab === 'settings' && <SettingsPage />}
+          {activeTab === 'home' && <HomePage />}
+        </motion.div>
+      </AnimatePresence>
+    );
   };
 
   // =========================================================
@@ -1978,6 +2066,8 @@ export default function App() {
       flex flex-col
       selection:bg-cyan-500/30
       selection:text-cyan-200
+      pt-[env(safe-area-inset-top)]
+      pb-[env(safe-area-inset-bottom)]
     ">
 
       <Navbar

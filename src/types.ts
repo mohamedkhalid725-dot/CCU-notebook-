@@ -260,6 +260,45 @@ export interface VentilatorSettings {
   etTubeDepth?: string;
 }
 
+export interface VentilatorRecord {
+  id: string;
+  timestamp: string;
+  recordedBy?: string;
+  // Mode & Airway
+  mode: string;
+  airwayType?: 'ETT' | 'Tracheostomy' | 'NIV Mask' | 'High-Flow Nasal Cannula (HFNC)' | 'T-Piece';
+  etTubeSize?: string;
+  etTubeDepth?: string;
+  // Oxygenation
+  fio2: number | string;
+  peep: number | string;
+  spo2Target?: string;
+  // Volume / Pressure
+  tidalVolume?: number | string;
+  inspiratoryPressure?: number | string;
+  pressureSupport?: number | string;
+  peakPressure?: number | string;
+  plateauPressure?: number | string;
+  drivingPressure?: number | string;
+  // Respiratory Rate
+  setRate?: number | string;
+  actualRate?: number | string;
+  // Timing & Flow
+  ieRatio?: string;
+  inspiratoryTime?: number | string;
+  inspiratoryFlow?: number | string;
+  // Additional Parameters
+  triggerType?: 'Flow' | 'Pressure';
+  sensitivity?: string;
+  riseTime?: string;
+  // Monitoring & Mechanics
+  minuteVentilation?: number | string;
+  exhaledTidalVolume?: number | string;
+  compliance?: number | string;
+  autoPeep?: number | string;
+  notes?: string;
+}
+
 export interface Medication {
   id: string;
   name: string;
@@ -484,6 +523,7 @@ export interface PatientRecord {
   // Specialty data
   ccuData: CCUCardiology;
   icuVentilator: VentilatorSettings;
+  ventilationRecords?: VentilatorRecord[];
   icuScores: ICUScores;
 
   // Therapies & Interventions

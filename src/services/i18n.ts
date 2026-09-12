@@ -653,5 +653,6 @@ export function useI18n() {
     isRtl: lang === 'ar',
     t: (key: TranslationKey) => t(key, lang),
     setLanguage: changeLanguage,
+    setLang: changeLanguage,
   };
 }

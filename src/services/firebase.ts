@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithCredential,
   signOut,
@@ -111,6 +113,24 @@ export async function loginWithGoogle(): Promise<User> {
   );
 
   return cred.user;
+}
+
+export async function loginWithGoogleRedirect(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    await loginWithGoogle();
+    return;
+  }
+  await signInWithRedirect(auth, googleProvider);
+}
+
+export async function checkRedirectAuth(): Promise<User | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    return result?.user || null;
+  } catch (err) {
+    console.warn('Redirect auth check warning:', err);
+    return null;
+  }
 }
 
 export async function logoutUser(): Promise<void> {

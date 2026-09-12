@@ -564,24 +564,68 @@ export function setTotalBeds(beds: number): void {
  * Dynamic bed management
  */
 export function getBedsList(defaultTotal?: number): BedDefinition[] {
+  let existingBeds: BedDefinition[] | null = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_BEDS_LIST);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        existingBeds = parsed;
+      }
     }
   } catch (err) {
     console.error('Error loading beds list:', err);
   }
-  const total = defaultTotal || getTotalBeds();
-  const initialBeds: BedDefinition[] = Array.from({ length: total }, (_, i) => ({
+
+  const targetCount = defaultTotal || getTotalBeds();
+
+  if (existingBeds) {
+    if (!defaultTotal || existingBeds.length === targetCount) {
+      return existingBeds;
+    }
+    // Resize existing beds to targetCount
+    return syncBedsCount(targetCount, existingBeds);
+  }
+
+  const initialBeds: BedDefinition[] = Array.from({ length: targetCount }, (_, i) => ({
     id: `bed-${i + 1}`,
+    bedNumber: i + 1,
     name: `Bed ${i + 1}`,
-    department: i < Math.ceil(total / 2) ? 'CCU' : 'ICU',
+    department: i < Math.ceil(targetCount / 2) ? 'CCU' : 'ICU',
     status: 'active'
   }));
   localStorage.setItem(STORAGE_KEY_BEDS_LIST, JSON.stringify(initialBeds));
+  localStorage.setItem(STORAGE_KEY_ACTIVE_BEDS, targetCount.toString());
   return initialBeds;
+}
+
+export function syncBedsCount(targetCount: number, baseBeds?: BedDefinition[]): BedDefinition[] {
+  const safeCount = Math.max(3, targetCount);
+  const currentBeds = baseBeds || getBedsList();
+
+  if (currentBeds.length === safeCount) {
+    return currentBeds;
+  }
+
+  let nextBeds: BedDefinition[];
+  if (currentBeds.length < safeCount) {
+    nextBeds = [...currentBeds];
+    for (let i = currentBeds.length; i < safeCount; i++) {
+      const num = i + 1;
+      nextBeds.push({
+        id: `bed-${num}`,
+        bedNumber: num,
+        name: `Bed ${num}`,
+        department: i < Math.ceil(safeCount / 2) ? 'CCU' : 'ICU',
+        status: 'active'
+      });
+    }
+  } else {
+    nextBeds = currentBeds.slice(0, safeCount);
+  }
+
+  saveBedsList(nextBeds);
+  return nextBeds;
 }
 
 export function saveBedsList(beds: BedDefinition[]): void {
@@ -664,6 +708,26 @@ export function migratePatientRecord(p: PatientRecord): PatientRecord {
     });
   }
 
+  // Populate ventilationRecords from icuVentilator if missing
+  const ventilationRecords = p.ventilationRecords && Array.isArray(p.ventilationRecords) ? [...p.ventilationRecords] : [];
+  if (ventilationRecords.length === 0 && p.icuVentilator?.mode && p.icuVentilator.mode !== 'Room Air') {
+    ventilationRecords.push({
+      id: `vent-init-${p.id}`,
+      timestamp: p.admissionDate || new Date().toISOString().slice(0, 16),
+      mode: p.icuVentilator.mode,
+      fio2: p.icuVentilator.fio2 || 40,
+      peep: p.icuVentilator.peep || 5,
+      tidalVolume: p.icuVentilator.tv || '',
+      setRate: p.icuVentilator.rate || '',
+      actualRate: p.icuVentilator.totalRate || p.icuVentilator.rate || '',
+      peakPressure: p.icuVentilator.pPeak || '',
+      plateauPressure: p.icuVentilator.pPlat || '',
+      etTubeSize: p.icuVentilator.etTubeSize || '',
+      etTubeDepth: p.icuVentilator.etTubeDepth || '',
+      notes: 'Initial admission ventilator settings',
+    });
+  }
+
   return {
     ...p,
     secondaryDiagnoses: p.secondaryDiagnoses || [],
@@ -675,6 +739,7 @@ export function migratePatientRecord(p: PatientRecord): PatientRecord {
     ecgRecords,
     echoStudies,
     imagingStudies,
+    ventilationRecords,
     medications: p.medications || [],
     infusions: p.infusions || [],
     procedures: p.procedures || [],

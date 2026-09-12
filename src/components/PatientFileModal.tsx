@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   X,
   Printer,
+  FileDown,
   Trash2,
   LogOut,
   RotateCcw,
@@ -24,6 +25,7 @@ import {
   Clock,
   CheckCircle2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 import {
   PatientRecord,
@@ -46,6 +48,7 @@ import { PatientDailyRounds } from './patient/PatientDailyRounds';
 import { PatientTimeline } from './patient/PatientTimeline';
 import { PatientDischarge } from './patient/PatientDischarge';
 import { PatientVitalsIO } from './patient/PatientVitalsIO';
+import { PatientVentilation } from './patient/PatientVentilation';
 
 interface PatientFileModalProps {
   patient: PatientRecord;
@@ -62,6 +65,7 @@ interface PatientFileModalProps {
 type TabKey =
   | 'overview'
   | 'vitals_io'
+  | 'ventilation'
   | 'history'
   | 'examination'
   | 'labs'
@@ -126,6 +130,12 @@ export default function PatientFileModal({
       label: 'Vitals & I/O',
       icon: <Droplet size={15} />,
       badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined,
+    },
+    {
+      id: 'ventilation',
+      label: 'Ventilator',
+      icon: <Wind size={15} />,
+      badge: patient.ventilationRecords?.length || (patient.icuVentilator?.mode && patient.icuVentilator.mode !== 'Room Air' ? 1 : undefined),
     },
     { id: 'history', label: 'History', icon: <History size={15} /> },
     { id: 'examination', label: 'Physical Exam', icon: <Stethoscope size={15} /> },
@@ -193,7 +203,7 @@ export default function PatientFileModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-hidden animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-sm overflow-hidden animate-in fade-in duration-200">
       <div className="relative flex flex-col w-full max-w-6xl h-[94vh] max-h-[950px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100">
         {/* Top Sticky Header */}
         <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
@@ -248,13 +258,14 @@ export default function PatientFileModal({
               <option value="discharged" className="dark:bg-slate-900">Discharged</option>
             </select>
 
-            {/* Print Button */}
+            {/* Export PDF Button */}
             <button
               onClick={() => onPrintPatient(patient)}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              title="Print Clinical Record"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white transition shadow-xs"
+              title="Export Clinical File to PDF"
             >
-              <Printer size={16} />
+              <FileDown size={14} />
+              <span className="hidden sm:inline">Export PDF</span>
             </button>
 
             {/* Discharge Button */}
@@ -331,110 +342,127 @@ export default function PatientFileModal({
 
         {/* Modal Scrollable Body */}
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-          {activeTab === 'overview' && (
-            <PatientOverview
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            >
+              {activeTab === 'overview' && (
+                <PatientOverview
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'vitals_io' && (
-            <PatientVitalsIO
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'vitals_io' && (
+                <PatientVitalsIO
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'history' && (
-            <PatientHistory
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'ventilation' && (
+                <PatientVentilation
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'examination' && (
-            <PatientExamination
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'history' && (
+                <PatientHistory
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'labs' && (
-            <PatientLabs
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'examination' && (
+                <PatientExamination
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'abg' && (
-            <PatientABG
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'labs' && (
+                <PatientLabs
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'ecg' && (
-            <PatientECG
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'abg' && (
+                <PatientABG
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'echo' && (
-            <PatientEcho
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'ecg' && (
+                <PatientECG
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'imaging' && (
-            <PatientImaging
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'echo' && (
+                <PatientEcho
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'medications' && (
-            <PatientMedications
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'imaging' && (
+                <PatientImaging
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'infusions' && (
-            <PatientInfusions
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'medications' && (
+                <PatientMedications
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'procedures' && (
-            <PatientProcedures
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'infusions' && (
+                <PatientInfusions
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'rounds' && (
-            <PatientDailyRounds
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'procedures' && (
+                <PatientProcedures
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'events' && (
-            <PatientTimeline
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'rounds' && (
+                <PatientDailyRounds
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
 
-          {activeTab === 'discharge' && (
-            <PatientDischarge
-              patient={patient}
-              onUpdatePatient={onUpdatePatient}
-            />
-          )}
+              {activeTab === 'events' && (
+                <PatientTimeline
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
+
+              {activeTab === 'discharge' && (
+                <PatientDischarge
+                  patient={patient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         {/* Delete Confirmation Modal */}

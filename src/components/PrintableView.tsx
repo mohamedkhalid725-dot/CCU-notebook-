@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PatientRecord } from '../types';
-import { Printer, X, Download } from 'lucide-react';
+import { Printer, X, Download, Share2, Loader2, Check, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 
 interface PrintableViewProps {
   patients: PatientRecord[];
@@ -16,102 +16,203 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
   onClose
 }) => {
   const recordsToPrint = activePatient ? [activePatient] : patients;
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handlePrint = async () => {
+  const generatePdfBlob = async (): Promise<{ pdf: jsPDF; blob: Blob; fileName: string }> => {
     const element = document.getElementById('printable-report');
     if (!element) {
-      window.print();
-      return;
+      throw new Error('Report element not found');
     }
 
-    try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(
-        imgData,
-        'JPEG',
-        0,
-        position,
-        imgWidth,
-        imgHeight
-      );
-
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(
-          imgData,
-          'JPEG',
-          0,
-          position,
-          imgWidth,
-          imgHeight
-        );
-        heightLeft -= pageHeight;
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      onclone: (clonedDoc) => {
+        const report = clonedDoc.getElementById('printable-report');
+        if (report) {
+          report.style.width = '800px';
+          report.style.maxWidth = '800px';
+          report.style.margin = '0 auto';
+          report.style.boxShadow = 'none';
+        }
       }
+    });
 
-      const fileName = activePatient
-        ? `CardioVault_${activePatient.name.replace(/[^a-z0-9_-]/gi, '_')}_Report.pdf`
-        : `CardioVault_Census_Report.pdf`;
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF('p', 'mm', 'a4');
 
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    const fileName = activePatient
+      ? `CardioVault_${activePatient.name.replace(/[^a-z0-9_-]/gi, '_')}_Report.pdf`
+      : `CardioVault_Census_Report.pdf`;
+
+    const blob = pdf.output('blob');
+    return { pdf, blob, fileName };
+  };
+
+  const handleDownloadPdf = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setErrorMessage(null);
+    try {
+      const { pdf, fileName } = await generatePdfBlob();
       pdf.save(fileName);
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      window.print();
+    } catch (error: any) {
+      console.error('PDF export failed:', error);
+      setErrorMessage('Direct PDF export encountered an issue. Launching print dialog...');
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
+  const handleSharePdf = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setErrorMessage(null);
+    try {
+      const { blob, fileName } = await generatePdfBlob();
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+          text: `CardioVault clinical file: ${activePatient ? activePatient.name : 'Census'}`
+        });
+        setShareSuccess(true);
+        setTimeout(() => setShareSuccess(false), 3000);
+      } else {
+        // Fallback to direct download if sharing files is not supported
+        const { pdf } = await generatePdfBlob();
+        pdf.save(fileName);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.warn('Share not completed or cancelled:', err);
+        setErrorMessage('Unable to share PDF via system sheet. Downloading file instead...');
+        try {
+          const { pdf, fileName } = await generatePdfBlob();
+          pdf.save(fileName);
+        } catch {
+          // ignore fallback error
+        }
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-md overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* Top action bar (hidden during print) */}
-      <div className="sticky top-0 z-10 print:hidden flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-800 text-white">
-        <div className="flex items-center gap-2">
-          <Printer className="w-5 h-5 text-cyan-400" />
-          <span className="font-bold text-sm">
-            {activePatient ? `Print Handover: ${activePatient.name} (Bed ${activePatient.bedNumber})` : `Print Census Handover (${recordsToPrint.length} Patients)`}
+      <div className="sticky top-0 z-10 print:hidden flex items-center justify-between px-4 sm:px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-sm">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Printer className="w-4 h-4" />
+          </div>
+          <span className="font-bold text-xs sm:text-sm truncate">
+            {activePatient ? `CardioVault Clinical File: ${activePatient.name}` : `Census Handover (${recordsToPrint.length} Patients)`}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Share Button (Android / Web Share API) */}
+          <button
+            onClick={handleSharePdf}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition disabled:opacity-60"
+            title="Share PDF"
+          >
+            {shareSuccess ? (
+              <Check className="w-4 h-4 text-emerald-500" />
+            ) : (
+              <Share2 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            )}
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
+          {/* Export PDF Button */}
+          <button
+            onClick={handleDownloadPdf}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs transition disabled:opacity-60"
+            title="Download PDF"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Export PDF</span>
+              </>
+            )}
+          </button>
+
+          {/* Print Button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md transition"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition"
+            title="Print Document"
           >
             <Printer className="w-4 h-4" />
-            <span>Print / Save as PDF</span>
+            <span>Print</span>
           </button>
+
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition ml-1"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
+      {errorMessage && (
+        <div className="print:hidden mx-auto max-w-4xl w-full px-4 pt-3">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        </div>
+      )}
+
       {/* Printable Sheet (Styling optimized for paper and PDF export) */}
       <div id="printable-report" className="max-w-4xl mx-auto w-full my-6 p-8 bg-white text-slate-900 rounded-xl shadow-2xl print:m-0 print:p-4 print:shadow-none print:w-full print:max-w-none text-xs leading-normal">
         <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">
-              ICU & CCU Clinical Handover Report
+              CardioVault — Clinical Patient Summary & Handover
             </h1>
             <p className="text-slate-600 text-[11px]">
               Confidential Medical Document • Generated: {new Date().toLocaleString()}
@@ -246,7 +347,22 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                       <p className="text-slate-700">DAPT: {patient.ccuData.antiplatelets}</p>
                     </div>
                   )}
-                  {patient.icuVentilator?.mode && (
+                  {(patient.ventilationRecords && patient.ventilationRecords.length > 0) ? (
+                    <div>
+                      <strong className="block text-slate-800 text-[10px] uppercase">Mechanical Ventilation:</strong>
+                      <p className="text-slate-700 font-medium">
+                        Mode: {patient.ventilationRecords[0].mode} | FiO2: {patient.ventilationRecords[0].fio2}% | PEEP: {patient.ventilationRecords[0].peep} cmH2O
+                      </p>
+                      <p className="text-slate-600 text-[10px] font-mono">
+                        TV: {patient.ventilationRecords[0].tidalVolume || '—'} mL • Rate: {patient.ventilationRecords[0].setRate || '—'}/{patient.ventilationRecords[0].actualRate || '—'} • Ppeak/Pplat: {patient.ventilationRecords[0].peakPressure || '—'}/{patient.ventilationRecords[0].plateauPressure || '—'} cmH2O • Driving P: {patient.ventilationRecords[0].drivingPressure || '—'}
+                      </p>
+                      {latestAbg && (
+                        <p className="text-slate-700 font-mono text-[10px] mt-0.5">
+                          ABG: pH {latestAbg.ph} / pCO2 {latestAbg.pco2} / HCO3 {latestAbg.hco3} / Lac {latestAbg.lactate}
+                        </p>
+                      )}
+                    </div>
+                  ) : patient.icuVentilator?.mode ? (
                     <div>
                       <strong className="block text-slate-800 text-[10px] uppercase">Respiratory & Vent:</strong>
                       <p className="text-slate-700">Mode: {patient.icuVentilator.mode} (FiO2 {patient.icuVentilator.fio2}, PEEP {patient.icuVentilator.peep})</p>
@@ -256,7 +372,7 @@ export const PrintableView: React.FC<PrintableViewProps> = ({
                         </p>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 

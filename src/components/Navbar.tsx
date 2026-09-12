@@ -53,6 +53,9 @@ interface NavbarProps {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
 
+  theme?: AppTheme;
+  onSetTheme?: (theme: AppTheme) => void;
+
   onOpenCloudAccount: () => void;
   onOpenNewPatientModal: () => void;
   onOpenCalculators: () => void;
@@ -76,6 +79,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   activeTab,
   onTabChange,
+
+  theme: propTheme,
+  onSetTheme,
 
   onOpenCloudAccount,
   onOpenNewPatientModal,
@@ -108,7 +114,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       p.status === 'stable'
   ).length;
 
-  const [theme, setThemeState] = useState<AppTheme>(() => getAppTheme());
+  const [localTheme, setLocalTheme] = useState<AppTheme>(() => getAppTheme());
+  const theme = propTheme || localTheme;
   const [isOnline, setIsOnline] = useState<boolean>(() => isDeviceOnline());
 
   useEffect(() => {
@@ -121,9 +128,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleToggleTheme = () => {
     const nextTheme: AppTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark';
-    setThemeState(nextTheme);
-    setAppTheme(nextTheme);
-    applyThemeToDom(nextTheme);
+    if (onSetTheme) {
+      onSetTheme(nextTheme);
+    } else {
+      setLocalTheme(nextTheme);
+      setAppTheme(nextTheme);
+      applyThemeToDom(nextTheme);
+    }
   };
 
   const tabs: {

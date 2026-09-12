@@ -12,7 +12,8 @@ import {
   UploadCloud, 
   DownloadCloud,
   ShieldCheck,
-  Smartphone
+  Smartphone,
+  ExternalLink
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { 
@@ -47,6 +48,7 @@ export const CloudAccountModal: React.FC<CloudAccountModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,13 +86,19 @@ export const CloudAccountModal: React.FC<CloudAccountModalProps> = ({
   const handleGoogleLogin = async () => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    setPopupBlocked(false);
     setLoading(true);
     try {
       await loginWithGoogle();
       setSuccessMsg('تم تسجيل الدخول بنجاح عبر حساب Google!');
     } catch (err: any) {
       console.error('Google Auth error:', err);
-      setErrorMsg('تعذر تسجيل الدخول عبر Google. تحقق من النوافذ المنبثقة.');
+      if (err.code === 'auth/popup-blocked' || err.message?.includes('popup-blocked')) {
+        setPopupBlocked(true);
+        setErrorMsg(null);
+      } else {
+        setErrorMsg('تعذر تسجيل الدخول عبر Google. تحقق من النوافذ المنبثقة.');
+      }
     } finally {
       setLoading(false);
     }
@@ -140,6 +148,38 @@ export const CloudAccountModal: React.FC<CloudAccountModalProps> = ({
         {/* Modal Body */}
         <div className="p-5 space-y-5">
           {/* Status Banners */}
+          {popupBlocked && (
+            <div className="p-3.5 rounded-xl bg-sky-950/60 border border-sky-800/80 text-sky-200 text-xs space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-sky-400 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sky-300">حظر المتصفح النافذة المنبثقة لحساب Google</h4>
+                  <p className="text-[11px] text-sky-200/90 leading-relaxed mt-0.5">
+                    حظر المتصفح أو إطار المعاينة النافذة. يمكنك فتح التطبيق في تبويب كامل أو استخدام البريد الإلكتروني وكلمة المرور.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>فتح في تبويب مستقل</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPopupBlocked(false)}
+                  className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />

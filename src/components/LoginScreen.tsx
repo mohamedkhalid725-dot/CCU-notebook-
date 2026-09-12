@@ -18,12 +18,15 @@ import {
   ExternalLink,
   Check,
   Globe,
-  UserCheck
+  UserCheck,
+  RefreshCw
 } from 'lucide-react';
 import { 
   loginWithEmail, 
   registerWithEmail, 
-  loginWithGoogle 
+  loginWithGoogle,
+  loginWithGoogleRedirect,
+  checkRedirectAuth
 } from '../services/firebase';
 import { AppSecuritySettings } from '../types';
 import { hashPin } from '../services/crypto';
@@ -58,13 +61,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
   const [copiedDomain, setCopiedDomain] = useState(false);
 
+  // Popup blocked state
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  const [redirectLoading, setRedirectLoading] = useState(false);
+
   // Offline PIN fallback state
   const [showOfflinePin, setShowOfflinePin] = useState(false);
   const [offlinePinInput, setOfflinePinInput] = useState('');
   const [offlinePinError, setOfflinePinError] = useState<string | null>(null);
 
   const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
   const firebaseSettingsUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
+
+  // Check if user just returned from a redirect sign-in
+  React.useEffect(() => {
+    checkRedirectAuth()
+      .then((user) => {
+        if (user) {
+          onLoginSuccess();
+        }
+      })
+      .catch((err) => {
+        console.warn('Check redirect auth:', err);
+      });
+  }, [onLoginSuccess]);
 
   const handleCopyDomain = () => {
     if (currentHostname) {
@@ -153,6 +174,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
     setUnauthorizedDomain(null);
+    setPopupBlocked(false);
     setGoogleLoading(true);
     try {
       await loginWithGoogle();
@@ -166,13 +188,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         setUnauthorizedDomain(currentHostname || 'ais-dev-*.run.app');
       } else if (err.code === 'auth/popup-closed-by-user') {
         setErrorMsg(lang === 'ar' ? 'تم إغلاق نافذة تسجيل الدخول عبر Google قبل إتمام العملية.' : 'Google sign-in popup was closed before completing.');
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorMsg(lang === 'ar' ? 'تم حظر النافذة المنبثقة من قِبل المتصفح. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.' : 'Popup was blocked by browser. Please allow popups for this site.');
+      } else if (err.code === 'auth/popup-blocked' || err.message?.includes('popup-blocked')) {
+        setPopupBlocked(true);
+        setErrorMsg(null);
       } else {
         setErrorMsg(err.message || (lang === 'ar' ? 'تعذر تسجيل الدخول عبر Google. يرجى التحقق من الشبكة والمحاولة مجدداً.' : 'Google sign-in failed. Please check network and retry.'));
       }
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleRedirectSignIn = async () => {
+    if (isInIframe) {
+      // In an iframe, redirection to accounts.google.com will be blocked by X-Frame-Options: DENY
+      // So open top-level app in a new tab
+      window.open(window.location.href, '_blank');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setRedirectLoading(true);
+    try {
+      await loginWithGoogleRedirect();
+    } catch (err: any) {
+      console.error('Google redirect error:', err);
+      setErrorMsg(err.message || 'Failed to initiate redirect sign in.');
+      setRedirectLoading(false);
     }
   };
 
@@ -312,6 +355,73 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           )}
 
+          {/* Popup Blocked Assistance Card */}
+          {popupBlocked && (
+            <div className="p-4 bg-sky-950/60 border border-sky-800/80 rounded-2xl text-xs text-sky-200 space-y-3 animate-in fade-in duration-200 shadow-xl">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sky-300 text-sm">
+                    {lang === 'ar' ? 'تم حظر النافذة المنبثقة بواسطة المتصفح' : 'Google Sign-In Popup Blocked'}
+                  </h4>
+                  <p className="text-sky-200/90 text-[11px] mt-1 leading-relaxed">
+                    {lang === 'ar'
+                      ? 'يحظر المتصفح أو إطار المعاينة فتح نوافذ تسجيل الدخول المنبثقة. يمكنك فتح التطبيق في تبويب كامل للمتابعة بحساب Google، أو تسجيل الدخول بالبريد الإلكتروني، أو المتابعة الفورية كطبيب مناوب.'
+                      : 'Your browser or the preview frame blocked the sign-in popup. Open CardioVault in a full browser tab to complete Google Sign-In, or use Email / Duty Doctor access.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition shadow-md text-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'فتح بتبويب جديد والدخول' : 'Open in New Tab & Sign In'}</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleRedirectSignIn}
+                  disabled={redirectLoading}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  {redirectLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  <span>{lang === 'ar' ? 'إعادة المحاولة عبر الرابط' : 'Retry via Direct Navigation'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-sky-900/50 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPopupBlocked(false);
+                    setActiveTab('signin');
+                  }}
+                  className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 cursor-pointer"
+                >
+                  {lang === 'ar' ? 'استخدام البريد الإلكتروني' : 'Sign in with Email instead'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDutyDoctorAccess}
+                  className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer"
+                >
+                  {lang === 'ar' ? 'متابعة كطبيب مناوب (Offline)' : 'Continue as Duty Doctor'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* General Notification Messages */}
           {errorMsg && !unauthorizedDomain && (
             <div className="p-3 bg-rose-950/70 border border-rose-800/80 rounded-xl text-rose-200 text-xs sm:text-sm flex items-start gap-2.5 animate-in fade-in duration-200">
@@ -386,6 +496,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             )}
             <span>{lang === 'ar' ? 'تسجيل الدخول عبر Google' : 'Sign in with Google'}</span>
           </button>
+
+          {isInIframe && (
+            <p className="text-[11px] text-center text-slate-400 leading-normal -mt-2">
+              {lang === 'ar' 
+                ? 'ملاحظة: إذا حظر المتصفح النافذة في إطار المعاينة، يمكنك استخدام البريد الإلكتروني أو فتح التطبيق في تبويب مستقل' 
+                : 'Note: If preview frame blocks the popup, you can sign in with Email or open in a new tab'}
+            </p>
+          )}
 
           {/* Tabs: Sign In vs Sign Up with Email */}
           <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
