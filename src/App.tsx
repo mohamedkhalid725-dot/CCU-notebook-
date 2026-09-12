@@ -1356,334 +1356,74 @@ export default function App() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          title="Total Beds"
-          value={totalBeds}
-          subtitle={`${occupiedCount} occupied`}
-          icon={BedDouble}
-          onClick={() =>
-            setActiveTab('beds')
-          }
-        />
-
-        <StatCard
-          title="Available"
-          value={availableCount}
-          subtitle="Beds available"
-          icon={CheckCircle2}
-          onClick={() =>
-            setActiveTab('beds')
-          }
-        />
-
-        <StatCard
-          title="Critical"
-          value={criticalCount}
-          subtitle="Critical / deteriorating"
-          icon={AlertTriangle}
-          onClick={() =>
-            setActiveTab('patients')
-          }
-        />
-
-        <StatCard
-          title="Archive"
-          value={archivedPatients.length}
-          subtitle="Discharged cases"
-          icon={Archive}
-          onClick={() =>
-            setActiveTab('archive')
-          }
-        />
+        <StatCard title="Total Beds" value={totalBeds} subtitle={`${occupiedCount} occupied`} icon={BedDouble} onClick={() => setActiveTab('beds')} />
+        <StatCard title="Available" value={availableCount} subtitle="Beds available" icon={CheckCircle2} onClick={() => setActiveTab('beds')} />
+        <StatCard title="Critical" value={criticalCount} subtitle="Critical / deteriorating" icon={AlertTriangle} onClick={() => setActiveTab('patients')} />
+        <StatCard title="Archive" value={archivedPatients.length} subtitle="Discharged cases" icon={Archive} onClick={() => setActiveTab('archive')} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-
         <div className="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
-
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Current Patients
-              </h3>
-
-              <p className="text-xs text-slate-500 mt-1">
-                Active ICU / CCU cases
-              </p>
+              <h3 className="font-semibold text-slate-900 dark:text-white">Current Patients</h3>
+              <p className="text-xs text-slate-500 mt-1">Active ICU / CCU cases</p>
             </div>
-
-            <button
-              onClick={() =>
-                setActiveTab('patients')
-              }
-              className="text-xs text-cyan-400 hover:text-cyan-300"
-            >
-              View all
-            </button>
+            <button onClick={() => setActiveTab('patients')} className="text-xs text-cyan-400 hover:text-cyan-300">View all</button>
           </div>
-
           {activePatients.length === 0 ? (
             <div className="py-12 text-center">
               <Users className="w-10 h-10 text-slate-700 mx-auto" />
-
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
-                No active patients
-              </p>
-
-              <button
-                onClick={() =>
-                  setAdmitBedNumber(
-                    availableBeds[0] || 1
-                  )
-                }
-                className="text-xs text-cyan-400 mt-2"
-              >
-                Add first patient
-              </button>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">No active patients</p>
+              <button onClick={() => setAdmitBedNumber(availableBeds[0] || 1)} className="text-xs text-cyan-400 mt-2">Add first patient</button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {activePatients
-                .slice(0, 5)
-                .map((patient) => (
-                  <PatientRow
-                    key={patient.id}
-                    patient={patient}
-                  />
-                ))}
-            </div>
+            <div className="space-y-2">{activePatients.slice(0, 5).map((patient) => <PatientRow key={patient.id} patient={patient} />)}</div>
           )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
-
-          <h3 className="font-semibold text-slate-900 dark:text-white">
-            Bed Overview
-          </h3>
-
+          <h3 className="font-semibold text-slate-900 dark:text-white">Bed Overview</h3>
           <div className="mt-4 space-y-3">
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600 dark:text-slate-400">
-                Occupied
-              </span>
-
-              <span className="text-sm font-semibold text-cyan-300">
-                {occupiedCount}
-              </span>
-            </div>
-
-            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-cyan-500 rounded-full"
-                style={{
-                  width: `${
-                    totalBeds
-                      ? Math.min(
-                          100,
-                          (occupiedCount /
-                            totalBeds) *
-                            100
-                        )
-                      : 0
-                  }%`
-                }}
-              />
-            </div>
-
+            <div className="flex items-center justify-between"><span className="text-xs text-slate-600 dark:text-slate-400">Occupied</span><span className="text-sm font-semibold text-cyan-300">{occupiedCount}</span></div>
+            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-cyan-500 rounded-full" style={{ width: `${totalBeds ? Math.min(100, (occupiedCount / totalBeds) * 100) : 0}%` }} /></div>
             <div className="grid grid-cols-2 gap-2 pt-2">
-
-              <div className="rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/70 p-3">
-                <p className="text-[10px] text-slate-500">
-                  Stable
-                </p>
-
-                <p className="text-lg font-bold text-emerald-400">
-                  {stableCount}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/70 p-3">
-                <p className="text-[10px] text-slate-500">
-                  Guarded
-                </p>
-
-                <p className="text-lg font-bold text-amber-400">
-                  {guardedCount}
-                </p>
-              </div>
-
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-800/70 p-3"><p className="text-[10px] text-slate-500">Stable</p><p className="text-lg font-bold text-emerald-400">{stableCount}</p></div>
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-800/70 p-3"><p className="text-[10px] text-slate-500">Guarded</p><p className="text-lg font-bold text-amber-400">{guardedCount}</p></div>
             </div>
           </div>
-
-          <button
-            onClick={() =>
-              setActiveTab('beds')
-            }
-            className="
-              w-full
-              mt-4
-              py-2.5
-              rounded-xl
-              border border-slate-700
-              text-xs
-              text-slate-700 dark:text-slate-300
-              hover:bg-slate-100 dark:bg-slate-800
-            "
-          >
-            Open Bed Board
-          </button>
+          <button onClick={() => setActiveTab('beds')} className="w-full mt-4 py-2.5 rounded-xl border border-slate-700 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Open Bed Board</button>
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-4">
-
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="w-4 h-4 text-cyan-400" />
-
-          <h3 className="font-semibold text-slate-900 dark:text-white">
-            Quick Clinical Tools
-          </h3>
-        </div>
-
+        <div className="flex items-center gap-2 mb-4"><Activity className="w-4 h-4 text-cyan-400" /><h3 className="font-semibold text-slate-900 dark:text-white">Quick Clinical Tools</h3></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-
-          <button
-            onClick={() =>
-              setShowCalculators(true)
-            }
-            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
-          >
-            <Activity className="w-4 h-4 text-amber-400" />
-            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
-              Calculators
-            </p>
-          </button>
-
-          <button
-            onClick={() =>
-              setShowCustomizer(true)
-            }
-            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
-            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
-              Customize
-            </p>
-          </button>
-
-          <button
-            onClick={() =>
-              setShowCloudAccountModal(true)
-            }
-            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
-          >
-            <Cloud className="w-4 h-4 text-emerald-400" />
-            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
-              Cloud Sync
-            </p>
-          </button>
-
-          <button
-            onClick={() =>
-              setShowSecurityModal(true)
-            }
-            className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"
-          >
-            <ShieldCheck className="w-4 h-4 text-violet-400" />
-            <p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">
-              Security
-            </p>
-          </button>
-
+          <button onClick={() => setShowCalculators(true)} className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"><Activity className="w-4 h-4 text-amber-400" /><p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">Calculators</p></button>
+          <button onClick={() => setShowCustomizer(true)} className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"><SlidersHorizontal className="w-4 h-4 text-cyan-400" /><p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">Customize</p></button>
+          <button onClick={() => setShowCloudAccountModal(true)} className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"><Cloud className="w-4 h-4 text-emerald-400" /><p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">Cloud Sync</p></button>
+          <button onClick={() => setShowSecurityModal(true)} className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-left"><ShieldCheck className="w-4 h-4 text-violet-400" /><p className="text-xs font-semibold text-slate-900 dark:text-white mt-2">Security</p></button>
         </div>
       </div>
     </div>
   );
-
-  // =========================================================
-  // Patients Page
-  // =========================================================
 
   const PatientsPage = () => (
     <div className="space-y-5">
-
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Patients
-        </h2>
-
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Active ICU / CCU patient records
-        </p>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-
-        <input
-          value={patientSearch}
-          onChange={(e) =>
-            setPatientSearch(e.target.value)
-          }
-          placeholder="Search by name, ID, diagnosis or bed..."
-          className="
-            w-full
-            bg-white dark:bg-slate-900
-            border border-slate-200 dark:border-slate-800
-            rounded-xl
-            pl-10 pr-4 py-3
-            text-sm
-            text-slate-900 dark:text-white
-            outline-none
-            focus:border-cyan-600
-            shadow-sm
-          "
-        />
-      </div>
-
+      <div><h2 className="text-2xl font-bold text-slate-900 dark:text-white">Patients</h2><p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Active ICU / CCU patient records</p></div>
+      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Search by name, ID, diagnosis or bed..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-cyan-600 shadow-sm" /></div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        <span className="px-3 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-950/80 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-semibold whitespace-nowrap">
-          Active: {activePatients.length}
-        </span>
-
-        <span className="px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold whitespace-nowrap">
-          Critical: {criticalCount}
-        </span>
-
-        <span className="px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold whitespace-nowrap">
-          Stable: {stableCount}
-        </span>
+        <span className="px-3 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-950/80 border border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300 text-xs font-semibold whitespace-nowrap">Active: {activePatients.length}</span>
+        <span className="px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold whitespace-nowrap">Critical: {criticalCount}</span>
+        <span className="px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold whitespace-nowrap">Stable: {stableCount}</span>
       </div>
-
-      {filteredPatients.filter(
-        (p) => !p.isDischarged
-      ).length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm">
-          <Users className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
-
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
-            No matching active patients
-          </p>
-        </div>
+      {filteredPatients.filter((p) => !p.isDischarged).length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm"><Users className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" /><p className="text-sm text-slate-600 dark:text-slate-400 mt-3">No matching active patients</p></div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-3">
-          {filteredPatients
-            .filter((p) => !p.isDischarged)
-            .map((patient) => (
-              <PatientRow
-                key={patient.id}
-                patient={patient}
-              />
-            ))}
-        </div>
+        <div className="grid md:grid-cols-2 gap-3">{filteredPatients.filter((p) => !p.isDischarged).map((patient) => <PatientRow key={patient.id} patient={patient} />)}</div>
       )}
     </div>
   );
-
-  // =========================================================
-  // Beds Page
-  // =========================================================
 
   const BedsPage = () => (
     <CensusView
@@ -1700,479 +1440,100 @@ export default function App() {
     />
   );
 
-  // =========================================================
-  // Archive Page
-  // =========================================================
-
   const ArchivePage = () => (
     <div className="space-y-5">
-
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Archive
-        </h2>
-
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Discharged patients and completed clinical records
-        </p>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-
-        <input
-          value={patientSearch}
-          onChange={(e) =>
-            setPatientSearch(e.target.value)
-          }
-          placeholder="Search archived patients..."
-          className="
-            w-full
-            bg-white dark:bg-slate-900
-            border border-slate-200 dark:border-slate-800
-            rounded-xl
-            pl-10 pr-4 py-3
-            text-sm
-            text-slate-900 dark:text-white
-            outline-none
-            focus:border-cyan-600
-            shadow-sm
-          "
-        />
-      </div>
-
-      {filteredPatients.filter(
-        (p) => p.isDischarged
-      ).length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm">
-          <Archive className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" />
-
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-3">
-            Archive is empty
-          </p>
-        </div>
+      <div><h2 className="text-2xl font-bold text-slate-900 dark:text-white">Archive</h2><p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Discharged patients and completed clinical records</p></div>
+      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Search archived patients..." className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-cyan-600 shadow-sm" /></div>
+      {filteredPatients.filter((p) => p.isDischarged).length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 py-16 text-center shadow-sm"><Archive className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto" /><p className="text-sm text-slate-600 dark:text-slate-400 mt-3">Archive is empty</p></div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-3">
-          {filteredPatients
-            .filter((p) => p.isDischarged)
-            .map((patient) => (
-              <PatientRow
-                key={patient.id}
-                patient={patient}
-                archived
-              />
-            ))}
-        </div>
+        <div className="grid md:grid-cols-2 gap-3">{filteredPatients.filter((p) => p.isDischarged).map((patient) => <PatientRow key={patient.id} patient={patient} archived />)}</div>
       )}
     </div>
   );
 
-  // =========================================================
-  // Settings Page
-  // =========================================================
-
   const SettingsPage = () => (
     <div className="space-y-5">
-
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Settings
-        </h2>
-
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          CardioVault configuration
-        </p>
-      </div>
+      <div><h2 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h2><p className="text-sm text-slate-600 dark:text-slate-400 mt-1">CardioVault configuration</p></div>
 
       <div className="grid md:grid-cols-2 gap-4">
-
-        {/* Appearance & Theme Selector */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <Sun className="w-5 h-5 text-amber-500" />
-
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Appearance & Theme
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                Choose Light, Dark, or System preference
-              </p>
-            </div>
-          </div>
-
+          <div className="flex items-center gap-3 mb-4"><Sun className="w-5 h-5 text-amber-500" /><div><h3 className="font-semibold text-slate-900 dark:text-white">Appearance & Theme</h3><p className="text-[11px] text-slate-500">Choose Light, Dark, or System preference</p></div></div>
           <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleSelectTheme('light')}
-              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
-                currentTheme === 'light'
-                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
-                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Sun className="w-5 h-5 text-amber-500" />
-              <span className="text-xs">Light</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectTheme('dark')}
-              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
-                currentTheme === 'dark'
-                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
-                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Moon className="w-5 h-5 text-indigo-400" />
-              <span className="text-xs">Dark</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectTheme('system')}
-              className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${
-                currentTheme === 'system'
-                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm'
-                  : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Laptop className="w-5 h-5 text-cyan-500" />
-              <span className="text-xs">System</span>
-            </button>
+            <button onClick={() => handleSelectTheme('light')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${currentTheme === 'light' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Sun className="w-5 h-5 text-amber-500" /><span className="text-xs">Light</span></button>
+            <button onClick={() => handleSelectTheme('dark')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${currentTheme === 'dark' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Moon className="w-5 h-5 text-violet-500" /><span className="text-xs">Dark</span></button>
+            <button onClick={() => handleSelectTheme('system')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${currentTheme === 'system' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold shadow-sm' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Laptop className="w-5 h-5 text-slate-500" /><span className="text-xs">System</span></button>
           </div>
         </div>
 
-        {/* Bed Configuration */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-
-          <div className="flex items-center gap-3 mb-4">
-            <BedDouble className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Bed Configuration
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                Set the total number of ICU/CCU beds
-              </p>
-            </div>
+          <div className="flex items-center gap-3 mb-4"><BedDouble className="w-5 h-5 text-emerald-500" /><div><h3 className="font-semibold text-slate-900 dark:text-white">Bed Configuration</h3><p className="text-[11px] text-slate-500">Set the total number of ICU/CCU beds</p></div></div>
+          <label className="text-xs text-slate-500 dark:text-slate-400">Total Beds</label>
+          <div className="mt-2 flex items-center gap-2">
+            <button type="button" aria-label="Decrease total beds" onClick={() => handleChangeTotalBeds(totalBeds - 1)} disabled={totalBeds <= 3} className="w-12 h-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xl font-bold text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed hover:border-cyan-500 transition">−</button>
+            <div className="flex-1 h-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-xl font-bold text-slate-900 dark:text-white">{totalBeds}</div>
+            <button type="button" aria-label="Increase total beds" onClick={() => handleChangeTotalBeds(totalBeds + 1)} className="w-12 h-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xl font-bold text-slate-700 dark:text-slate-200 hover:border-cyan-500 transition">+</button>
           </div>
-
-          <label className="text-xs text-slate-500 dark:text-slate-400">
-            Total Beds
-          </label>
-
-          <div className="flex gap-2 mt-2">
-
-            <input
-              type="number"
-              min={3}
-              value={totalBeds}
-              onChange={(e) =>
-                handleChangeTotalBeds(
-                  Number(e.target.value)
-                )
-              }
-              className="
-                flex-1
-                bg-slate-50 dark:bg-slate-950
-                border border-slate-300 dark:border-slate-700
-                rounded-xl
-                px-3 py-3
-                text-slate-900 dark:text-white
-                outline-none
-                focus:border-cyan-600
-              "
-            />
-
-            <div className="px-4 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center text-xs text-slate-600 dark:text-slate-400">
-              beds
-            </div>
-
-          </div>
-
-          <p className="text-[10px] text-slate-400 mt-2">
-            Minimum 3 beds.
-          </p>
+          <p className="text-[10px] text-slate-400 mt-2">Minimum 3 beds.</p>
         </div>
 
-        {/* Security */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-
-          <div className="flex items-center gap-3 mb-4">
-            <ShieldCheck className="w-5 h-5 text-violet-500 dark:text-violet-400" />
-
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Security
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                PIN and automatic lock
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() =>
-              setShowSecurityModal(true)
-            }
-            className="
-              w-full
-              flex items-center justify-between
-              p-3
-              rounded-xl
-              bg-slate-100 dark:bg-slate-800
-              hover:bg-slate-200 dark:hover:bg-slate-700
-              transition
-            "
-          >
-            <span className="text-sm text-slate-800 dark:text-slate-200">
-              Security Settings
-            </span>
-
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </button>
+          <div className="flex items-center gap-3 mb-4"><ShieldCheck className="w-5 h-5 text-violet-500 dark:text-violet-400" /><div><h3 className="font-semibold text-slate-900 dark:text-white">Security</h3><p className="text-[11px] text-slate-500">PIN and automatic lock</p></div></div>
+          <button onClick={() => setShowSecurityModal(true)} className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"><span className="text-sm text-slate-800 dark:text-slate-200">Security Settings</span><ChevronRight className="w-4 h-4 text-slate-500" /></button>
         </div>
 
-        {/* Patient Fields */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-
-          <div className="flex items-center gap-3 mb-4">
-            <SlidersHorizontal className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Patient Fields
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                Customize visible clinical sections
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() =>
-              setShowCustomizer(true)
-            }
-            className="
-              w-full
-              flex items-center justify-between
-              p-3
-              rounded-xl
-              bg-slate-100 dark:bg-slate-800
-              hover:bg-slate-200 dark:hover:bg-slate-700
-              transition
-            "
-          >
-            <span className="text-sm text-slate-800 dark:text-slate-200">
-              Customize Fields
-            </span>
-
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          </button>
+          <div className="flex items-center gap-3 mb-4"><SlidersHorizontal className="w-5 h-5 text-cyan-600 dark:text-cyan-400" /><div><h3 className="font-semibold text-slate-900 dark:text-white">Patient Fields</h3><p className="text-[11px] text-slate-500">Customize visible clinical sections</p></div></div>
+          <button onClick={() => setShowCustomizer(true)} className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"><span className="text-sm text-slate-800 dark:text-slate-200">Customize Fields</span><ChevronRight className="w-4 h-4 text-slate-500" /></button>
         </div>
 
-        {/* Cloud Sync */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-
-          <div className="flex items-center gap-3 mb-4">
-            <Cloud className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-
-            <div>
-              <h3 className="font-semibold text-slate-900 dark:text-white">
-                Cloud Sync
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                Backup and multi-device sync
-              </p>
-            </div>
-          </div>
-
+          <div className="flex items-center gap-3 mb-4"><Cloud className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /><div><h3 className="font-semibold text-slate-900 dark:text-white">Cloud Sync</h3><p className="text-[11px] text-slate-500">Backup and multi-device sync</p></div></div>
           <div className="flex items-center gap-2 mb-3">
-
-            {cloudSyncStatus === 'syncing' ? (
-              <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
-            ) : cloudSyncStatus === 'synced' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            ) : (
-              <Clock3 className="w-4 h-4 text-slate-500" />
-            )}
-
-            <span className="text-xs text-slate-600 dark:text-slate-400">
-              {cloudSyncStatus === 'syncing'
-                ? 'Syncing...'
-                : cloudSyncStatus === 'synced'
-                  ? 'Synced'
-                  : cloudSyncStatus === 'error'
-                    ? 'Sync error'
-                    : 'Offline'}
-            </span>
+            {cloudSyncStatus === 'syncing' ? <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" /> : cloudSyncStatus === 'synced' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Clock3 className="w-4 h-4 text-slate-500" />}
+            <span className="text-xs text-slate-600 dark:text-slate-400">{cloudSyncStatus === 'syncing' ? 'Syncing...' : cloudSyncStatus === 'synced' ? 'Synced' : cloudSyncStatus === 'error' ? 'Sync error' : 'Offline'}</span>
           </div>
-
-          <button
-            onClick={() =>
-              setShowCloudAccountModal(true)
-            }
-            className="
-              w-full
-              p-3
-              rounded-xl
-              bg-slate-100 dark:bg-slate-800
-              hover:bg-slate-200 dark:hover:bg-slate-700
-              text-sm
-              text-slate-800 dark:text-slate-200
-              transition
-            "
-          >
-            Cloud Account
-          </button>
+          <button onClick={() => setShowCloudAccountModal(true)} className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm text-slate-800 dark:text-slate-200 transition">Cloud Account</button>
         </div>
-
       </div>
 
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
-
-        <div className="flex items-center gap-3">
-          <LogOut className="w-5 h-5 text-rose-500 dark:text-rose-400" />
-
-          <div className="flex-1">
-            <h3 className="font-semibold text-slate-900 dark:text-white">
-              Session
-            </h3>
-
-            <p className="text-[11px] text-slate-500">
-              {currentUser?.email || 'Offline / Local mode'}
-            </p>
-          </div>
-
-          <button
-            onClick={handleLockApp}
-            className="
-              px-3 py-2
-              rounded-xl
-              bg-slate-100 dark:bg-slate-800
-              hover:bg-slate-200 dark:hover:bg-slate-700
-              text-xs
-              text-slate-800 dark:text-slate-300
-              transition
-            "
-          >
-            Lock
-          </button>
-
-          {currentUser && (
-            <button
-              onClick={handleLogout}
-              className="
-                px-3 py-2
-                rounded-xl
-                bg-rose-100 dark:bg-rose-950
-                hover:bg-rose-200 dark:hover:bg-rose-900
-                text-xs
-                text-rose-700 dark:text-rose-300
-                transition
-              "
-            >
-              Logout
-            </button>
-          )}
-        </div>
+        <div className="flex items-center gap-3"><LogOut className="w-5 h-5 text-rose-500 dark:text-rose-400" /><div className="flex-1"><h3 className="font-semibold text-slate-900 dark:text-white">Session</h3><p className="text-[11px] text-slate-500">{currentUser?.email || 'Offline / Local mode'}</p></div><button onClick={handleLockApp} className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs text-slate-800 dark:text-slate-300 transition">Lock</button>{currentUser && <button onClick={handleLogout} className="px-3 py-2 rounded-xl bg-rose-100 dark:bg-rose-950 hover:bg-rose-200 dark:hover:bg-rose-900 text-xs text-rose-700 dark:text-rose-300 transition">Logout</button>}</div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4">
-        <div className="flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-slate-400" />
-
-          <p className="text-xs text-slate-500">
-            CardioVault • ICU & CCU Clinical Notebook
-          </p>
-        </div>
-      </div>
-
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4"><div className="flex items-center gap-2"><Wrench className="w-4 h-4 text-slate-400" /><p className="text-xs text-slate-500">CardioVault • ICU & CCU Clinical Notebook</p></div></div>
     </div>
   );
 
-  // =========================================================
-  // Render Active Page
-  // =========================================================
-
-  const renderActivePage = () => {
-    return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -5 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-        >
-          {activeTab === 'patients' && <PatientsPage />}
-          {activeTab === 'beds' && <BedsPage />}
-          {activeTab === 'archive' && <ArchivePage />}
-          {activeTab === 'settings' && <SettingsPage />}
-          {activeTab === 'home' && <HomePage />}
-        </motion.div>
-      </AnimatePresence>
-    );
-  };
-
-  // =========================================================
-  // Auth Loading
-  // =========================================================
+  const renderActivePage = () => (
+    <AnimatePresence mode="wait"><motion.div key={activeTab} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.18, ease: 'easeOut' }}>
+      {activeTab === 'patients' && <PatientsPage />}
+      {activeTab === 'beds' && <BedsPage />}
+      {activeTab === 'archive' && <ArchivePage />}
+      {activeTab === 'settings' && <SettingsPage />}
+      {activeTab === 'home' && <HomePage />}
+    </motion.div></AnimatePresence>
+  );
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
-
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl mb-4 animate-pulse">
-          <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-            <HeartPulse className="w-7 h-7 text-cyan-400" />
-          </div>
-        </div>
-
-        <p className="text-sm font-semibold text-slate-200">
-          جاري التحقق من جلسة العمل السريرية...
-        </p>
-
-        <p className="text-xs text-slate-500 mt-1">
-          CardioVault
-        </p>
-      </div>
-    );
+    return <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4"><div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl mb-4 animate-pulse"><div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center"><HeartPulse className="w-7 h-7 text-cyan-400" /></div></div><p className="text-sm font-semibold text-slate-200">جاري التحقق من جلسة العمل السريرية...</p><p className="text-xs text-slate-500 mt-1">CardioVault</p></div>;
   }
-
-  // =========================================================
-  // Login
-  // =========================================================
 
   if (!currentUser && !isOfflineBypassed) {
     return (
       <LoginScreen
-        onLoginSuccess={() => {
-          setIsUnlocked(true);
-        }}
-        onContinueOffline={async (pin) => {
+        onLoginSuccess={() => { setIsUnlocked(true); }}
+        onContinueOffline={async () => {
+          // Offline access no longer requires a PIN. Use a local empty key context
+          // and attempt to load existing patient data without changing cloud auth.
           setIsOfflineBypassed(true);
-
-          const pinToUse =
-            pin || '0000';
-
-          setActivePin(pinToUse);
+          setActivePin('');
           setIsUnlocked(true);
-
           try {
-            const loaded =
-              await loadPatients(pinToUse);
-
+            const loaded = await loadPatients('');
             setPatients(loaded);
           } catch (err) {
-            console.error(
-              'Failed to load offline patients:',
-              err
-            );
+            console.error('Failed to load offline patients:', err);
           }
         }}
         securitySettings={securitySettings}
@@ -2180,289 +1541,46 @@ export default function App() {
     );
   }
 
-  // =========================================================
-  // Lock Screen
-  // =========================================================
-
   if (!isUnlocked) {
-    return (
-      <LockScreen
-        securitySettings={securitySettings}
-        onUnlockSuccess={handleUnlockSuccess}
-      />
-    );
+    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} />;
   }
 
-  // =========================================================
-  // Main Application
-  // =========================================================
-
   return (
-    <div className="
-      min-h-screen
-      bg-slate-50 dark:bg-slate-950
-      text-slate-900 dark:text-slate-100
-      flex flex-col
-      selection:bg-cyan-500/30
-      selection:text-cyan-200
-      pt-[max(env(safe-area-inset-top),0.5rem)]
-      pb-[max(env(safe-area-inset-bottom),0.5rem)]
-      transition-colors duration-200
-    ">
-
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200 pt-[max(env(safe-area-inset-top),0.5rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)] transition-colors duration-200">
       <Navbar
         specialtyMode={specialtyMode}
         onSetSpecialtyMode={setSpecialtyMode}
-
         activeTab={activeTab}
         onTabChange={setActiveTab}
-
         patients={patients}
         totalBeds={totalBeds}
-
         currentUser={currentUser}
         cloudSyncStatus={cloudSyncStatus}
-
         theme={currentTheme}
         onSetTheme={handleSelectTheme}
-
-        onOpenCloudAccount={() =>
-          setShowCloudAccountModal(true)
-        }
-
-        onOpenNewPatientModal={() =>
-          setAdmitBedNumber(
-            availableBeds[0] || 1
-          )
-        }
-
-        onOpenCalculators={() =>
-          setShowCalculators(true)
-        }
-
-        onOpenCustomizer={() =>
-          setShowCustomizer(true)
-        }
-
-        onOpenSecurity={() =>
-          setShowSecurityModal(true)
-        }
-
-        onOpenApkGuide={() =>
-          setShowApkModal(true)
-        }
-
-        onOpenPrintHandover={() =>
-          setShowPrintView(true)
-        }
-
+        onOpenCloudAccount={() => setShowCloudAccountModal(true)}
+        onOpenNewPatientModal={() => setAdmitBedNumber(availableBeds[0] || 1)}
+        onOpenCalculators={() => setShowCalculators(true)}
+        onOpenCustomizer={() => setShowCustomizer(true)}
+        onOpenSecurity={() => setShowSecurityModal(true)}
+        onOpenApkGuide={() => setShowApkModal(true)}
+        onOpenPrintHandover={() => setShowPrintView(true)}
         onLockSession={handleLockApp}
-
         onLogout={handleLogout}
       />
 
-      <main
-        className="
-          flex-1
-          w-full
-          max-w-7xl
-          mx-auto
-          px-4
-          sm:px-6
-          lg:px-8
-          py-6
-          pb-24
-          md:pb-6
-        "
-      >
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6">{renderActivePage()}</main>
 
-        {renderActivePage()}
-
-      </main>
-
-      {/* =====================================================
-          Patient File
-          ===================================================== */}
-
-      {activePatientRecord && (
-        <PatientFileModal
-          patient={activePatientRecord}
-          fieldConfig={fieldConfig}
-          specialtyMode={specialtyMode}
-
-          onUpdatePatient={
-            handleUpdatePatient
-          }
-
-          onDeletePatient={
-            handleDeletePatient
-          }
-
-          onDischargePatient={(pt) =>
-            setPatientToDischarge(pt)
-          }
-
-          onReadmitPatient={(pt) =>
-            setPatientToReadmit(pt)
-          }
-
-          onPrintPatient={(pt) => {
-            setPatientToPrint(pt);
-            setShowPrintView(true);
-          }}
-
-          onClose={() =>
-            setSelectedPatientId(null)
-          }
-        />
-      )}
-
-      {/* Admit */}
-
-      {admitBedNumber !== null && (
-        <AdmitPatientModal
-          bedNumber={admitBedNumber}
-          specialtyMode={specialtyMode}
-          onAdmit={handleAdmitPatient}
-          onClose={() =>
-            setAdmitBedNumber(null)
-          }
-        />
-      )}
-
-      {/* Calculators */}
-
-      {showCalculators && (
-        <ClinicalCalculatorsModal
-          onClose={() =>
-            setShowCalculators(false)
-          }
-        />
-      )}
-
-      {/* Customizer */}
-
-      {showCustomizer && (
-        <FieldCustomizerModal
-          config={fieldConfig}
-          onSaveConfig={
-            handleSaveFieldConfig
-          }
-          onClose={() =>
-            setShowCustomizer(false)
-          }
-        />
-      )}
-
-      {/* Security */}
-
-      {showSecurityModal && (
-        <SecuritySettingsModal
-          securitySettings={
-            securitySettings
-          }
-
-          patients={patients}
-
-          currentActivePin={activePin}
-
-          onUpdateSecurity={(newSettings) =>
-            setSecuritySettings(
-              newSettings
-            )
-          }
-
-          onRestorePatients={(restored) =>
-            updatePatients(restored)
-          }
-
-          onClose={() =>
-            setShowSecurityModal(false)
-          }
-        />
-      )}
-
-      {/* APK Guide */}
-
-      {showApkModal && (
-        <AndroidApkModal
-          onClose={() =>
-            setShowApkModal(false)
-          }
-        />
-      )}
-
-      {/* Print */}
-
-      {showPrintView && (
-        <PrintableView
-          patients={patients}
-          activePatient={patientToPrint}
-
-          onClose={() => {
-            setShowPrintView(false);
-            setPatientToPrint(null);
-          }}
-        />
-      )}
-
-      {/* Discharge */}
-
-      {patientToDischarge && (
-        <DischargePatientModal
-          patient={patientToDischarge}
-
-          onConfirmDischarge={
-            handleDischargePatient
-          }
-
-          onClose={() =>
-            setPatientToDischarge(null)
-          }
-        />
-      )}
-
-      {/* Readmit */}
-
-      {patientToReadmit && (
-        <ReadmitPatientModal
-          patient={patientToReadmit}
-          availableBeds={availableBeds}
-
-          onReadmit={
-            handleReadmitPatient
-          }
-
-          onClose={() =>
-            setPatientToReadmit(null)
-          }
-        />
-      )}
-
-      {/* Cloud */}
-
-      {showCloudAccountModal && (
-        <CloudAccountModal
-          currentUser={currentUser}
-          cloudSyncStatus={
-            cloudSyncStatus
-          }
-          patients={patients}
-
-          onManualSync={
-            handleManualSync
-          }
-
-          onPullCloudData={
-            handlePullCloudData
-          }
-
-          onClose={() =>
-            setShowCloudAccountModal(false)
-          }
-        />
-      )}
-
+      {activePatientRecord && <PatientFileModal patient={activePatientRecord} fieldConfig={fieldConfig} specialtyMode={specialtyMode} onUpdatePatient={handleUpdatePatient} onDeletePatient={handleDeletePatient} onDischargePatient={(pt) => setPatientToDischarge(pt)} onReadmitPatient={(pt) => setPatientToReadmit(pt)} onPrintPatient={(pt) => { setPatientToPrint(pt); setShowPrintView(true); }} onClose={() => setSelectedPatientId(null)} />}
+      {admitBedNumber !== null && <AdmitPatientModal bedNumber={admitBedNumber} specialtyMode={specialtyMode} onAdmit={handleAdmitPatient} onClose={() => setAdmitBedNumber(null)} />}
+      {showCalculators && <ClinicalCalculatorsModal onClose={() => setShowCalculators(false)} />}
+      {showCustomizer && <FieldCustomizerModal config={fieldConfig} onSaveConfig={handleSaveFieldConfig} onClose={() => setShowCustomizer(false)} />}
+      {showSecurityModal && <SecuritySettingsModal securitySettings={securitySettings} patients={patients} currentActivePin={activePin} onUpdateSecurity={(newSettings) => setSecuritySettings(newSettings)} onRestorePatients={(restored) => updatePatients(restored)} onClose={() => setShowSecurityModal(false)} />}
+      {showApkModal && <AndroidApkModal onClose={() => setShowApkModal(false)} />}
+      {showPrintView && <PrintableView patients={patients} activePatient={patientToPrint} onClose={() => { setShowPrintView(false); setPatientToPrint(null); }} />}
+      {patientToDischarge && <DischargePatientModal patient={patientToDischarge} onConfirmDischarge={handleDischargePatient} onClose={() => setPatientToDischarge(null)} />}
+      {patientToReadmit && <ReadmitPatientModal patient={patientToReadmit} availableBeds={availableBeds} onReadmit={handleReadmitPatient} onClose={() => setPatientToReadmit(null)} />}
+      {showCloudAccountModal && <CloudAccountModal currentUser={currentUser} cloudSyncStatus={cloudSyncStatus} patients={patients} onManualSync={handleManualSync} onPullCloudData={handlePullCloudData} onClose={() => setShowCloudAccountModal(false)} />}
     </div>
   );
 }
