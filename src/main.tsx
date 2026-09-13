@@ -41,7 +41,20 @@ if (typeof document !== 'undefined') {
 
   document.addEventListener('pointerdown', focusFormControl, true);
   document.addEventListener('touchstart', focusFormControl, true);
-  document.addEventListener('touchend', focusFormControl, true);
+
+  // Android WebView can keep the DOM input focused while the native soft
+  // keyboard remains hidden. Notify the native activity whenever a text input
+  // actually receives focus so it can explicitly request the IME.
+  const requestNativeKeyboard = (event: FocusEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    if ((target as HTMLInputElement).readOnly || (target as HTMLInputElement).disabled) return;
+
+    const bridge = (window as Window & { AndroidKeyboard?: { showKeyboard?: () => void } }).AndroidKeyboard;
+    bridge?.showKeyboard?.();
+  };
+
+  document.addEventListener('focusin', requestNativeKeyboard, true);
 
   // The specialty switcher is also a direct bed-board selector.
   // After changing All Systems / CCU / ICU, activate the Beds tab so the
