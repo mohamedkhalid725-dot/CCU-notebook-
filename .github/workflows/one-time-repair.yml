@@ -6,11 +6,11 @@ permissions:
   contents: write
 jobs:
   repair:
+    if: github.event.head_commit.message != 'repair: calculators + pdf'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Apply fixes once
-        if: github.event.head_commit.message != 'repair: calculators + pdf'
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -19,10 +19,9 @@ jobs:
           old='''const Field:React.FC<FieldProps>=({label,value,onChange,step='1',min,max,inputMode})=>(
   <div className="space-y-1"><div className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div><input type="number" inputMode={inputMode||(step==='1'?'numeric':'decimal')} step={step} min={min} max={max} value={value===undefined?'':String(value)} onChange={e=>onChange(e.target.value)} autoComplete="off" className="w-full min-h-12 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-base text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
 );'''
-          new='''const Field:React.FC<FieldProps>=({label,value,onChange,step='1',min,max,inputMode})=>{
-  const focusInput=(el:HTMLInputElement)=>{ requestAnimationFrame(()=>{ el.focus({preventScroll:true}); }); };
-  return <div className="space-y-1"><div className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div><input type="text" inputMode={inputMode||(step==='1'?'numeric':'decimal')} enterKeyHint="done" step={step} min={min} max={max} value={value===undefined?'':String(value)} onChange={e=>onChange(e.target.value)} onPointerDown={e=>e.stopPropagation()} onTouchStart={e=>{e.stopPropagation(); focusInput(e.currentTarget);}} onFocus={e=>{ const el=e.currentTarget; requestAnimationFrame(()=>el.focus({preventScroll:true})); }} autoComplete="off" autoCorrect="off" spellCheck={false} className="w-full min-h-12 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-base text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /> </div>;
-};'''
+          new='''const Field:React.FC<FieldProps>=({label,value,onChange,step='1',min,max,inputMode})=>(
+  <div className="space-y-1"><div className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</div><input type="text" inputMode={inputMode||(step==='1'?'numeric':'decimal')} enterKeyHint="done" step={step} min={min} max={max} value={value===undefined?'':String(value)} onChange={e=>onChange(e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} className="w-full min-h-12 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-base text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" /></div>
+);'''
           if old not in s: raise SystemExit('calculator Field pattern not found')
           p.write_text(s.replace(old,new,1))
 
@@ -34,7 +33,9 @@ jobs:
           if end<0: raise SystemExit('progress card end not found')
           end += len('</Card></div>')
           s=s[:start]+s[end:]
-          s=s.replace('<div className="md:col-span-2"><Card><SectionHeader icon={<Calculator', '<div className="md:col-span-5"><Card><SectionHeader icon={<Calculator', 1)
+          old_calc='<div className="md:col-span-2"><Card><SectionHeader icon={<Calculator'
+          if old_calc not in s: raise SystemExit('calculator report card not found')
+          s=s.replace(old_calc, '<div className="md:col-span-5"><Card><SectionHeader icon={<Calculator', 1)
           p.write_text(s)
           PY
           git config user.name 'github-actions[bot]'
