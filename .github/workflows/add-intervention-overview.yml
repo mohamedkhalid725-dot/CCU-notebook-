@@ -1,0 +1,63 @@
+name: Surface interventions in patient overview
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Patch Patient Overview
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/patient/PatientOverview.tsx')
+          s = p.read_text()
+
+          s = s.replace(
+              '  AlertTriangle\\n} from \'lucide-react\';',
+              '  AlertTriangle,\\n  Wrench,\\n  ChevronRight\\n} from \'lucide-react\';'
+          )
+
+          marker = '''          {/* Team & Disposition Card */}'''
+          card = '''          {/* Recent Procedures & Critical Interventions */}\n          <div className="md:col-span-2 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60">\n            <div className="flex items-center justify-between gap-3 mb-3">\n              <div>\n                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">\n                  <Wrench size={14} className="text-emerald-500" />\n                  <span>Recent Procedures & Critical Interventions</span>\n                </h3>\n                <p className="text-[10px] text-slate-500 mt-1">Procedures and major bedside interventions documented for this admission.</p>\n              </div>\n              <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">\n                {patient.procedures?.length || 0} recorded\n              </span>\n            </div>\n            {patient.procedures && patient.procedures.length > 0 ? (\n              <div className="space-y-2">\n                {patient.procedures.slice(0, 3).map((proc) => (\n                  <div key={proc.id} className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">\n                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">\n                      <Wrench size={14} />\n                    </div>\n                    <div className="min-w-0 flex-1">\n                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{proc.procedureName || proc.name || 'Procedure / Intervention'}</p>\n                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">\n                        {proc.timestamp || proc.date || 'Date not recorded'}{proc.operator ? ` • ${proc.operator}` : ''}{proc.site ? ` • ${proc.site}` : ''}\n                      </p>\n                      {proc.details && <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{proc.details}</p>}\n                    </div>\n                    <ChevronRight size={14} className="text-slate-400 shrink-0 mt-1" />\n                  </div>\n                ))}\n                {patient.procedures.length > 3 && <p className="text-[10px] text-slate-400 text-center pt-1">+ {patient.procedures.length - 3} more — open Procedures tab for full record</p>}\n              </div>\n            ) : (\n              <div className="py-4 text-center rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-slate-200 dark:border-slate-800">\n                <Wrench size={20} className="mx-auto text-slate-400" />\n                <p className="text-xs text-slate-500 mt-1">No procedures or major interventions recorded yet.</p>\n              </div>\n            )}\n          </div>\n\n'''
+
+          if 'Recent Procedures & Critical Interventions' not in s:
+              if marker not in s:
+                  raise SystemExit('Could not find overview insertion marker')
+              s = s.replace(marker, card + marker, 1)
+
+          p.write_text(s)
+          PY
+      - name: Build web app
+        run: |
+          npm ci
+          npm run build
+      - name: Commit change
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/patient/PatientOverview.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "feat: show recent interventions in patient overview"
+            git push
+          fi
+      - name: Remove temporary workflow
+        if: always()
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/add-intervention-overview.yml 2>/dev/null || true
+          git rm -f .github/workflows/add-intervention-overview.yml 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove temporary intervention workflow"
+          git push
