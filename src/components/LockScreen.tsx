@@ -61,8 +61,8 @@ const handleBiometricUnlock = async () => {
       setPin(next);
       setErrorMsg('');
 
-      // Auto-submit when 4 or 6 digits entered
-      if (!isSettingUp && (next.length === 4 || next.length === 6)) {
+      // Auto-submit only after all 6 digits are entered.
+      if (!isSettingUp && next.length === 6) {
         verifyPin(next);
       }
     }
@@ -84,7 +84,7 @@ const handleBiometricUnlock = async () => {
       if (testHash === securitySettings.hashedPin) {
         triggerUnlock(candidatePin);
       } else {
-        if (candidatePin.length >= 4) {
+        if (candidatePin.length === 6) {
           setErrorMsg('Incorrect PIN. Please try again.');
           setPin('');
         }
@@ -97,8 +97,8 @@ const handleBiometricUnlock = async () => {
 
   const handleSetupProceed = async () => {
     if (setupStep === 'enter') {
-      if (pin.length < 4) {
-        setErrorMsg('PIN must be at least 4 digits');
+      if (pin.length !== 6) {
+        setErrorMsg('PIN must be exactly 6 digits');
         return;
       }
       setConfirmPin(pin);
@@ -106,6 +106,10 @@ const handleBiometricUnlock = async () => {
       setSetupStep('confirm');
       setErrorMsg('');
     } else {
+      if (pin.length !== 6) {
+        setErrorMsg('PIN must be exactly 6 digits');
+        return;
+      }
       if (pin !== confirmPin) {
         setErrorMsg('PINs do not match. Please re-enter.');
         setPin('');
@@ -121,11 +125,9 @@ const handleBiometricUnlock = async () => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-4 pt-[max(env(safe-area-inset-top),1rem)] pb-[max(env(safe-area-inset-bottom),1rem)] select-none overflow-y-auto transition-colors">
-      {/* Background glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(6,182,212,0.12),transparent_70%)] pointer-events-none" />
 
       <div className="w-full max-w-sm flex flex-col items-center z-10 my-auto">
-        {/* Shield & App Brand */}
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 shadow-xl shadow-cyan-950/20 mb-4 flex items-center justify-center">
           <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[14px] flex items-center justify-center">
             <Lock className="w-8 h-8 text-cyan-600 dark:text-cyan-400 animate-pulse" />
@@ -141,11 +143,10 @@ const handleBiometricUnlock = async () => {
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center max-w-xs">
           {isSettingUp
-            ? 'All medical records will be locally encrypted on this device with AES-GCM 256-bit.'
-            : 'Confidential Patient Data — Enter PIN to decrypt session'}
+            ? 'Create a secure 6-digit PIN. All medical records will be locally encrypted on this device with AES-GCM 256-bit.'
+            : 'Confidential Patient Data — Enter your 6-digit PIN to decrypt session'}
         </p>
 
-        {/* PIN Indicators */}
         <div className="flex items-center justify-center gap-3 my-6">
           {[0, 1, 2, 3, 4, 5].map(i => {
             const filled = i < pin.length;
@@ -162,7 +163,6 @@ const handleBiometricUnlock = async () => {
           })}
         </div>
 
-        {/* Error Message */}
         {errorMsg && (
           <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/40 px-3 py-1.5 rounded-lg mb-4 animate-shake">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -170,8 +170,7 @@ const handleBiometricUnlock = async () => {
           </div>
         )}
 
-        {/* Setup Continue Button */}
-        {isSettingUp && pin.length >= 4 && (
+        {isSettingUp && pin.length === 6 && (
           <button
             onClick={handleSetupProceed}
             className="w-full mb-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm shadow-lg shadow-cyan-950/20 transition active:scale-98 flex items-center justify-center gap-2"
@@ -188,7 +187,6 @@ const handleBiometricUnlock = async () => {
           </button>
         )}
 
-        {/* Numeric Keypad */}
         <div className="grid grid-cols-3 gap-3 w-full max-w-xs mb-4">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
             <button
@@ -200,7 +198,6 @@ const handleBiometricUnlock = async () => {
             </button>
           ))}
 
-          {/* Bottom row: Clear, 0, Backspace */}
           <button
             onClick={handleClear}
             className="h-14 rounded-2xl bg-white dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 transition active:scale-95 flex items-center justify-center shadow-sm"
@@ -224,7 +221,6 @@ const handleBiometricUnlock = async () => {
           </button>
         </div>
 
-        {/* Local-First Privacy Guarantee Banner */}
         <div className="mt-4 p-3 rounded-xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2 max-w-xs text-left shadow-sm">
           <Shield className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
           <div>
