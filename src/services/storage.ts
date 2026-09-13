@@ -775,35 +775,25 @@ export async function loadPatients(activePin?: string): Promise<PatientRecord[]>
       return migrated;
     }
 
-    if (security.isPinSet && activePin) {
-      // Encrypted data format
-      try {
-        const decryptedJson = await decryptData(rawData, activePin, security.pinSalt);
-        const parsed = JSON.parse(decryptedJson);
-        if (Array.isArray(parsed)) {
-          return parsed.map(migratePatientRecord);
-        }
-      } catch (err) {
-        console.warn('Could not decrypt with provided PIN, attempting fallback or re-throw', err);
-        throw err;
-      }
-    } else {
-      // Unencrypted or initial
-      try {
-        const parsed = JSON.parse(rawData);
-        if (Array.isArray(parsed)) {
-          return parsed.map(migratePatientRecord);
-        }
-      } catch {
-        // May be encrypted but no pin provided yet
-      }
-      return INITIAL_PATIENTS.map(migratePatientRecord);
+    if (security.isPinSet) {
+      if (!activePin) throw new Error('PIN required to access encrypted patient data');
+      const decryptedJson = await decryptData(rawData, activePin, security.pinSalt);
+      const parsed = JSON.parse(decryptedJson);
+      if (!Array.isArray(parsed)) throw new Error('Corrupted patient database');
+      return parsed.map(migratePatientRecord);
     }
+
+    try {
+      const parsed = JSON.parse(rawData);
+      if (Array.isArray(parsed)) return parsed.map(migratePatientRecord);
+    } catch {
+      throw new Error('Patient database is encrypted or corrupted; PIN required');
+    }
+    throw new Error('Invalid patient database');
   } catch (err) {
     console.error('Error loading patients:', err);
-    return INITIAL_PATIENTS.map(migratePatientRecord);
+    throw err;
   }
-  return INITIAL_PATIENTS.map(migratePatientRecord);
 }
 
 /**
@@ -834,13 +824,14 @@ export async function setupNewPin(newPin: string, currentPin?: string): Promise<
   const salt = generateSalt();
   const hash = await hashPin(newPin, salt);
 
+  const currentSecurity = getSecuritySettings();
   const newSecurity: AppSecuritySettings = {
+    ...currentSecurity,
     isPinSet: true,
     hashedPin: hash,
     pinSalt: salt,
-    autoLockMinutes: 5,
-    biometricEnabled: false,
-    lastUnlockedTimestamp: Date.now()
+    lastUnlockedTimestamp: Date.now(),
+    biometricEnabled: false
   };
 
   saveSecuritySettings(newSecurity);

@@ -188,49 +188,46 @@ export default function App() {
   // =========================================================
 
   const handleUnlockSuccess = async (pin: string) => {
-    setActivePin(pin);
-    setIsUnlocked(true);
-    setLastActivity(Date.now());
-
     try {
       const loaded = await loadPatients(pin);
+      setActivePin(pin);
+      setIsUnlocked(true);
+      setLastActivity(Date.now());
+      setPatients(loaded);
 
-      // If the user is logged in, restore patients from Cloud first.
       if (currentUser) {
+        setCloudSyncStatus('syncing');
         try {
-          const cloudData = await fetchCloudPatients(
-            currentUser.uid
-          );
-
+          const cloudData = await fetchCloudPatients(currentUser.uid);
           if (cloudData.length > 0) {
             setPatients(cloudData);
-
-            // Save the restored Cloud data locally
-            // using the current PIN.
-            await savePatients(
-              cloudData,
-              pin
-            );
-
-            setCloudSyncStatus('synced');
-            return;
+            await savePatients(cloudData, pin);
+          } else if (loaded.length > 0) {
+            await syncAllPatientsToCloud(currentUser.uid, loaded);
           }
+          const cloudSettings = await fetchUserSettingsFromCloud(currentUser.uid);
+          if (cloudSettings) {
+            if (typeof cloudSettings.totalBeds === 'number') {
+              const safeBeds = Math.max(3, Math.floor(cloudSettings.totalBeds));
+              setTotalBeds(safeBeds);
+              localStorage.setItem('icu_total_beds', String(safeBeds));
+            }
+            if (cloudSettings.specialtyMode === 'all' || cloudSettings.specialtyMode === 'ccu' || cloudSettings.specialtyMode === 'icu') setSpecialtyMode(cloudSettings.specialtyMode);
+            if (cloudSettings.fieldConfig) { setFieldConfig(cloudSettings.fieldConfig); saveFieldConfig(cloudSettings.fieldConfig); }
+          }
+          setCloudSyncStatus('synced');
         } catch (cloudErr) {
-          console.warn(
-            'Cloud patients restore unavailable, continuing with local encrypted data:',
-            cloudErr
-          );
+          console.warn('Cloud restore unavailable; local encrypted data remains active:', cloudErr);
           setCloudSyncStatus('error');
         }
+      } else {
+        setCloudSyncStatus('offline');
       }
-
-      // If there is no Cloud data, use local data.
-      setPatients(loaded);
     } catch (err) {
-      console.warn(
-        'Notice loading patient records:',
-        err
-      );
+      console.warn('Unlock failed; clinical data remains locked:', err);
+      setIsUnlocked(false);
+      setActivePin('');
+      throw err;
     }
   };
 
@@ -244,86 +241,11 @@ export default function App() {
       setAuthLoading(false);
 
       if (user) {
-        setIsUnlocked(true);
-        setCloudSyncStatus('syncing');
-
-        // Always ensure local data is loaded first as baseline
-        try {
-          const localData = await loadPatients(activePin || '0000');
-          if (localData && localData.length > 0) {
-            setPatients(localData);
-          }
-        } catch {
-          // Local storage empty or needs PIN
-        }
-
-        try {
-          const cloudData = await fetchCloudPatients(user.uid);
-          const cloudSettings = await fetchUserSettingsFromCloud(user.uid);
-
-          if (cloudData && cloudData.length > 0) {
-            setPatients(cloudData);
-
-            if (activePin) {
-              await savePatients(cloudData, activePin);
-            }
-          } else if (patients.length > 0) {
-            try {
-              await syncAllPatientsToCloud(
-                user.uid,
-                patients
-              );
-            } catch (syncErr) {
-              console.warn('Initial cloud sync postponed:', syncErr);
-            }
-          }
-
-          if (cloudSettings) {
-            if (typeof cloudSettings.totalBeds === 'number') {
-              const safeBeds = Math.max(
-                3,
-                Math.floor(cloudSettings.totalBeds)
-              );
-              setTotalBeds(safeBeds);
-              localStorage.setItem(
-                'icu_total_beds',
-                String(safeBeds)
-              );
-            }
-
-            if (
-              cloudSettings.specialtyMode === 'all' ||
-              cloudSettings.specialtyMode === 'ccu' ||
-              cloudSettings.specialtyMode === 'icu'
-            ) {
-              setSpecialtyMode(cloudSettings.specialtyMode);
-            }
-
-            if (cloudSettings.fieldConfig) {
-              setFieldConfig(cloudSettings.fieldConfig);
-              saveFieldConfig(cloudSettings.fieldConfig);
-            }
-          } else {
-            try {
-              await saveUserSettingsToCloud(user.uid, {
-                totalBeds,
-                specialtyMode,
-                fieldConfig
-              });
-            } catch (settingsErr) {
-              console.warn('Initial settings sync postponed:', settingsErr);
-            }
-          }
-
-          setCloudSyncStatus('synced');
-        } catch (err) {
-          console.warn(
-            'Cloud patients synchronization notice (using local offline storage):',
-            err
-          );
-
-          setCloudSyncStatus('error');
-        }
+        // Firebase authentication must never bypass the local clinical-data lock.
+        setIsUnlocked(false);
+        setActivePin('');
+        setPatients([]);
+        setCloudSyncStatus('offline');
       } else {
         setCloudSyncStatus('offline');
       }
@@ -1001,11 +923,7 @@ export default function App() {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        if (
-          securitySettings.autoLockMinutes === 0
-        ) {
-          handleLockApp();
-        }
+        handleLockApp();
       }
     };
 
@@ -1522,19 +1440,16 @@ export default function App() {
   if (!currentUser && !isOfflineBypassed) {
     return (
       <LoginScreen
-        onLoginSuccess={() => { setIsUnlocked(true); }}
-        onContinueOffline={async () => {
-          // Offline access no longer requires a PIN. Use a local empty key context
-          // and attempt to load existing patient data without changing cloud auth.
-          setIsOfflineBypassed(true);
+        onLoginSuccess={() => {
+          setIsOfflineBypassed(false);
+          setIsUnlocked(false);
           setActivePin('');
-          setIsUnlocked(true);
-          try {
-            const loaded = await loadPatients('');
-            setPatients(loaded);
-          } catch (err) {
-            console.error('Failed to load offline patients:', err);
-          }
+        }}
+        onContinueOffline={async () => {
+          setIsOfflineBypassed(true);
+          setIsUnlocked(false);
+          setActivePin('');
+          setPatients([]);
         }}
         securitySettings={securitySettings}
       />
