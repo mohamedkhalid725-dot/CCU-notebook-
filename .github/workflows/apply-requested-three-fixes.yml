@@ -39,28 +39,25 @@ jobs:
           p.write_text(s.replace(old, new, 1))
           PY
       - name: Verify requested scope
-        shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          pf = Path('src/components/PatientFileModal.tsx').read_text()
-          expected = ["'overview'", "'history'", "'ecg'", "'vitals_io'", "'examination'", "'labs'", "'echo'"]
-          pos = [pf.index(x) for x in expected]
-          assert pos == sorted(pos), 'Patient tab order verification failed'
-          for f in ['src/components/calculators/CriticalCareCalcs.tsx','src/components/calculators/CardiologyCalcs.tsx','src/components/calculators/ThromboembolismCalcs.tsx','src/components/calculators/RenalRespiratoryCalcs.tsx','src/components/calculators/ElectrolytesGeneralCalcs.tsx','src/components/PrintableView.tsx']:
-              assert Path(f).exists(), f'Missing {f}'
-          calc = ''.join(Path(f).read_text() for f in ['src/components/calculators/CriticalCareCalcs.tsx','src/components/calculators/CardiologyCalcs.tsx','src/components/calculators/ThromboembolismCalcs.tsx','src/components/calculators/RenalRespiratoryCalcs.tsx','src/components/calculators/ElectrolytesGeneralCalcs.tsx'])
-          assert 'onChange=' in calc and 'type=\"number\"' in calc, 'Calculator numeric inputs verification failed'
-          pdf = Path('src/components/PrintableView.tsx').read_text()
-          assert 'Latest Progress Notes' not in pdf and 'Latest Progress Note' not in pdf and 'Progress Note' not in pdf, 'Progress Note still present in PDF source'
-          print('Scope verification passed: calculators inputs present, PDF progress note absent, requested tab order applied.')
+          pf=Path('src/components/PatientFileModal.tsx').read_text()
+          expected=["{ id: 'overview'", "{ id: 'history'", "{ id: 'ecg'", "{ id: 'vitals_io'", "{ id: 'examination'", "{ id: 'labs'", "{ id: 'echo'"]
+          pos=[pf.index(x) for x in expected]
+          assert pos==sorted(pos)
+          files=['src/components/calculators/CriticalCareCalcs.tsx','src/components/calculators/CardiologyCalcs.tsx','src/components/calculators/ThromboembolismCalcs.tsx','src/components/calculators/RenalRespiratoryCalcs.tsx','src/components/calculators/ElectrolytesGeneralCalcs.tsx']
+          calc=''.join(Path(f).read_text() for f in files)
+          assert 'onChange=' in calc and 'type=\"number\"' in calc
+          pdf=Path('src/components/PrintableView.tsx').read_text()
+          assert 'Latest Progress Notes' not in pdf and 'Latest Progress Note' not in pdf and 'Progress Note' not in pdf
+          print('Requested scope verified')
           PY
       - name: Build web app
         run: |
           npm ci
           npm run build
-      - name: Commit only requested changes
-        shell: bash
+      - name: Commit only PatientFileModal
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
