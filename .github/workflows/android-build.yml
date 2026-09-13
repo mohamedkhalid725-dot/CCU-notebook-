@@ -6,145 +6,61 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Apply requested patient file layout
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          modal = Path('src/components/PatientFileModal.tsx')
-          text = modal.read_text()
-          start = text.index("  const tabs: Array<{ id: TabKey; label: string; icon: React.ReactNode; badge?: number | string }> = [")
-          end = text.index("\n  ];", start) + len("\n  ];")
-          new_tabs = '''  const tabs: Array<{ id: TabKey; label: string; icon: React.ReactNode; badge?: number | string }> = [
-    { id: 'overview', label: 'Overview', icon: <User size={15} /> },
-    { id: 'history', label: 'History', icon: <History size={15} /> },
-    { id: 'ecg', label: '12-Lead ECG', icon: <Activity size={15} />, badge: patient.ecgRecords?.length || undefined },
-    { id: 'examination', label: 'Physical Exam', icon: <Stethoscope size={15} /> },
-    { id: 'vitals_io', label: 'Vitals & I/O', icon: <Droplet size={15} />, badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined },
-    { id: 'medications', label: 'Medications', icon: <Pill size={15} />, badge: patient.medications?.filter((m) => m.status === 'active').length || undefined },
-    { id: 'infusions', label: 'Infusions', icon: <Syringe size={15} />, badge: patient.infusions?.filter((i) => i.status === 'running' || i.status === 'active').length || undefined },
-    { id: 'labs', label: 'Labs & Biomarkers', icon: <TestTube2 size={15} />, badge: patient.labPanels?.length || undefined },
-    { id: 'abg', label: 'ABG', icon: <Wind size={15} />, badge: patient.abgRecords?.length || undefined },
-    { id: 'ventilation', label: 'Ventilator', icon: <Wind size={15} />, badge: patient.ventilationRecords?.length || (patient.icuVentilator?.mode && patient.icuVentilator.mode !== 'Room Air' ? 1 : undefined) },
-    { id: 'echo', label: 'Echo (TTE)', icon: <Heart size={15} />, badge: patient.echoStudies?.length || undefined },
-    { id: 'imaging', label: 'Radiology & CT', icon: <Film size={15} />, badge: patient.imagingStudies?.length || undefined },
-    { id: 'procedures', label: 'Procedures', icon: <Wrench size={15} />, badge: patient.procedures?.length || undefined },
-    { id: 'calculators', label: 'Calculators', icon: <Calculator size={15} />, badge: patient.clinicalCalculations?.length || undefined },
-    { id: 'rounds', label: 'Daily Rounds', icon: <ClipboardList size={15} />, badge: (patient.dailyNotes?.length || patient.progressNotes?.length) || undefined },
-    { id: 'events', label: 'Events & Code', icon: <Flame size={15} />, badge: patient.clinicalEvents?.length || undefined },
-    { id: 'discharge', label: 'Discharge Plan', icon: <LogOut size={15} /> },
-  ];'''
-          if text[start:end] != new_tabs:
-              text = text[:start] + new_tabs + text[end:]
-              modal.write_text(text)
 
-          overview = Path('src/components/patient/PatientOverview.tsx')
-          text = overview.read_text()
-          marker = '      {/* Edit Form or Read Mode */}'
-          if 'Clinical History Summary' not in text:
-              card = '''      {/* Clinical History Summary */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Clinical History Summary</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Key history is shown here for rapid bedside review.</p>
-          </div>
-          <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase">History</span>
-        </div>
-        <div className="space-y-3">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Chief Complaint</div>
-            <div className="text-xs font-medium text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{patient.chiefComplaint || <span className="text-slate-400 italic">No chief complaint recorded</span>}</div>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">History of Present Illness (HPI)</div>
-            <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{patient.historyOfPresentIllness || <span className="text-slate-400 italic">No HPI recorded</span>}</div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {[
-              ['Past Medical History', patient.pastMedicalHistory],
-              ['Past Surgical History', patient.pastSurgicalHistory],
-              ['Pre-Admission Drug History', patient.drugHistory],
-              ['Family History', patient.familyHistory],
-              ['Social History', patient.socialHistory],
-            ].map(([label, value]) => (
-              <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</div>
-                <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{value || <span className="text-slate-400 italic">None recorded</span>}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-'''
-              if marker not in text:
-                  raise SystemExit('Overview insertion marker not found')
-              overview.write_text(text.replace(marker, card + marker, 1))
-          PY
-          if ! git diff --quiet -- src/components/PatientFileModal.tsx src/components/patient/PatientOverview.tsx; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add src/components/PatientFileModal.tsx src/components/patient/PatientOverview.tsx
-            git commit -m 'feat: patient file layout applied'
-            git push
-          fi
-      - name: Verify requested patient file layout
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          modal = Path('src/components/PatientFileModal.tsx').read_text()
-          overview = Path('src/components/patient/PatientOverview.tsx').read_text()
-          expected = ["id: 'overview'", "id: 'history'", "id: 'ecg'", "id: 'examination'", "id: 'vitals_io'", "id: 'medications'", "id: 'infusions'", "id: 'labs'"]
-          positions = [modal.index(x) for x in expected]
-          assert positions == sorted(positions)
-          assert 'Clinical History Summary' in overview
-          print('Patient file layout verified')
-          PY
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+
       - name: Install dependencies
         run: npm install
+
       - name: Build web app
         run: npm run build
+
       - name: Sync Capacitor Android
         run: npx cap sync android
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
+
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug
+
       - name: Build Release APK
         working-directory: android
         run: ./gradlew assembleRelease
+
       - name: Build Play release bundle
         working-directory: android
         run: ./gradlew bundleRelease
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: CardioVault-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: CardioVault-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+
       - name: Upload Play AAB
         uses: actions/upload-artifact@v4
         with:
