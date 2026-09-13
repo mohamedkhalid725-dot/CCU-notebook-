@@ -6,6 +6,7 @@ on:
       - main
   workflow_dispatch:
 
+# Build trigger for the current main branch.
 jobs:
   build:
     runs-on: ubuntu-latest
