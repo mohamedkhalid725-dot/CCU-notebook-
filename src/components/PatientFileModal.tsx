@@ -24,7 +24,6 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
-  Calculator
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -50,7 +49,6 @@ import { PatientTimeline } from './patient/PatientTimeline';
 import { PatientDischarge } from './patient/PatientDischarge';
 import { PatientVitalsIO } from './patient/PatientVitalsIO';
 import { PatientVentilation } from './patient/PatientVentilation';
-import { PatientClinicalCalculators } from './patient/PatientClinicalCalculators';
 
 interface PatientFileModalProps {
   patient: PatientRecord;
@@ -78,7 +76,6 @@ type TabKey =
   | 'medications'
   | 'infusions'
   | 'procedures'
-  | 'calculators'
   | 'rounds'
   | 'events'
   | 'discharge';
@@ -139,7 +136,6 @@ export default function PatientFileModal({
     { id: 'medications', label: 'Medications', icon: <Pill size={15} />, badge: patient.medications?.filter((m) => m.status === 'active').length || undefined },
     { id: 'infusions', label: 'Infusions', icon: <Syringe size={15} />, badge: patient.infusions?.filter((i) => i.status === 'running' || i.status === 'active').length || undefined },
     { id: 'procedures', label: 'Procedures', icon: <Wrench size={15} />, badge: patient.procedures?.length || undefined },
-    { id: 'calculators', label: 'Calculators', icon: <Calculator size={15} />, badge: patient.clinicalCalculations?.length || undefined },
     { id: 'rounds', label: 'Daily Rounds', icon: <ClipboardList size={15} />, badge: (patient.dailyNotes?.length || patient.progressNotes?.length) || undefined },
     { id: 'events', label: 'Events & Code', icon: <Flame size={15} />, badge: patient.clinicalEvents?.length || undefined },
     { id: 'discharge', label: 'Discharge Plan', icon: <LogOut size={15} /> },
@@ -160,7 +156,6 @@ export default function PatientFileModal({
       {activeTab === 'medications' && <PatientMedications patient={patient} onUpdatePatient={onUpdatePatient} />}
       {activeTab === 'infusions' && <PatientInfusions patient={patient} onUpdatePatient={onUpdatePatient} />}
       {activeTab === 'procedures' && <PatientProcedures patient={patient} onUpdatePatient={onUpdatePatient} />}
-      {activeTab === 'calculators' && <PatientClinicalCalculators patient={patient} onUpdatePatient={onUpdatePatient} />}
       {activeTab === 'rounds' && <PatientDailyRounds patient={patient} onUpdatePatient={onUpdatePatient} />}
       {activeTab === 'events' && <PatientTimeline patient={patient} onUpdatePatient={onUpdatePatient} />}
       {activeTab === 'discharge' && <PatientDischarge patient={patient} onUpdatePatient={onUpdatePatient} />}
@@ -176,11 +171,7 @@ export default function PatientFileModal({
         </header>
         <nav className="flex items-center gap-1.5 px-4 py-2 bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 overflow-x-auto shrink-0 scrollbar-thin">{tabs.map((tab) => { const isActive = activeTab === tab.id; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${isActive ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60'}`}><span className={isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}>{tab.icon}</span><span>{tab.label}</span>{tab.badge !== undefined && <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>{tab.badge}</span>}</button>; })}</nav>
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-          {activeTab === 'calculators' ? (
-            <div className="min-h-full">{renderTabContent()}</div>
-          ) : (
-            <AnimatePresence mode="wait"><motion.div key={activeTab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15, ease: 'easeOut' }}>{renderTabContent()}</motion.div></AnimatePresence>
-          )}
+          <AnimatePresence mode="wait"><motion.div key={activeTab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15, ease: 'easeOut' }}>{renderTabContent()}</motion.div></AnimatePresence>
         </main>
         {showDeleteConfirm && <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="w-full max-w-sm p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center"><div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mx-auto"><AlertTriangle size={24} /></div><div><h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Patient Record?</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">This will permanently delete the clinical file for <strong>{patient.name}</strong>. This cannot be undone.</p></div><div className="flex items-center justify-center gap-2 pt-2"><button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</button><button onClick={() => { onDeletePatient(patient); onClose(); }} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition">Confirm Delete</button></div></div></div>}
         {showDischargeConfirm && <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="w-full max-w-sm p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center"><div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto"><LogOut size={24} /></div><div><h3 className="text-base font-bold text-slate-900 dark:text-white">Discharge {patient.name}?</h3><p className="text-xs text-slate-500 dark:text-slate-400 mt-1">This will release the bed and move the patient file to the Discharged Registry.</p></div><div className="flex items-center justify-center gap-2 pt-2"><button onClick={() => setShowDischargeConfirm(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Cancel</button><button onClick={() => { onDischargePatient(patient); onClose(); }} className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-sm transition">Discharge</button></div></div></div>}
