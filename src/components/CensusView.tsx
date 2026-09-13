@@ -67,6 +67,7 @@ export const CensusView: React.FC<CensusViewProps> = ({
   initialCategory = 'active'
 }) => {
   const [currentView, setCurrentView] = useState<BedsCategory>(initialCategory);
+  useEffect(() => { setCurrentView(initialCategory); }, [initialCategory]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [archiveFilter, setArchiveFilter] = useState<string>('all');
@@ -259,69 +260,68 @@ export const CensusView: React.FC<CensusViewProps> = ({
         </div>
 
         {/* View Switcher & Bed Management Action */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto max-w-full">
-            <button
-              onClick={() => setCurrentView('active')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                currentView === 'active'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Bed className="w-4 h-4" />
-              <span>Active Beds</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                currentView === 'active' ? 'bg-emerald-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}>
-                {occupiedCount}/{beds.length}
-              </span>
-            </button>
+<div className="space-y-2.5 w-full">
+  <div className="grid grid-cols-3 gap-2 w-full">
+    <button
+      type="button"
+      onClick={() => setCurrentView('active')}
+      className={`min-h-[52px] touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-bold transition active:scale-[0.98] ${
+        currentView === 'active'
+          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+      }`}
+      aria-pressed={currentView === 'active'}
+    >
+      <span className="flex items-center gap-1.5"><Bed className="w-4 h-4" />Active Beds</span>
+      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${currentView === 'active' ? 'bg-emerald-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+        {occupiedCount}/{beds.length}
+      </span>
+    </button>
 
-            <button
-              onClick={() => setCurrentView('discharged')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                currentView === 'discharged'
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Discharged</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                currentView === 'discharged' ? 'bg-cyan-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}>
-                {dischargedPatients.length}
-              </span>
-            </button>
+    <button
+      type="button"
+      onClick={() => setCurrentView('discharged')}
+      className={`min-h-[52px] touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-bold transition active:scale-[0.98] ${
+        currentView === 'discharged'
+          ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-cyan-400'
+      }`}
+      aria-pressed={currentView === 'discharged'}
+    >
+      <span className="flex items-center gap-1.5"><LogOut className="w-4 h-4" />Discharged</span>
+      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${currentView === 'discharged' ? 'bg-cyan-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+        {dischargedPatients.length}
+      </span>
+    </button>
 
-            <button
-              onClick={() => setCurrentView('archive')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                currentView === 'archive'
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <FolderArchive className="w-4 h-4" />
-              <span>Archive</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                currentView === 'archive' ? 'bg-amber-700 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}>
-                {dischargedPatients.length}
-              </span>
-            </button>
-          </div>
+    <button
+      type="button"
+      onClick={() => setCurrentView('archive')}
+      className={`min-h-[52px] touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-xs font-bold transition active:scale-[0.98] ${
+        currentView === 'archive'
+          ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-amber-400'
+      }`}
+      aria-pressed={currentView === 'archive'}
+    >
+      <span className="flex items-center gap-1.5"><FolderArchive className="w-4 h-4" />Archive</span>
+      <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${currentView === 'archive' ? 'bg-amber-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+        {dischargedPatients.length}
+      </span>
+    </button>
+  </div>
 
-          <button
-            onClick={() => setIsBedModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 text-xs font-semibold shadow-sm transition"
-            title="Add, rename or remove beds"
-          >
-            <Settings className="w-4 h-4 text-emerald-500" />
-            <span>Manage Beds</span>
-          </button>
-        </div>
+  <button
+    type="button"
+    onClick={() => setIsBedModalOpen(true)}
+    className="w-full min-h-[48px] touch-manipulation select-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 text-sm font-semibold shadow-sm transition active:scale-[0.99]"
+    title="Add, rename or remove beds"
+  >
+    <Settings className="w-5 h-5 text-emerald-500" />
+    <span>Manage Beds</span>
+    <ChevronRight className="w-4 h-4 text-slate-400" />
+  </button>
+</div>
       </div>
 
       {/* ACTIVE BEDS VIEW */}
