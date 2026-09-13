@@ -1,6 +1,8 @@
 name: Enable Native Biometric Unlock
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -46,7 +48,6 @@ jobs:
             if (!Capacitor.isNativePlatform() || !pin) return false;
             const available = await isBiometricAvailable();
             if (!available) return false;
-
             await BiometricAuth.authenticate({
               reason: 'Verify your identity to enable fingerprint unlock for CardioVault',
               cancelTitle: 'Cancel',
@@ -55,25 +56,19 @@ jobs:
               androidSubtitle: 'Authenticate to protect your clinical notebook',
               androidConfirmationRequired: false,
             });
-
             await SecureStorage.set(BIOMETRIC_PIN_KEY, pin);
             return true;
           }
 
           export async function disableBiometricUnlock(): Promise<void> {
             if (!Capacitor.isNativePlatform()) return;
-            try {
-              await SecureStorage.remove(BIOMETRIC_PIN_KEY);
-            } catch {
-              // Nothing to remove.
-            }
+            try { await SecureStorage.remove(BIOMETRIC_PIN_KEY); } catch {}
           }
 
           export async function authenticateBiometricAndGetPin(): Promise<string | null> {
             if (!Capacitor.isNativePlatform()) return null;
             const available = await isBiometricAvailable();
             if (!available) return null;
-
             try {
               await BiometricAuth.authenticate({
                 reason: 'Unlock your confidential ICU & CCU clinical notebook',
@@ -85,9 +80,7 @@ jobs:
               });
               const stored = await SecureStorage.get(BIOMETRIC_PIN_KEY);
               return typeof stored === 'string' && stored.length > 0 ? stored : null;
-            } catch {
-              return null;
-            }
+            } catch { return null; }
           }
 
           export async function clearBiometricCredential(): Promise<void> {
@@ -104,14 +97,12 @@ jobs:
           s = s.replace("import { setupNewPin, saveSecuritySettings, exportEncryptedBackup, importEncryptedBackup, wipeAllLocalData } from '../services/storage';", "import { setupNewPin, saveSecuritySettings, exportEncryptedBackup, importEncryptedBackup, wipeAllLocalData } from '../services/storage';\nimport { enableBiometricUnlock, disableBiometricUnlock, isBiometricAvailable } from '../services/biometric';")
           s = s.replace("  const [biometric, setBiometric] = useState<boolean>(false);", "  const [biometric, setBiometric] = useState<boolean>(securitySettings.biometricEnabled);\n  const [biometricStatus, setBiometricStatus] = useState<{ text: string; error?: boolean } | null>(null);")
           old = """  const handleSavePreferences = () => {\n    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: false };\n    saveSecuritySettings(updated);\n    onUpdateSecurity(updated);\n    setBackupStatus('Security preferences saved');\n    window.setTimeout(() => setBackupStatus(''), 2500);\n  };"""
-          new = """  const handleToggleBiometric = async () => {\n    setBiometricStatus(null);\n    if (biometric) {\n      await disableBiometricUnlock();\n      setBiometric(false);\n      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: false };\n      saveSecuritySettings(updated);\n      onUpdateSecurity(updated);\n      setBiometricStatus({ text: 'Biometric unlock disabled.' });\n      return;\n    }\n\n    if (!securitySettings.isPinSet || !currentActivePin) {\n      setBiometricStatus({ text: 'Set and unlock with your PIN first.', error: true });\n      return;\n    }\n\n    try {\n      const available = await isBiometricAvailable();\n      if (!available) {\n        setBiometricStatus({ text: 'No enrolled biometric authentication is available on this device.', error: true });\n        return;\n      }\n      const enabled = await enableBiometricUnlock(currentActivePin);\n      if (!enabled) throw new Error('Biometric authentication unavailable');\n      setBiometric(true);\n      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: true };\n      saveSecuritySettings(updated);\n      onUpdateSecurity(updated);\n      setBiometricStatus({ text: 'Fingerprint / biometric unlock enabled successfully.' });\n    } catch {\n      setBiometricStatus({ text: 'Biometric verification was cancelled or failed. PIN remains active.', error: true });\n    }\n  };\n\n  const handleSavePreferences = () => {\n    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: biometric };\n    saveSecuritySettings(updated);\n    onUpdateSecurity(updated);\n    setBackupStatus('Security preferences saved');\n    window.setTimeout(() => setBackupStatus(''), 2500);\n  };"""
-          if old not in s:
-              raise SystemExit('save preferences block not found')
+          new = """  const handleToggleBiometric = async () => {\n    setBiometricStatus(null);\n    if (biometric) {\n      await disableBiometricUnlock();\n      setBiometric(false);\n      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: false };\n      saveSecuritySettings(updated);\n      onUpdateSecurity(updated);\n      setBiometricStatus({ text: 'Biometric unlock disabled.' });\n      return;\n    }\n    if (!securitySettings.isPinSet || !currentActivePin) {\n      setBiometricStatus({ text: 'Set and unlock with your PIN first.', error: true });\n      return;\n    }\n    try {\n      const available = await isBiometricAvailable();\n      if (!available) {\n        setBiometricStatus({ text: 'No enrolled biometric authentication is available on this device.', error: true });\n        return;\n      }\n      const enabled = await enableBiometricUnlock(currentActivePin);\n      if (!enabled) throw new Error('Biometric authentication unavailable');\n      setBiometric(true);\n      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: true };\n      saveSecuritySettings(updated);\n      onUpdateSecurity(updated);\n      setBiometricStatus({ text: 'Fingerprint / biometric unlock enabled successfully.' });\n    } catch {\n      setBiometricStatus({ text: 'Biometric verification was cancelled or failed. PIN remains active.', error: true });\n    }\n  };\n\n  const handleSavePreferences = () => {\n    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: biometric };\n    saveSecuritySettings(updated);\n    onUpdateSecurity(updated);\n    setBackupStatus('Security preferences saved');\n    window.setTimeout(() => setBackupStatus(''), 2500);\n  };"""
+          if old not in s: raise SystemExit('save preferences block not found')
           s = s.replace(old, new)
           old_bio = """            <div className=\"flex items-center justify-between pt-2 border-t border-slate-800/80\">\n              <div className=\"flex items-center gap-2\"><Fingerprint className=\"w-4 h-4 text-slate-500\" /><div><span className=\"font-semibold text-slate-300\">Biometric / Fingerprint Unlock</span><p className=\"text-[10px] text-slate-500\">Native biometric authentication is not available in this build. PIN remains the secure unlock method.</p></div></div>\n              <button type=\"button\" role=\"switch\" aria-checked={false} disabled onClick={() => setBiometric(v => !v)} className=\"relative w-11 h-6 rounded-full border bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed touch-manipulation\" title=\"Native biometric authentication is not available in this build\">\n                <span className=\"absolute top-0.5 w-5 h-5 rounded-full bg-white shadow translate-x-0.5\" />\n              </button>\n            </div>"""
           new_bio = """            <div className=\"flex items-center justify-between pt-2 border-t border-slate-800/80 gap-3\">\n              <div className=\"flex items-center gap-2 min-w-0\"><Fingerprint className={`w-4 h-4 ${biometric ? 'text-emerald-400' : 'text-slate-500'}`} /><div><span className=\"font-semibold text-slate-300\">Biometric / Fingerprint Unlock</span><p className=\"text-[10px] text-slate-500\">Uses Android/iOS native biometric authentication. Your PIN remains the fallback.</p></div></div>\n              <button type=\"button\" role=\"switch\" aria-checked={biometric} onClick={handleToggleBiometric} className={`relative w-11 h-6 rounded-full border transition touch-manipulation ${biometric ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-800 border-slate-700'}`} title=\"Toggle biometric unlock\">\n                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${biometric ? 'translate-x-5' : 'translate-x-0.5'}`} />\n              </button>\n            </div>\n            {biometricStatus && <div className={`p-2 rounded-lg text-[11px] ${biometricStatus.error ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>{biometricStatus.text}</div>}"""
-          if old_bio not in s:
-              raise SystemExit('biometric UI block not found')
+          if old_bio not in s: raise SystemExit('biometric UI block not found')
           s = s.replace(old_bio, new_bio)
           s = s.replace("  const handleWipeData = () => { wipeAllLocalData(); window.location.reload(); };", "  const handleWipeData = async () => { await disableBiometricUnlock(); wipeAllLocalData(); window.location.reload(); };")
           p.write_text(s)
@@ -125,7 +116,7 @@ jobs:
           s = p.read_text()
           s = s.replace("import React, { useState } from 'react';", "import React, { useEffect, useState } from 'react';")
           s = s.replace("import { AppSecuritySettings } from '../types';", "import { AppSecuritySettings } from '../types';\nimport { authenticateBiometricAndGetPin, isBiometricAvailable } from '../services/biometric';")
-          s = s.replace("  onSetupInitialPin?: (pin: string) => Promise<void>;", "  onSetupInitialPin?: (pin: string) => Promise<void>;\n  onBiometricUnlock?: (pin: string) => Promise<void>;" )
+          s = s.replace("  onSetupInitialPin?: (pin: string) => Promise<void>;", "  onSetupInitialPin?: (pin: string) => Promise<void>;\n  onBiometricUnlock?: (pin: string) => Promise<void>;")
           s = s.replace("  onSetupInitialPin\n}) => {", "  onSetupInitialPin,\n  onBiometricUnlock\n}) => {")
           marker = "  const [errorMsg, setErrorMsg] = useState('');\n"
           insert = marker + """
@@ -179,7 +170,6 @@ jobs:
           if "import { clearBiometricCredential } from './biometric';" not in s:
               s = s.replace("import { encryptData, decryptData, hashPin, generateSalt } from './crypto';", "import { encryptData, decryptData, hashPin, generateSalt } from './crypto';\nimport { clearBiometricCredential } from './biometric';")
           s = s.replace("  const currentSecurity = getSecuritySettings();\n  const newSecurity: AppSecuritySettings = {", "  await clearBiometricCredential();\n  const currentSecurity = getSecuritySettings();\n  const newSecurity: AppSecuritySettings = {")
-          s = s.replace("  localStorage.removeItem(STORAGE_KEY_SECURITY);\n  localStorage.removeItem(STORAGE_KEY_FIELDS);", "  localStorage.removeItem(STORAGE_KEY_SECURITY);\n  localStorage.removeItem(STORAGE_KEY_FIELDS);")
           p.write_text(s)
           PY
 
@@ -189,8 +179,8 @@ jobs:
           from pathlib import Path
           p = Path('src/App.tsx')
           s = p.read_text()
-          old = """    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} onSetupInitialPin={handleInitialPinSetup} />;"""
-          new = """    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} onBiometricUnlock={handleUnlockSuccess} onSetupInitialPin={handleInitialPinSetup} />;"""
+          old = "    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} onSetupInitialPin={handleInitialPinSetup} />;"
+          new = "    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} onBiometricUnlock={handleUnlockSuccess} onSetupInitialPin={handleInitialPinSetup} />;"
           if old not in s: raise SystemExit('App LockScreen wiring not found')
           s = s.replace(old, new, 1)
           p.write_text(s)
@@ -211,5 +201,5 @@ jobs:
         if: always()
         run: |
           git rm .github/workflows/enable-native-biometric.yml || true
-          git commit -m "chore: remove biometric patch workflow" || true
+          git commit -m "chore: remove temporary biometric workflow" || true
           git push || true
