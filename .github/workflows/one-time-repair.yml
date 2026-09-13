@@ -6,11 +6,11 @@ permissions:
   contents: write
 jobs:
   repair:
-    if: github.event.head_commit.message != 'repair: calculators + pdf'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply fixes
+      - name: Apply fixes once
+        if: github.event.head_commit.message != 'repair: calculators + pdf'
         run: |
           python3 - <<'PY'
           from pathlib import Path
