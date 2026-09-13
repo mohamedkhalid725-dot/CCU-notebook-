@@ -39,3 +39,8 @@
 #clinical-calculators label span {
   color: #e2e8f0 !important;
 }
+
+/* The PDF now uses Current Plan as the single plan section; hide the legacy orange disposition card. */
+#printable-report .bg-amber-50.border-amber-200 {
+  display: none !important;
+}
