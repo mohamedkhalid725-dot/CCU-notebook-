@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, X, Key, Fingerprint, Clock, Download, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { setupNewPin, saveSecuritySettings, exportEncryptedBackup, importEncryptedBackup, wipeAllLocalData } from '../services/storage';
+import { enableBiometricUnlock, disableBiometricUnlock, isBiometricAvailable } from '../services/biometric';
 import { AppSecuritySettings, PatientRecord } from '../types';
 
 interface SecuritySettingsModalProps {
@@ -19,7 +20,8 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
   const [pinStatusMsg, setPinStatusMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [autoLockMin, setAutoLockMin] = useState<number>(securitySettings.autoLockMinutes);
   // Native biometric authentication is not implemented yet; keep it disabled rather than exposing a simulated unlock.
-  const [biometric, setBiometric] = useState<boolean>(false);
+  const [biometric, setBiometric] = useState<boolean>(securitySettings.biometricEnabled);
+  const [biometricStatus, setBiometricStatus] = useState<{ text: string; error?: boolean } | null>(null);
   const [backupPassphrase, setBackupPassphrase] = useState('');
   const [backupStatus, setBackupStatus] = useState('');
   const [importPassphrase, setImportPassphrase] = useState('');
@@ -33,12 +35,43 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
       await setupNewPin(newPin, currentActivePin);
       setPinStatusMsg({ text: 'PIN updated & database re-encrypted successfully!', error: false });
       setNewPin(''); setConfirmPin(''); setShowChangePin(false);
-      onUpdateSecurity({ ...securitySettings, isPinSet: true });
+      onUpdateSecurity({ ...securitySettings, isPinSet: true, biometricEnabled: false });
     } catch { setPinStatusMsg({ text: 'Failed to update PIN', error: true }); }
   };
 
+  const handleToggleBiometric = async () => {
+    setBiometricStatus(null);
+    if (biometric) {
+      await disableBiometricUnlock();
+      setBiometric(false);
+      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: false };
+      saveSecuritySettings(updated);
+      onUpdateSecurity(updated);
+      setBiometricStatus({ text: 'Biometric unlock disabled.' });
+      return;
+    }
+    if (!securitySettings.isPinSet || !currentActivePin) {
+      setBiometricStatus({ text: 'Set and unlock with your PIN first.', error: true });
+      return;
+    }
+    try {
+      if (!(await isBiometricAvailable())) {
+        setBiometricStatus({ text: 'No enrolled biometric authentication is available on this device.', error: true });
+        return;
+      }
+      if (!(await enableBiometricUnlock(currentActivePin))) throw new Error('unavailable');
+      setBiometric(true);
+      const updated: AppSecuritySettings = { ...securitySettings, biometricEnabled: true };
+      saveSecuritySettings(updated);
+      onUpdateSecurity(updated);
+      setBiometricStatus({ text: 'Fingerprint / biometric unlock enabled successfully.' });
+    } catch {
+      setBiometricStatus({ text: 'Biometric verification was cancelled or failed. PIN remains active.', error: true });
+    }
+  };
+
   const handleSavePreferences = () => {
-    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: false };
+    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: biometric };
     saveSecuritySettings(updated);
     onUpdateSecurity(updated);
     setBackupStatus('Security preferences saved');
@@ -78,7 +111,7 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
     reader.readAsText(file);
   };
 
-  const handleWipeData = () => { wipeAllLocalData(); window.location.reload(); };
+  const handleWipeData = async () => { await disableBiometricUnlock(); wipeAllLocalData(); window.location.reload(); };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto pointer-events-auto touch-manipulation" style={{ WebkitTapHighlightColor: 'transparent' }}>
@@ -109,12 +142,13 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
 
             {pinStatusMsg && <div className={`p-2 rounded-lg text-xs ${pinStatusMsg.error ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>{pinStatusMsg.text}</div>}
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-              <div className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-slate-500" /><div><span className="font-semibold text-slate-300">Biometric / Fingerprint Unlock</span><p className="text-[10px] text-slate-500">Native biometric authentication is not available in this build. PIN remains the secure unlock method.</p></div></div>
-              <button type="button" role="switch" aria-checked={false} disabled onClick={() => setBiometric(v => !v)} className="relative w-11 h-6 rounded-full border bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed touch-manipulation" title="Native biometric authentication is not available in this build">
-                <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow translate-x-0.5" />
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 gap-3">
+              <div className="flex items-center gap-2 min-w-0"><Fingerprint className={`w-4 h-4 ${biometric ? 'text-emerald-400' : 'text-slate-500'}`} /><div><span className="font-semibold text-slate-300">Biometric / Fingerprint Unlock</span><p className="text-[10px] text-slate-500">Uses Android/iOS native biometric authentication. Your PIN remains the fallback.</p></div></div>
+              <button type="button" role="switch" aria-checked={biometric} onClick={handleToggleBiometric} className={`relative w-11 h-6 rounded-full border transition touch-manipulation ${biometric ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-800 border-slate-700'}`} title="Toggle biometric unlock">
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${biometric ? 'translate-x-5' : 'translate-x-0.5'}`} />
               </button>
             </div>
+            {biometricStatus && <div className={`p-2 rounded-lg text-[11px] ${biometricStatus.error ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>{biometricStatus.text}</div>}
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 gap-3">
               <div className="flex items-center gap-2 min-w-0"><Clock className="w-4 h-4 text-amber-400 shrink-0" /><div><span className="font-semibold text-slate-200">Auto-Lock Timer</span><p className="text-[10px] text-slate-400">Lock notebook on inactivity or tab change</p></div></div>

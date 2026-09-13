@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lock, Shield, Delete, CheckCircle2, AlertCircle } from 'lucide-react';
 import { hashPin } from '../services/crypto';
 import { AppSecuritySettings } from '../types';
+import { authenticateBiometricAndGetPin, isBiometricAvailable } from '../services/biometric';
 
 interface LockScreenProps {
   securitySettings: AppSecuritySettings;
@@ -22,6 +23,37 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [setupStep, setSetupStep] = useState<'enter' | 'confirm'>('enter');
   const [errorMsg, setErrorMsg] = useState('');
+
+const [biometricAvailable, setBiometricAvailable] = useState(false);
+const [biometricBusy, setBiometricBusy] = useState(false);
+
+useEffect(() => {
+  let mounted = true;
+  if (!isSettingUp && securitySettings.biometricEnabled) {
+    isBiometricAvailable().then((available) => {
+      if (mounted) setBiometricAvailable(available);
+    });
+  }
+  return () => { mounted = false; };
+}, [isSettingUp, securitySettings.biometricEnabled]);
+
+const handleBiometricUnlock = async () => {
+  if (!biometricAvailable || biometricBusy) return;
+  setBiometricBusy(true);
+  setErrorMsg('');
+  try {
+    const storedPin = await authenticateBiometricAndGetPin();
+    if (!storedPin) {
+      setErrorMsg('Biometric unlock failed. Enter your PIN.');
+      return;
+    }
+    await triggerUnlock(storedPin);
+  } catch {
+    setErrorMsg('Biometric unlock failed. Enter your PIN.');
+  } finally {
+    setBiometricBusy(false);
+  }
+};
 
   const handleDigit = (digit: string) => {
     if (pin.length < 6) {
@@ -146,6 +178,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           >
             <CheckCircle2 className="w-4 h-4" />
             {setupStep === 'enter' ? 'Continue' : 'Set PIN & Encrypt'}
+          </button>
+        )}
+
+        {!isSettingUp && securitySettings.biometricEnabled && biometricAvailable && (
+          <button type="button" onClick={handleBiometricUnlock} disabled={biometricBusy} className="w-full max-w-xs mb-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-semibold text-sm shadow-lg transition active:scale-98 flex items-center justify-center gap-2">
+            <span className="text-lg">☝️</span>
+            {biometricBusy ? 'Waiting for fingerprint…' : 'Unlock with Fingerprint'}
           </button>
         )}
 
