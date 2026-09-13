@@ -38,3 +38,5 @@ jobs:
         with:
           name: CardioVault-CURRENT-FIXED
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # Rebuild explicitly from the current main source so the APK cannot be stale.
