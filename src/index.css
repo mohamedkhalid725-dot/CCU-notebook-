@@ -65,3 +65,12 @@
 #printable-report .bg-amber-50.border-amber-200 {
   display: none !important;
 }
+
+/* Patient PDF: remove the Latest Progress Notes card and let Clinical Calculators use the full row. */
+#printable-report .grid.grid-cols-1.md\:grid-cols-5.gap-3.mt-3.cv-break:has(> .md\:col-span-3) > .md\:col-span-3 {
+  display: none !important;
+}
+
+#printable-report .grid.grid-cols-1.md\:grid-cols-5.gap-3.mt-3.cv-break:has(> .md\:col-span-3) > .md\:col-span-2 {
+  grid-column: span 5 / span 5 !important;
+}
