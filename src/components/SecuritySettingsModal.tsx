@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { AppSecuritySettings, PatientRecord } from '../types';
 import { Shield, X, Key, Fingerprint, Clock, Download, Upload, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { setupNewPin, saveSecuritySettings, exportEncryptedBackup, importEncryptedBackup, wipeAllLocalData } from '../services/storage';
+import { AppSecuritySettings, PatientRecord } from '../types';
 
 interface SecuritySettingsModalProps {
   securitySettings: AppSecuritySettings;
@@ -18,7 +18,8 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
   const [confirmPin, setConfirmPin] = useState('');
   const [pinStatusMsg, setPinStatusMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [autoLockMin, setAutoLockMin] = useState<number>(securitySettings.autoLockMinutes);
-  const [biometric, setBiometric] = useState<boolean>(securitySettings.biometricEnabled);
+  // Native biometric authentication is not implemented yet; keep it disabled rather than exposing a simulated unlock.
+  const [biometric, setBiometric] = useState<boolean>(false);
   const [backupPassphrase, setBackupPassphrase] = useState('');
   const [backupStatus, setBackupStatus] = useState('');
   const [importPassphrase, setImportPassphrase] = useState('');
@@ -37,7 +38,7 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
   };
 
   const handleSavePreferences = () => {
-    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: biometric };
+    const updated: AppSecuritySettings = { ...securitySettings, autoLockMinutes: autoLockMin, biometricEnabled: false };
     saveSecuritySettings(updated);
     onUpdateSecurity(updated);
     setBackupStatus('Security preferences saved');
@@ -109,9 +110,9 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({ se
             {pinStatusMsg && <div className={`p-2 rounded-lg text-xs ${pinStatusMsg.error ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>{pinStatusMsg.text}</div>}
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-              <div className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-emerald-400" /><div><span className="font-semibold text-slate-200">Biometric / Fingerprint Unlock</span><p className="text-[10px] text-slate-400">Unlock quickly using device biometrics</p></div></div>
-              <button type="button" role="switch" aria-checked={biometric} onClick={() => setBiometric(v => !v)} className={`relative w-11 h-6 rounded-full border transition-colors touch-manipulation ${biometric ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-800 border-slate-700'}`} title={biometric ? 'Biometric unlock enabled' : 'Biometric unlock disabled'}>
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${biometric ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              <div className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-slate-500" /><div><span className="font-semibold text-slate-300">Biometric / Fingerprint Unlock</span><p className="text-[10px] text-slate-500">Native biometric authentication is not available in this build. PIN remains the secure unlock method.</p></div></div>
+              <button type="button" role="switch" aria-checked={false} disabled onClick={() => setBiometric(v => !v)} className="relative w-11 h-6 rounded-full border bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed touch-manipulation" title="Native biometric authentication is not available in this build">
+                <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow translate-x-0.5" />
               </button>
             </div>
 
