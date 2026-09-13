@@ -154,6 +154,58 @@ export const PatientOverview: React.FC<PatientOverviewProps> = ({
         </div>
       </div>
 
+      {/* Echo Summary */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <HeartPulse size={16} className="text-emerald-600 dark:text-emerald-400" />
+              Echo Summary
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Latest transthoracic / bedside echocardiography findings.</p>
+          </div>
+          <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase">TTE / POCUS</span>
+        </div>
+        {patient.echoStudies?.length ? (() => {
+          const echo = patient.echoStudies[0];
+          const rows = [
+            ['EF', echo.ef],
+            ['LV Dimensions', echo.lvDimensions],
+            ['LV Systolic Function', echo.lvSystolicFunction],
+            ['RV Assessment', echo.rvAssessment],
+            ['TAPSE', echo.tapse],
+            ['LA / RA', echo.laRa],
+            ['RWMA', echo.rwma],
+            ['Diastolic Function', echo.diastolicFunction],
+            ['Valvular Assessment', echo.valvularAssessment],
+            ['PASP', echo.pasp],
+            ['IVC', echo.ivc],
+            ['Pericardium', echo.pericardium],
+            ['Other Measurements', echo.otherMeasurements],
+            ['Findings', echo.findings],
+            ['Impression', echo.impression],
+          ].filter(([, value]) => value);
+          return (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</div>
+                    <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{value}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 text-[10px] text-slate-400">
+                <span>Study: {echo.timestamp}</span>
+                {echo.imageUrl && <span>• Image available in Echo tab</span>}
+              </div>
+            </>
+          );
+        })() : (
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 text-xs text-slate-400 italic">No echocardiography study recorded.</div>
+        )}
+      </div>
+
       {/* Edit Form or Read Mode */}
       {isEditing ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
@@ -323,6 +375,47 @@ export const PatientOverview: React.FC<PatientOverviewProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Recent Procedures & Critical Interventions */}
+          <div className="md:col-span-2 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Wrench size={14} className="text-emerald-500" />
+                  <span>Recent Procedures & Critical Interventions</span>
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-1">Procedures and major bedside interventions documented for this admission.</p>
+              </div>
+              <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                {patient.procedures?.length || 0} recorded
+              </span>
+            </div>
+            {patient.procedures && patient.procedures.length > 0 ? (
+              <div className="space-y-2">
+                {patient.procedures.slice(0, 3).map((proc) => (
+                  <div key={proc.id} className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Wrench size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{proc.procedureName || proc.name || 'Procedure / Intervention'}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {proc.timestamp || proc.date || 'Date not recorded'}{proc.operator ? ` • ${proc.operator}` : ''}{proc.site ? ` • ${proc.site}` : ''}
+                      </p>
+                      {proc.details && <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{proc.details}</p>}
+                    </div>
+                    <ChevronRight size={14} className="text-slate-400 shrink-0 mt-1" />
+                  </div>
+                ))}
+                {patient.procedures.length > 3 && <p className="text-[10px] text-slate-400 text-center pt-1">+ {patient.procedures.length - 3} more — open Procedures tab for full record</p>}
+              </div>
+            ) : (
+              <div className="py-4 text-center rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-slate-200 dark:border-slate-800">
+                <Wrench size={20} className="mx-auto text-slate-400" />
+                <p className="text-xs text-slate-500 mt-1">No procedures or major interventions recorded yet.</p>
+              </div>
+            )}
           </div>
 
           {/* Team & Disposition Card */}
