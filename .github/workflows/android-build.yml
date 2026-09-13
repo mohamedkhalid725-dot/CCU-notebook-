@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,16 +18,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Add Echo Summary to Patient Overview
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          p = Path('src/components/patient/PatientOverview.tsx')
-          s = p.read_text()
-          if 'Echo Summary' not in s:
-              marker = '      {/* Edit Form or Read Mode */}'
-              if marker not in s:
-                  raise SystemExit('Overview insertion marker not found')
-              card = r'''      {/* Echo Summary */}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'src/components/patient/PatientOverview.tsx';
+            let local = fs.readFileSync(path, 'utf8');
+            if (!local.includes('Echo Summary')) {
+              const marker = '      {/* Edit Form or Read Mode */}';
+              if (!local.includes(marker)) throw new Error('Overview insertion marker not found');
+              const card = `      {/* Echo Summary */}
           <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -76,10 +79,29 @@ jobs:
             )}
           </div>
 
-'''
-              s = s.replace(marker, card + marker, 1)
-              p.write_text(s)
-          PY
+`;
+              local = local.replace(marker, card + marker, 1);
+              fs.writeFileSync(path, local);
+            }
+
+            const current = await github.rest.repos.getContent({owner: context.repo.owner, repo: context.repo.repo, path, ref: context.sha});
+            const remote = Buffer.from(current.data.content, 'base64').toString('utf8');
+            if (remote.includes('Echo Summary')) {
+              core.info('Echo Summary already committed.');
+            } else {
+              const patched = remote.replace('      {/* Edit Form or Read Mode */}', local.includes('Echo Summary') ? local.slice(local.indexOf('      {/* Echo Summary */}')) : '');
+              if (!patched.includes('Echo Summary')) throw new Error('Patch generation failed');
+              await github.rest.repos.createOrUpdateFileContents({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path,
+                message: 'feat: add echo summary to patient overview',
+                content: Buffer.from(patched, 'utf8').toString('base64'),
+                sha: current.data.sha,
+                branch: 'main'
+              });
+              core.info('Echo Summary committed to main.');
+            }
 
       - name: Upload Patched Patient Overview Source
         uses: actions/upload-artifact@v4
