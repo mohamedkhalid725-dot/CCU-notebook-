@@ -252,7 +252,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [activePin]);
+  }, []);
 
   // =========================================================
   // Android Native Hardware Back Button Handling
@@ -922,7 +922,7 @@ export default function App() {
     );
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden && securitySettings.autoLockMinutes !== -1) {
         handleLockApp();
       }
     };
@@ -1457,7 +1457,13 @@ export default function App() {
   }
 
   if (!isUnlocked) {
-    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} />;
+    const handleInitialPinSetup = async (pin: string) => {
+      const { setupNewPin } = await import('./services/storage');
+      await setupNewPin(pin);
+      await handleUnlockSuccess(pin);
+      setSecuritySettings(getSecuritySettings());
+    };
+    return <LockScreen securitySettings={securitySettings} onUnlockSuccess={handleUnlockSuccess} onSetupInitialPin={handleInitialPinSetup} />;
   }
 
   return (
