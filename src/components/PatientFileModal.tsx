@@ -127,14 +127,14 @@ export default function PatientFileModal({
 
   const tabs: Array<{ id: TabKey; label: string; icon: React.ReactNode; badge?: number | string }> = [
     { id: 'overview', label: 'Overview', icon: <User size={15} /> },
-    { id: 'vitals_io', label: 'Vitals & I/O', icon: <Droplet size={15} />, badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined },
-    { id: 'ventilation', label: 'Ventilator', icon: <Wind size={15} />, badge: patient.ventilationRecords?.length || (patient.icuVentilator?.mode && patient.icuVentilator.mode !== 'Room Air' ? 1 : undefined) },
     { id: 'history', label: 'History', icon: <History size={15} /> },
+    { id: 'ecg', label: '12-Lead ECG', icon: <Activity size={15} />, badge: patient.ecgRecords?.length || undefined },
+    { id: 'vitals_io', label: 'Vitals & I/O', icon: <Droplet size={15} />, badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined },
     { id: 'examination', label: 'Physical Exam', icon: <Stethoscope size={15} /> },
     { id: 'labs', label: 'Labs & Biomarkers', icon: <TestTube2 size={15} />, badge: patient.labPanels?.length || undefined },
-    { id: 'abg', label: 'ABG', icon: <Wind size={15} />, badge: patient.abgRecords?.length || undefined },
-    { id: 'ecg', label: '12-Lead ECG', icon: <Activity size={15} />, badge: patient.ecgRecords?.length || undefined },
     { id: 'echo', label: 'Echo (TTE)', icon: <Heart size={15} />, badge: patient.echoStudies?.length || undefined },
+    { id: 'ventilation', label: 'Ventilator', icon: <Wind size={15} />, badge: patient.ventilationRecords?.length || (patient.icuVentilator?.mode && patient.icuVentilator.mode !== 'Room Air' ? 1 : undefined) },
+    { id: 'abg', label: 'ABG', icon: <Wind size={15} />, badge: patient.abgRecords?.length || undefined },
     { id: 'imaging', label: 'Radiology & CT', icon: <Film size={15} />, badge: patient.imagingStudies?.length || undefined },
     { id: 'medications', label: 'Medications', icon: <Pill size={15} />, badge: patient.medications?.filter((m) => m.status === 'active').length || undefined },
     { id: 'infusions', label: 'Infusions', icon: <Syringe size={15} />, badge: patient.infusions?.filter((i) => i.status === 'running' || i.status === 'active').length || undefined },
