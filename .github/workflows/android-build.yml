@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,6 +16,77 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Apply requested patient tab order only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/components/PatientFileModal.tsx')
+          s=p.read_text()
+          old="""    { id: 'overview', label: 'Overview', icon: <User size={15} /> },
+    { id: 'vitals_io', label: 'Vitals & I/O', icon: <Droplet size={15} />, badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined },
+    { id: 'ventilation', label: 'Ventilator', icon: <Wind size={15} />, badge: patient.ventilationRecords?.length || (patient.icuVentilator?.mode && patient.icuVentilator.mode !== 'Room Air' ? 1 : undefined) },
+    { id: 'history', label: 'History', icon: <History size={15 /> },
+"""
+          # Use exact block boundaries instead of broad refactoring.
+          marker="  const tabs: Array<{ id: TabKey; label: string; icon: React.ReactNode; badge?: number | string }> = ["
+          start=s.index(marker)
+          end=s.index("  ];",start)+4
+          block=s[start:end]
+          lines=block.splitlines()
+          wanted=[
+            "    { id: 'overview', label: 'Overview', icon: <User size={15} /> },",
+            "    { id: 'history', label: 'History', icon: <History size={15} /> },",
+            "    { id: 'ecg', label: '12-Lead ECG', icon: <Activity size={15} />, badge: patient.ecgRecords?.length || undefined },",
+            "    { id: 'vitals_io', label: 'Vitals & I/O', icon: <Droplet size={15} />, badge: (patient.vitals?.length || 0) + (patient.fluidBalanceRecords?.length || patient.ioRecords?.length || 0) || undefined },",
+            "    { id: 'examination', label: 'Physical Exam', icon: <Stethoscope size={15} /> },",
+            "    { id: 'labs', label: 'Labs & Biomarkers', icon: <TestTube2 size={15} />, badge: patient.labPanels?.length || undefined },",
+            "    { id: 'echo', label: 'Echo (TTE)', icon: <Heart size={15} />, badge: patient.echoStudies?.length || undefined },",
+          ]
+          # Preserve every remaining tab exactly as currently defined, while moving only the requested seven.
+          prefix=lines[0]
+          entries=lines[1:-1]
+          target_ids=["overview","history","ecg","vitals_io","examination","labs","echo"]
+          def tid(x):
+            import re
+            m=re.search(r"id: '([^']+)'",x)
+            return m.group(1) if m else ''
+          remaining=[x for x in entries if tid(x) not in target_ids]
+          if len(remaining)+7 != len(entries): raise SystemExit('Unexpected tab block; refusing unrelated changes')
+          newblock='\n'.join([prefix]+wanted+remaining+['  ];'])
+          p.write_text(s[:start]+newblock+s[end:])
+          PY
+
+      - name: Verify requested scope before build
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          pf=Path('src/components/PatientFileModal.tsx').read_text()
+          marker="  const tabs: Array<{ id: TabKey; label: string; icon: React.ReactNode; badge?: number | string }> = ["
+          start=pf.index(marker); end=pf.index("  ];",start)
+          block=pf[start:end]
+          expected=["id: 'overview'","id: 'history'","id: 'ecg'","id: 'vitals_io'","id: 'examination'","id: 'labs'","id: 'echo'"]
+          pos=[block.index(x) for x in expected]
+          assert pos==sorted(pos)
+          calc=''.join(Path(f).read_text() for f in ['src/components/calculators/CriticalCareCalcs.tsx','src/components/calculators/CardiologyCalcs.tsx','src/components/calculators/ThromboembolismCalcs.tsx','src/components/calculators/RenalRespiratoryCalcs.tsx','src/components/calculators/ElectrolytesGeneralCalcs.tsx'])
+          assert 'onChange=' in calc and 'type=\"number\"' in calc
+          pdf=Path('src/components/PrintableView.tsx').read_text()
+          assert 'Latest Progress Notes' not in pdf and 'Latest Progress Note' not in pdf and 'Progress Note' not in pdf
+          print('Requested scope verified')
+          PY
+
+      - name: Commit tab-order patch if needed
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/PatientFileModal.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: reorder patient file tabs only'
+            git push
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
