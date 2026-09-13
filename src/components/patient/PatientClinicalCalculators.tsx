@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Calculator, Clock, History, Save, Trash2 } from 'lucide-react';
 import { ClinicalCalculatorRecord, PatientRecord } from '../../types';
 
@@ -48,6 +48,10 @@ export const PatientClinicalCalculators: React.FC<Props> = ({ patient, onUpdateP
   });
 
   const set = (key: string, value: number | string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
+  const formRef = useRef(form);
+  const setRef = useRef(set);
+  formRef.current = form;
+  setRef.current = set;
 
   const result = useMemo(() => {
     let score = 0;
@@ -129,11 +133,12 @@ export const PatientClinicalCalculators: React.FC<Props> = ({ patient, onUpdateP
   const removeResult = (id: string) => onUpdatePatient({ ...patient, clinicalCalculations: (patient.clinicalCalculations || []).filter(item => item.id !== id), lastUpdated: new Date().toISOString() });
 
   const Toggle = ({ label, field }: { label: string; field: string }) => <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={Boolean(form[field])} onChange={e => set(field, e.target.checked)} /><span>{label}</span></label>;
-  const Input = ({ field, label, step = '1' }: { field: string; label: string; step?: string }) => {
+  const Input = useRef(({ field, label, step = '1' }: { field: string; label: string; step?: string }) => {
+    const currentForm = formRef.current;
     const isDecimal = step !== '1';
-    const value = form[field] === undefined || form[field] === '' ? '' : String(form[field]);
-    return <label className="text-xs block">{label}<input type="number" inputMode={isDecimal ? 'decimal' : 'numeric'} step={step} autoComplete="off" autoCorrect="off" spellCheck={false} value={value} onChange={e => set(field, e.target.value)} className="mt-1 w-full min-h-11 px-2.5 py-2 rounded-lg border bg-slate-50 dark:bg-slate-800 dark:border-slate-700" /></label>;
-  };
+    const value = currentForm[field] === undefined || currentForm[field] === '' ? '' : String(currentForm[field]);
+    return <label className="text-xs block">{label}<input type="number" inputMode={isDecimal ? 'decimal' : 'numeric'} step={step} autoComplete="off" autoCorrect="off" spellCheck={false} value={value} onChange={e => setRef.current(field, e.target.value)} className="mt-1 w-full min-h-11 px-2.5 py-2 rounded-lg border bg-slate-50 dark:bg-slate-800 dark:border-slate-700" /></label>;
+  }).current;
   const SelectScore = ({ field, label, options }: { field: string; label: string; options: string[] }) => <label className="text-xs block">{label}<select value={Number(form[field])} onChange={e => set(field, Number(e.target.value))} className="mt-1 w-full min-h-11 px-2.5 py-2 rounded-lg border bg-slate-50 dark:bg-slate-800 dark:border-slate-700">{options.map((o, i) => <option key={o} value={i}>{o}</option>)}</select></label>;
 
   const renderInputs = () => {
