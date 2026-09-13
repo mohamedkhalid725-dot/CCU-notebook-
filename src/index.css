@@ -40,6 +40,27 @@
   color: #e2e8f0 !important;
 }
 
+/* Android WebView: keep calculator controls as real, touch-editable form controls. */
+#clinical-calculators input,
+#clinical-calculators select,
+#clinical-calculators textarea {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default;
+  caret-color: currentColor;
+  position: relative;
+  z-index: 10;
+}
+
+#clinical-calculators input:focus,
+#clinical-calculators select:focus,
+#clinical-calculators textarea:focus {
+  outline: 2px solid rgba(16, 185, 129, 0.55);
+  outline-offset: 1px;
+}
+
 /* The PDF now uses Current Plan as the single plan section; hide the legacy orange disposition card. */
 #printable-report .bg-amber-50.border-amber-200 {
   display: none !important;
