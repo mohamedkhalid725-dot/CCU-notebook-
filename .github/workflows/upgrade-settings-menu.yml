@@ -1,0 +1,125 @@
+name: Upgrade Settings Menu
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/upgrade-settings-menu.yml'
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upgrade SettingsPage
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/App.tsx')
+          s=p.read_text()
+          start=s.index('  const SettingsPage = () => (')
+          end=s.index('\n\n  const renderActivePage = () =>', start)
+          new=r'''  const SettingsPage = () => {
+    const [defaultNoteTemplate, setDefaultNoteTemplate] = useState<string>(() => localStorage.getItem('cv_default_note_template') || 'Standard ICU / CCU Note');
+    const [autoSync, setAutoSync] = useState<boolean>(() => localStorage.getItem('cv_auto_sync') !== 'false');
+    const [settingsSaved, setSettingsSaved] = useState(false);
+
+    const saveClinicalPreferences = () => {
+      localStorage.setItem('cv_default_note_template', defaultNoteTemplate);
+      localStorage.setItem('cv_auto_sync', String(autoSync));
+      setSettingsSaved(true);
+      window.setTimeout(() => setSettingsSaved(false), 2200);
+    };
+
+    const Section = ({ icon: Icon, title, subtitle, children }: { icon: React.ElementType; title: string; subtitle: string; children: React.ReactNode }) => (
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/70 p-5 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0"><Icon className="w-5 h-5 text-cyan-500" /></div>
+          <div><h3 className="font-semibold text-slate-900 dark:text-white">{title}</h3><p className="text-[11px] text-slate-500">{subtitle}</p></div>
+        </div>
+        {children}
+      </section>
+    );
+
+    const ActionRow = ({ label, description, onClick, icon: Icon = ChevronRight, danger = false }: { label: string; description?: string; onClick: () => void; icon?: React.ElementType; danger?: boolean }) => (
+      <button onClick={onClick} className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition text-left">
+        <Icon className={`w-4 h-4 shrink-0 ${danger ? 'text-rose-500' : 'text-cyan-500'}`} />
+        <span className="flex-1 min-w-0"><span className={`block text-sm font-medium ${danger ? 'text-rose-700 dark:text-rose-300' : 'text-slate-800 dark:text-slate-200'}`}>{label}</span>{description && <span className="block text-[10px] text-slate-500 mt-0.5">{description}</span>}</span>
+        <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+      </button>
+    );
+
+    return (
+      <div className="space-y-5">
+        <div><h2 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h2><p className="text-sm text-slate-600 dark:text-slate-400 mt-1">CardioVault configuration & preferences</p></div>
+
+        <Section icon={Users} title="Account" subtitle="Doctor account and cloud connection">
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-800 p-4 mb-3">
+            <p className="text-xs text-slate-500">Account</p><p className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{currentUser?.displayName || 'Local Physician Account'}</p>
+            <p className="text-xs text-slate-500 mt-1">{currentUser?.email || 'Local-first / Offline mode'}</p>
+            <div className="flex items-center gap-2 mt-3"><span className={`w-2 h-2 rounded-full ${currentUser && cloudSyncStatus === 'synced' ? 'bg-emerald-500' : currentUser ? 'bg-amber-500' : 'bg-slate-400'}`} /><span className="text-[11px] text-slate-500">{currentUser ? (cloudSyncStatus === 'synced' ? 'Cloud connected & synced' : 'Cloud account connected') : 'No cloud account connected'}</span></div>
+          </div>
+          <div className="space-y-2"><ActionRow label="Cloud Account" description="Sign in, sync, restore, or manage cloud connection" onClick={() => setShowCloudAccountModal(true)} icon={Cloud} />{currentUser && <ActionRow label="Sign Out" description="Sign out of the cloud account; local encrypted data stays on this device" onClick={handleLogout} icon={LogOut} danger />}</div>
+        </Section>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Section icon={Activity} title="Clinical" subtitle="Default clinical workflow">
+            <div className="mb-4"><p className="text-xs text-slate-500 mb-2">Default Unit / Specialty</p><div className="grid grid-cols-3 gap-2">
+              {([['all','Combined'],['ccu','CCU'],['icu','ICU']] as const).map(([mode,label]) => <button key={mode} onClick={() => { onSetSpecialtyMode(mode); if (currentUser) saveUserSettingsToCloud(currentUser.uid,{specialtyMode:mode}); }} className={`p-2.5 rounded-xl border text-xs font-semibold transition ${specialtyMode === mode ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400'}`}>{label}</button>)}
+            </div></div>
+            <div className="mb-4"><p className="text-xs text-slate-500 mb-2">Default Note Template</p><select value={defaultNoteTemplate} onChange={e => setDefaultNoteTemplate(e.target.value)} className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 text-sm text-slate-800 dark:text-slate-200"><option>Standard ICU / CCU Note</option><option>SOAP Note</option><option>Focused Cardiology Note</option><option>Critical Care Daily Note</option><option>Handover Note</option></select></div>
+            <div><p className="text-xs text-slate-500 mb-2">Total Beds</p><div className="flex items-center gap-2"><button onClick={() => handleChangeTotalBeds(totalBeds-1)} disabled={totalBeds<=3} className="w-11 h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-xl disabled:opacity-40">−</button><div className="flex-1 h-11 rounded-xl border border-slate-300 dark:border-slate-700 flex items-center justify-center font-bold text-slate-900 dark:text-white">{totalBeds}</div><button onClick={() => handleChangeTotalBeds(totalBeds+1)} className="w-11 h-11 rounded-xl border border-slate-300 dark:border-slate-700 text-xl">+</button></div></div>
+          </Section>
+
+          <Section icon={Sun} title="Appearance" subtitle="Light, dark, or system theme">
+            <div className="grid grid-cols-3 gap-2">{([['light','Light',Sun],['dark','Dark',Moon],['system','System',Laptop] ] as const).map(([value,label,Icon]) => <button key={value} onClick={() => handleSelectTheme(value)} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition ${currentTheme === value ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 font-bold' : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400'}`}><Icon className="w-5 h-5" /><span className="text-xs">{label}</span></button>)}</div>
+          </Section>
+        </div>
+
+        <Section icon={ShieldCheck} title="Security" subtitle="Protect confidential clinical records">
+          <ActionRow label="Security Settings" description="PIN, biometric unlock, auto-lock and encrypted local database" onClick={() => setShowSecurityModal(true)} icon={ShieldCheck} />
+        </Section>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Section icon={Cloud} title="Sync" subtitle="Cloud synchronization controls">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 mb-2"><div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Auto Sync</p><p className="text-[10px] text-slate-500">Keep cloud data synchronized after changes</p></div><button onClick={() => setAutoSync(v => !v)} className={`w-12 h-7 rounded-full p-1 transition ${autoSync ? 'bg-emerald-500' : 'bg-slate-400'}`}><span className={`block w-5 h-5 rounded-full bg-white transition-transform ${autoSync ? 'translate-x-5' : ''}`} /></button></div>
+            <ActionRow label="Sync Now" description={cloudSyncStatus === 'synced' ? 'Latest data synchronized' : 'Run a manual cloud sync'} onClick={handleManualSync} icon={RefreshCw} />
+          </Section>
+
+          <Section icon={Archive} title="Backup" subtitle="Encrypted backup and restore">
+            <ActionRow label="Backup & Restore" description="Export or import an encrypted backup file" onClick={() => setShowSecurityModal(true)} icon={Archive} />
+          </Section>
+        </div>
+
+        <Section icon={SlidersHorizontal} title="Customize Fields" subtitle="Control which clinical sections appear in patient files">
+          <ActionRow label="Customize Patient Fields" description="Show or hide clinical documentation sections" onClick={() => setShowCustomizer(true)} icon={SlidersHorizontal} />
+        </Section>
+
+        <Section icon={Trash2} title="Data" subtitle="Export, restore, or permanently remove local clinical data">
+          <div className="space-y-2"><ActionRow label="Data & Backup" description="Open encrypted export/import and local data controls" onClick={() => setShowSecurityModal(true)} icon={Archive} /><ActionRow label="Emergency Wipe" description="Permanently erase local clinical records from this device" onClick={() => setShowSecurityModal(true)} icon={Trash2} danger /></div>
+        </Section>
+
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4"><div className="flex items-center gap-2"><Wrench className="w-4 h-4 text-slate-400" /><p className="text-xs text-slate-500">CardioVault • ICU & CCU Clinical Notebook</p></div><button onClick={saveClinicalPreferences} className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-semibold hover:bg-cyan-500">{settingsSaved ? 'Saved ✓' : 'Save Preferences'}</button></div>
+      </div>
+    );
+  );'''
+          s=s[:start]+new+s[end:]
+          p.write_text(s)
+          PY
+      - name: Typecheck and build
+        run: |
+          npm ci
+          npm run build
+      - name: Commit changes and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'settings-bot'
+          git config user.email 'settings-bot@users.noreply.github.com'
+          git add src/App.tsx
+          git commit -m 'feat: complete settings menu organization [settings-bot]' || true
+          git push
+          git rm .github/workflows/upgrade-settings-menu.yml || true
+          git commit -m 'chore: remove temporary settings workflow' || true
+          git push || true
