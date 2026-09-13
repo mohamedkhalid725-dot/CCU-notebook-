@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Shield, Fingerprint, Delete, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Shield, Delete, CheckCircle2, AlertCircle } from 'lucide-react';
 import { hashPin } from '../services/crypto';
 import { AppSecuritySettings } from '../types';
 
@@ -22,9 +22,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [setupStep, setSetupStep] = useState<'enter' | 'confirm'>('enter');
   const [errorMsg, setErrorMsg] = useState('');
-  const [biometricSupported] = useState<boolean>(
-    typeof window !== 'undefined' && (!!window.PublicKeyCredential || !!navigator.credentials)
-  );
 
   const handleDigit = (digit: string) => {
     if (pin.length < 6) {
@@ -87,24 +84,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({
       if (onSetupInitialPin) {
         await onSetupInitialPin(pin);
       }
-    }
-  };
-
-  const handleBiometricAuth = async () => {
-    // Biometric / WebAuthn unlock
-    try {
-      if (window.PublicKeyCredential) {
-        // Trigger platform authenticator (fingerprint / face ID)
-        setErrorMsg('Biometric authentication requested...');
-        // Simulating immediate secure pass or WebAuthn prompt
-        setTimeout(() => {
-          triggerUnlock('biometric');
-        }, 300);
-      } else {
-        setErrorMsg('Biometric hardware not available');
-      }
-    } catch {
-      setErrorMsg('Biometric verification failed');
     }
   };
 
@@ -182,24 +161,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             </button>
           ))}
 
-          {/* Bottom row: Biometric / Clear, 0, Backspace */}
-          {!isSettingUp && securitySettings.biometricEnabled ? (
-            <button
-              onClick={handleBiometricAuth}
-              className="h-14 rounded-2xl bg-white dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-cyan-600 dark:text-cyan-400 flex flex-col items-center justify-center transition active:scale-95 shadow-sm"
-              title="Biometric Unlock"
-            >
-              <Fingerprint className="w-6 h-6" />
-              <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-0.5">Biometric</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleClear}
-              className="h-14 rounded-2xl bg-white dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 transition active:scale-95 flex items-center justify-center shadow-sm"
-            >
-              Clear
-            </button>
-          )}
+          {/* Bottom row: Clear, 0, Backspace */}
+          <button
+            onClick={handleClear}
+            className="h-14 rounded-2xl bg-white dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 transition active:scale-95 flex items-center justify-center shadow-sm"
+          >
+            Clear
+          </button>
 
           <button
             onClick={() => handleDigit('0')}
