@@ -1,0 +1,37 @@
+name: Fix Auth Listener Dependency 2
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[security-bot4]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix auth listener dependency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('src/App.tsx'); s=p.read_text()
+          pattern=r"(const unsubscribe = subscribeToAuth\(async \(user\) =>\{.*?\n\s*\}\);\n\n\s*return \(\) => unsubscribe\(\);)\n\s*\}, \[[^\]]*\]\);"
+          ns,n=re.subn(pattern,r"\1\n  }, []);",s,count=1,flags=re.S)
+          if n != 1: raise SystemExit('Could not locate auth effect dependency')
+          p.write_text(ns)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "fix: stabilize auth listener during PIN unlock [security-bot4]"
+          git push
+      - name: Remove workflow
+        if: success()
+        run: |
+          rm -f .github/workflows/fix-auth-dependency-2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove auth dependency workflow [security-bot4]"
+          git push
