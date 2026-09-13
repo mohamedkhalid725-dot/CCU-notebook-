@@ -19,12 +19,11 @@ if (typeof window !== 'undefined' && window.matchMedia) {
 }
 
 if (typeof document !== 'undefined') {
-  // Keep native form controls reliably focusable inside the Android WebView.
-  // Some parent touch/gesture handlers can otherwise steal the first touch,
-  // making calculator inputs look editable but preventing the keyboard/focus.
+  // Native form controls must receive the initial touch directly in Android
+  // WebView. Do this at capture phase so parent gesture/scroll handlers cannot
+  // steal the touch before the input/select gets focus.
   const focusFormControl = (event: Event) => {
     const target = event.target as HTMLElement | null;
-    if (!target || !target.closest('#clinical-calculators')) return;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
 
     target.style.pointerEvents = 'auto';
@@ -34,7 +33,7 @@ if (typeof document !== 'undefined') {
         try {
           target.setSelectionRange(0, target.value.length);
         } catch {
-          // Selection is not supported for every input mode; focus is enough.
+          // Some input modes do not expose text selection.
         }
       });
     }
