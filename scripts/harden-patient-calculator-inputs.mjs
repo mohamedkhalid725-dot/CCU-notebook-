@@ -9,5 +9,10 @@ const newInput = `    <input type="text" inputMode={inputMode || (step==='1'?'nu
 if (!source.includes(oldInput)) throw new Error('Expected patient calculator input signature not found; refusing unrelated changes.');
 source = source.replace(oldInput, newInput);
 
+const oldRoot = `  return <div className="space-y-4" id="clinical-calculators">`;
+const newRoot = `  return <div className="space-y-4 pointer-events-auto touch-manipulation" id="clinical-calculators">`;
+if (!source.includes(oldRoot)) throw new Error('Expected patient calculator root not found; refusing unrelated changes.');
+source = source.replace(oldRoot, newRoot);
+
 fs.writeFileSync(path, source);
 console.log(`Hardened ${path} without changing calculator definitions or other patient-file tabs.`);
