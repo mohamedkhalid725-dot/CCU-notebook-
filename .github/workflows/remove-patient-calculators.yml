@@ -1,0 +1,56 @@
+name: Remove Patient File Calculators
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  remove-calculators:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove Calculators tab from Patient File
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/PatientFileModal.tsx')
+          s = p.read_text()
+          s = s.replace("import { PatientClinicalCalculators } from './patient/PatientClinicalCalculators';\n", "")
+          s = s.replace("  Calculator\n", "")
+          s = s.replace("  | 'calculators'\n", "")
+          s = s.replace("    { id: 'calculators', label: 'Calculators', icon: <Calculator size={15} />, badge: patient.clinicalCalculations?.length || undefined },\n", "")
+          s = s.replace("      {activeTab === 'calculators' && <PatientClinicalCalculators patient={patient} onUpdatePatient={onUpdatePatient} />}\n", "")
+          s = s.replace("          {activeTab === 'calculators' ? (\n            <div className=\"min-h-full\">{renderTabContent()}</div>\n          ) : (\n            <AnimatePresence mode=\"wait\"><motion.div key={activeTab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15, ease: 'easeOut' }}>{renderTabContent()}</motion.div></AnimatePresence>\n          )}", "          <AnimatePresence mode=\"wait\"><motion.div key={activeTab} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15, ease: 'easeOut' }}>{renderTabContent()}</motion.div></AnimatePresence>")
+          p.write_text(s)
+          PY
+
+          if grep -n "calculators\|PatientClinicalCalculators\|Calculator" src/components/PatientFileModal.tsx; then
+            echo 'Calculator references remain in PatientFileModal.tsx'
+            exit 1
+          fi
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/PatientFileModal.tsx
+          if git diff --cached --quiet; then
+            echo "No changes needed."
+            exit 0
+          fi
+          git commit -m "remove calculators tab from patient file"
+          git push
+
+      - name: Remove one-shot workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/remove-patient-calculators.yml || true
+          git commit -m "chore: remove one-shot calculator cleanup workflow" || true
+          git push || true
