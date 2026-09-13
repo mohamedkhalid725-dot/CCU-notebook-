@@ -14,6 +14,79 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Add Echo Summary to Patient Overview
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/components/patient/PatientOverview.tsx')
+          s = p.read_text()
+          if 'Echo Summary' not in s:
+              marker = '      {/* Edit Form or Read Mode */}'
+              if marker not in s:
+                  raise SystemExit('Overview insertion marker not found')
+              card = r'''      {/* Echo Summary */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <HeartPulse size={16} className="text-emerald-600 dark:text-emerald-400" />
+                  Echo Summary
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Latest transthoracic / bedside echocardiography findings.</p>
+              </div>
+              <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase">TTE / POCUS</span>
+            </div>
+            {patient.echoStudies?.length ? (() => {
+              const echo = patient.echoStudies[0];
+              const rows = [
+                ['EF', echo.ef],
+                ['LV Dimensions', echo.lvDimensions],
+                ['LV Systolic Function', echo.lvSystolicFunction],
+                ['RV Assessment', echo.rvAssessment],
+                ['TAPSE', echo.tapse],
+                ['LA / RA', echo.laRa],
+                ['RWMA', echo.rwma],
+                ['Diastolic Function', echo.diastolicFunction],
+                ['Valvular Assessment', echo.valvularAssessment],
+                ['PASP', echo.pasp],
+                ['IVC', echo.ivc],
+                ['Pericardium', echo.pericardium],
+                ['Other Measurements', echo.otherMeasurements],
+                ['Findings', echo.findings],
+                ['Impression', echo.impression],
+              ].filter(([, value]) => value);
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {rows.map(([label, value]) => (
+                      <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</div>
+                        <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-[10px] text-slate-400">
+                    <span>Study: {echo.timestamp}</span>
+                    {echo.imageUrl && <span>• Image available in Echo tab</span>}
+                  </div>
+                </>
+              );
+            })() : (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 text-xs text-slate-400 italic">No echocardiography study recorded.</div>
+            )}
+          </div>
+
+'''
+              s = s.replace(marker, card + marker, 1)
+              p.write_text(s)
+          PY
+
+      - name: Upload Patched Patient Overview Source
+        uses: actions/upload-artifact@v4
+        with:
+          name: patient-overview-echo-patch
+          path: src/components/patient/PatientOverview.tsx
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
