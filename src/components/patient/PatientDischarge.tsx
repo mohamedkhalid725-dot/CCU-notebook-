@@ -44,6 +44,14 @@ export const PatientDischarge: React.FC<PatientDischargeProps> = ({
     const updated: PatientRecord = {
       ...patient,
       dischargePlan: formState,
+      // Keep the PDF Current Plan synchronized with the patient's Discharge Plan.
+      dischargeTransferPlan: [
+        formState.conditionAtDischarge && `Condition: ${formState.conditionAtDischarge}`,
+        formState.destination && `Destination: ${formState.destination}`,
+        formState.followUpInstructions && `Follow-up: ${formState.followUpInstructions}`,
+        formState.dischargeMedications && `Medications: ${formState.dischargeMedications.replace(/\n+/g, '; ')}`,
+        formState.warningSigns && `Return precautions: ${formState.warningSigns}`,
+      ].filter(Boolean).join('\n'),
       lastUpdated: new Date().toISOString(),
     };
     onUpdatePatient(updated);
@@ -163,11 +171,7 @@ export const PatientDischarge: React.FC<PatientDischargeProps> = ({
                 rows={4}
                 value={formState.dischargeMedications}
                 onChange={(e) => setFormState({ ...formState, dischargeMedications: e.target.value })}
-                placeholder="1. Aspirin 100mg PO once daily
-2. Ticagrelor 90mg PO twice daily
-3. Atorvastatin 80mg PO once daily at bedtime
-4. Bisoprolol 2.5mg PO once daily
-5. Ramipril 2.5mg PO once daily"
+                placeholder="1. Aspirin 100mg PO once daily\n2. Ticagrelor 90mg PO twice daily\n3. Atorvastatin 80mg PO once daily at bedtime\n4. Bisoprolol 2.5mg PO once daily\n5. Ramipril 2.5mg PO once daily"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
               />
             </div>
