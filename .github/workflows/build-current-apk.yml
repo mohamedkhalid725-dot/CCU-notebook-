@@ -10,6 +10,7 @@ on:
       - 'package-lock.json'
       - 'android/**'
       - 'src/**'
+      - 'vite.config.ts'
 
 permissions:
   contents: read
@@ -35,7 +36,7 @@ jobs:
       - name: Harden patient calculator inputs only
         run: node scripts/harden-patient-calculator-inputs.mjs
       - name: Build web app
-        run: npm run build
+        run: CAPACITOR_BUILD=true npm run build
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Build Debug APK
@@ -47,4 +48,4 @@ jobs:
           name: CardioVault-CURRENT-FIXED
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-# Force a fresh verified build for the 2.1.3 package.
+# Native Android builds intentionally omit the PWA service worker to prevent stale cached UI.
