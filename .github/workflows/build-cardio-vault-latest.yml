@@ -17,11 +17,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout latest main
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -36,7 +37,15 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build web app
+      - name: Verify Patient File calculator removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q "id: 'calculators'" src/components/PatientFileModal.tsx
+          ! grep -q "PatientClinicalCalculators" src/components/PatientFileModal.tsx
+          echo 'Patient File Calculators tab is absent from source.'
+
+      - name: Build web app for Capacitor
         run: CAPACITOR_BUILD=true npm run build
 
       - name: Sync Capacitor
@@ -44,37 +53,40 @@ jobs:
 
       - name: Prepare clean debug signing key
         working-directory: android
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
           rm -f app/debug.keystore
-          keytool -genkeypair \
-            -v \
+          keytool -genkeypair -v \
             -keystore app/debug.keystore \
             -storepass android \
-            -keypass android \
+            -keypass androiddebugkey \
             -alias androiddebugkey \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
             -dname 'CN=Android Debug,O=Android,C=US'
-          echo '--- DEBUG KEY SHA-1 ---'
           keytool -list -v -keystore app/debug.keystore -storepass android -alias androiddebugkey | grep 'SHA1:'
-          echo '-----------------------'
 
       - name: Build Debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
 
-      - name: Verify APK output
-        working-directory: android
+      - name: Verify APK output and signature
+        shell: bash
         run: |
-          set -e
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
-          echo "APK size: $(stat -c%s app/build/outputs/apk/debug/app-debug.apk) bytes"
+          set -euo pipefail
+          APK='android/app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          keytool -printcert -jarfile "$APK" >/dev/null
+          echo "Verified APK: $APK"
+          echo "APK size: $(stat -c%s "$APK") bytes"
 
       - name: Upload current APK
         uses: actions/upload-artifact@v4
         with:
-          name: CardioVault-LATEST-FIXED
+          name: CardioVault-2.1.9-LATEST-FIXED
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
