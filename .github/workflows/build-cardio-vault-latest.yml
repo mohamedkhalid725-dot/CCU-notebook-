@@ -59,6 +59,7 @@ jobs:
           rm -f app/debug.keystore
           keytool -genkeypair -v \
             -keystore app/debug.keystore \
+            -storetype JKS \
             -storepass android \
             -keypass androiddebugkey \
             -alias androiddebugkey \
