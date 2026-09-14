@@ -45,6 +45,17 @@ jobs:
           ! grep -q "PatientClinicalCalculators" src/components/PatientFileModal.tsx
           echo 'Patient File Calculators tab is absent from source.'
 
+      - name: Verify Google Authentication configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '"@capacitor-firebase/authentication"' package.json
+          grep -q "providers: \['google.com'\]" capacitor.config.ts
+          grep -q 'rgcfaIncludeGoogle = true' android/variables.gradle
+          grep -q 'androidxCredentialsVersion = '\''1.3.0'\''' android/variables.gradle
+          grep -q 'FirebaseAuthenticationPlugin.class' android/app/src/main/java/com/ccunotebook/app/MainActivity.java
+          echo 'Google Firebase native authentication configuration is present.'
+
       - name: Build web app for Capacitor
         run: CAPACITOR_BUILD=true npm run build
 
@@ -73,7 +84,7 @@ jobs:
         working-directory: android
         run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
 
-      - name: Verify APK output and signature
+      - name: Verify APK output, auth plugin and signature
         shell: bash
         run: |
           set -euo pipefail
@@ -81,13 +92,16 @@ jobs:
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           keytool -printcert -jarfile "$APK" >/dev/null
+          unzip -p "$APK" assets/capacitor.plugins.json | grep -q 'FirebaseAuthenticationPlugin'
+          unzip -p "$APK" classes.dex | strings | grep -Eq 'GoogleIdTokenCredential|FirebaseAuthenticationPlugin|Google Sign-In'
+          unzip -p "$APK" assets/public/index.html | grep -q '/assets/'
           echo "Verified APK: $APK"
           echo "APK size: $(stat -c%s "$APK") bytes"
 
       - name: Upload current APK
         uses: actions/upload-artifact@v4
         with:
-          name: CardioVault-2.1.9-LATEST-FIXED
+          name: CardioVault-2.2.0-GoogleAuth-FIXED
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
