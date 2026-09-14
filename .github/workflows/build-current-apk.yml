@@ -32,7 +32,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Harden patient calculator inputs only
         run: node scripts/harden-patient-calculator-inputs.mjs
       - name: Build web app
