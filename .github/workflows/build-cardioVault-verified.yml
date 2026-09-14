@@ -58,13 +58,14 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Replace corrupted debug keystore with a fresh one
+      - name: Replace corrupted debug keystore with a fresh JKS
         working-directory: android
         shell: bash
         run: |
           set -euo pipefail
           rm -f app/debug.keystore
           keytool -genkeypair -v \
+            -storetype JKS \
             -keystore app/debug.keystore \
             -storepass android \
             -keypass androiddebugkey \
@@ -73,7 +74,7 @@ jobs:
             -keysize 2048 \
             -validity 10000 \
             -dname 'CN=Android Debug,O=Android,C=US'
-          keytool -list -keystore app/debug.keystore -storepass android -alias androiddebugkey
+          keytool -list -storetype JKS -keystore app/debug.keystore -storepass android -alias androiddebugkey
 
       - name: Build Debug APK
         working-directory: android
