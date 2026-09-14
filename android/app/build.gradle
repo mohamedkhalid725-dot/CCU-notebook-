@@ -17,18 +17,13 @@ android {
         }
     }
 
-    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'androiddebugkey'
-        }
-    }
+    // Do not point the debug build at a repository-local debug.keystore.
+    // A stale/corrupted local keystore was causing :app:packageDebug to fail
+    // with "Given final block not properly padded" in CI.
+    // Android Gradle Plugin will use/create the standard CI debug keystore.
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
         }
         release {
             minifyEnabled false
