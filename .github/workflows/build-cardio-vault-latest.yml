@@ -53,8 +53,9 @@ jobs:
           grep -q "providers: \['google.com'\]" capacitor.config.ts
           grep -q 'rgcfaIncludeGoogle = true' android/variables.gradle
           grep -q 'androidxCredentialsVersion = '\''1.3.0'\''' android/variables.gradle
-          grep -q 'FirebaseAuthenticationPlugin.class' android/app/src/main/java/com/ccunotebook/app/MainActivity.java
-          echo 'Google Firebase native authentication configuration is present.'
+          grep -q 'FirebaseAuthenticationPlugin' android/capacitor-cordova-android-plugins/src/main/java/com/ccunotebook/app/MainActivity.java 2>/dev/null || true
+          ! grep -q 'FirebaseAuthenticationPlugin.class' android/app/src/main/java/com/ccunotebook/app/MainActivity.java
+          echo 'Google Firebase authentication configuration is present and MainActivity uses Capacitor auto-registration.'
 
       - name: Build web app for Capacitor
         run: CAPACITOR_BUILD=true npm run build
@@ -62,27 +63,21 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Prepare clean debug signing key
+      - name: Restore stable CardioVault debug signing key
         working-directory: android
         shell: bash
         run: |
           set -euo pipefail
-          rm -f app/debug.keystore
-          keytool -genkeypair -v \
-            -keystore app/debug.keystore \
-            -storetype JKS \
-            -storepass android \
-            -keypass androiddebugkey \
-            -alias androiddebugkey \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname 'CN=Android Debug,O=Android,C=US'
-          keytool -list -v -keystore app/debug.keystore -storepass android -alias androiddebugkey | grep 'SHA1:'
+          echo 'Restoring stable debug keystore used for Firebase SHA-1.'
+          base64 -d app/cardiovault-debug.keystore.b64 > app/debug.keystore
+          test -s app/debug.keystore
+          SHA1=$(keytool -list -v -keystore app/debug.keystore -storepass android -alias androiddebugkey | awk -F': ' '/SHA1:/{print $2; exit}')
+          echo "Debug SHA-1: $SHA1"
+          test "$SHA1" = 'EE:10:46:22:5F:F5:B7:67:3C:7D:04:9F:F3:8A:31:AF:28:8B:37:BA'
 
       - name: Build Debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+        run: chmod +x gradlew && ./gradlew --no-daemon clean assembleDebug
 
       - name: Verify APK output, auth plugin and signature
         shell: bash
@@ -91,7 +86,7 @@ jobs:
           APK='android/app/build/outputs/apk/debug/app-debug.apk'
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          keytool -printcert -jarfile "$APK" >/dev/null
+          keytool -printcert -jarfile "$APK" | grep -q 'EE:10:46:22:5F:F5:B7:67:3C:7D:04:9F:F3:8A:31:AF:28:8B:37:BA'
           unzip -p "$APK" assets/capacitor.plugins.json | grep -q 'FirebaseAuthenticationPlugin'
           unzip -p "$APK" classes.dex | strings | grep -Eq 'GoogleIdTokenCredential|FirebaseAuthenticationPlugin|Google Sign-In'
           unzip -p "$APK" assets/public/index.html | grep -q '/assets/'
@@ -101,7 +96,7 @@ jobs:
       - name: Upload current APK
         uses: actions/upload-artifact@v4
         with:
-          name: CardioVault-2.2.0-GoogleAuth-FIXED
+          name: CardioVault-2.2.1-FirebaseAuth-STABLE-SHA
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
