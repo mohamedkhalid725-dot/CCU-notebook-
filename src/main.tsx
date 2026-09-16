@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import {GlobalAI} from './components/GlobalAI.tsx';
 import './index.css';
 import { getAppTheme, applyThemeToDom } from './services/storage.ts';
 import { getLanguage, applyLanguageToDom } from './services/i18n.ts';
@@ -42,5 +43,6 @@ if (typeof document !== 'undefined') {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
+    <GlobalAI />
   </StrictMode>,
 );
