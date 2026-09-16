@@ -1,6 +1,7 @@
 name: Build Current CardioVault APK
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - '.github/workflows/build-current-apk.yml'
@@ -49,4 +50,4 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
 # Native Android builds intentionally omit the PWA service worker to prevent stale cached UI.
-# Triggered for the current CardioVault build after the latest AI changes.
+# Manual Run workflow is enabled so the latest main branch can be built on demand.
